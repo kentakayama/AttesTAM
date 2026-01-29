@@ -8,6 +8,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/veraison/eat v0.0.0-20251105185612-2c0e43e22ea9
 	github.com/veraison/go-cose v1.3.1-0.20251008083203-58542e2a46e9
+	github.com/veraison/swid v1.1.0
 )
 
 require (
@@ -16,7 +17,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	github.com/veraison/swid v1.1.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
