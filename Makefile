@@ -1,6 +1,6 @@
 .PHONY: run-tam-server
 run-tam-server:
-	go run ./cmd/tam4wasm-mock
+	go run ./cmd/tam-over-http
 
 .PHONY: test
 test:

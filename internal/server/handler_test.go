@@ -174,7 +174,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	req0.Header.Set("Accept", "application/cbor")
 	w0 := httptest.NewRecorder()
 
-	h.getAgentStatusesByDeviceAdmin(w0, req0)
+	h.getAgentStatusesByTAMAdmin(w0, req0)
 	assert.Equal(t, http.StatusOK, w0.Result().StatusCode)
 
 	expected := []byte{
@@ -211,6 +211,6 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 	req0.Header.Set("Accept", "application/cbor")
 	w0 := httptest.NewRecorder()
 
-	h.getAgentStatusesByDeviceAdmin(w0, req0)
+	h.getAgentStatusesByTAMAdmin(w0, req0)
 	assert.Equal(t, http.StatusNoContent, w0.Result().StatusCode)
 }
