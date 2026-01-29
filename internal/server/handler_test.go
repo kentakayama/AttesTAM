@@ -8,6 +8,7 @@ package server
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -128,24 +129,88 @@ func TestTCHandler_Update_OK(t *testing.T) {
 	h, err := newHandler(tam, log.Default())
 	require.Nil(t, err)
 
-	req0 := httptest.NewRequest(http.MethodPost, "/api/manage/manifests", bytes.NewReader(taggedManifest0))
+	req0 := httptest.NewRequest(http.MethodPost, "/tc-developer/addManifest", bytes.NewReader(taggedManifest0))
 	req0.Header.Set("Content-Type", "application/suit-envelope+cose")
 	w0 := httptest.NewRecorder()
 
 	h.addTCManifest(w0, req0)
 	assert.Equal(t, http.StatusOK, w0.Result().StatusCode)
 
-	req1 := httptest.NewRequest(http.MethodPost, "/api/manage/manifests", bytes.NewReader(untaggedManifest1))
+	req1 := httptest.NewRequest(http.MethodPost, "/tc-developer/addManifest", bytes.NewReader(untaggedManifest1))
 	req1.Header.Set("Content-Type", "application/suit-envelope+cose")
 	w1 := httptest.NewRecorder()
 
 	h.addTCManifest(w1, req1)
 	assert.Equal(t, http.StatusOK, w1.Result().StatusCode)
 
-	req0_ := httptest.NewRequest(http.MethodPost, "/api/manage/manifests", bytes.NewReader(taggedManifest0))
+	req0_ := httptest.NewRequest(http.MethodPost, "/tc-developer/addManifest", bytes.NewReader(taggedManifest0))
 	req0_.Header.Set("Content-Type", "application/suit-envelope+cose")
 	w0_ := httptest.NewRecorder()
 
 	h.addTCManifest(w0_, req0_)
 	assert.NotEqual(t, http.StatusOK, w0_.Result().StatusCode)
+}
+
+func TestGetAgentStatus_OK(t *testing.T) {
+	logger := log.Default()
+	tam, err := tam.NewTAM(false, nil, logger)
+	if err != nil {
+		t.Fatalf("NewTAM error: %v", err)
+	}
+	if err = tam.InitWithPath(":memory:"); err != nil {
+		t.Fatalf("TAM Init error: %v", err)
+	}
+	if err := tam.EnsureDefaultEntity(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	}
+	if err := tam.EnsureDefaultTEEPAgent(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultTEEPAgent: %v", err)
+	}
+
+	h, err := newHandler(tam, log.Default())
+	require.Nil(t, err)
+
+	req0 := httptest.NewRequest(http.MethodGet, "/tc-developer/addManifest", bytes.NewReader(taggedManifest0))
+	req0.Header.Set("Accept", "application/cbor")
+	w0 := httptest.NewRecorder()
+
+	h.getAgentStatusesByDeviceAdmin(w0, req0)
+	assert.Equal(t, http.StatusOK, w0.Result().StatusCode)
+
+	expected := []byte{
+		0x81, 0x82, 0x58, 0x20, 0x64, 0x75, 0x6D, 0x6D, 0x79, 0x2D, 0x74, 0x65, 0x65, 0x70, 0x2D, 0x61,
+		0x67, 0x65, 0x6E, 0x74, 0x2D, 0x6B, 0x69, 0x64, 0x2D, 0x66, 0x6F, 0x72, 0x2D, 0x64, 0x65, 0x76,
+		0x2D, 0x31, 0x32, 0x33, 0xA2, 0x6A, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73,
+		0xA1, 0x19, 0x01, 0x00, 0x51, 0x01, 0x62, 0x75, 0x69, 0x6C, 0x64, 0x69, 0x6E, 0x67, 0x2D, 0x64,
+		0x65, 0x76, 0x2D, 0x31, 0x32, 0x33, 0x69, 0x77, 0x61, 0x70, 0x70, 0x5F, 0x6C, 0x69, 0x73, 0x74,
+		0x82, 0x82, 0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x03, 0x82,
+		0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x02,
+	}
+	body, err := io.ReadAll(w0.Result().Body)
+	require.Nil(t, err)
+	assert.Equal(t, expected, body)
+}
+
+func TestGetAgentStatus_NoContent(t *testing.T) {
+	logger := log.Default()
+	tam, err := tam.NewTAM(false, nil, logger)
+	if err != nil {
+		t.Fatalf("NewTAM error: %v", err)
+	}
+	if err = tam.InitWithPath(":memory:"); err != nil {
+		t.Fatalf("TAM Init error: %v", err)
+	}
+	if err := tam.EnsureDefaultEntity(false); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	}
+
+	h, err := newHandler(tam, log.Default())
+	require.Nil(t, err)
+
+	req0 := httptest.NewRequest(http.MethodGet, "/tc-developer/addManifest", bytes.NewReader(taggedManifest0))
+	req0.Header.Set("Accept", "application/cbor")
+	w0 := httptest.NewRecorder()
+
+	h.getAgentStatusesByDeviceAdmin(w0, req0)
+	assert.Equal(t, http.StatusNoContent, w0.Result().StatusCode)
 }

@@ -1033,6 +1033,15 @@ func (t *TAM) EnsureDefaultEntity(withManifest bool) error {
 	return nil
 }
 
+func (t *TAM) FindEntity(name string) (*model.Entity, error) {
+	entityRepo := sqlite.NewEntityRepository(t.db)
+	entity, err := entityRepo.FindByName(t.ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
 func (t *TAM) EnsureDefaultTEEPAgent(withStatus bool) error {
 	// XXX: initialize default entiries only for demo purpose
 

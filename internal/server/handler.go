@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/domain/model"
 	"github.com/kentakayama/tam-over-http/internal/suit"
 	"github.com/kentakayama/tam-over-http/internal/tam"
 )
@@ -50,17 +51,15 @@ func newHandler(tam *tam.TAM, logger *log.Logger) (*handler, error) {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-
 	switch r.URL.Path {
 	case "/tam":
 		h.tamOverHttp(w, r)
 		return
-	case "/api/manage/manifests":
+	case "/tc-developer/addManifest":
 		h.addTCManifest(w, r)
+		return
+	case "/admin/getAgents":
+		h.getAgentStatusesByTAMAdmin(w, r)
 		return
 	default:
 		http.NotFound(w, r)
@@ -70,6 +69,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	// NOTE: authentication is done in the TEEP Protocol layer
+	if r.Method != http.MethodPost {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
 
 	// check the content
 	if r.Header.Get("Content-Type") != "application/teep+cbor" {
@@ -114,6 +117,11 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	// TODO: authenticate and authorize TC Developer to add new SUIT Manifest for the TC
+
+	if r.Method != http.MethodPost {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
 
 	// check the content
 	if r.Header.Get("Content-Type") != "application/suit-envelope+cose" {
@@ -191,6 +199,61 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 		status:      http.StatusOK,
 		body:        []byte("OK"),
 		contentType: "text/plain",
+	}
+	h.writeResponse(w, resp)
+}
+
+func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Request) {
+	// TODO: authenticate and authorize TAM Admin to get TEEP Agent status
+
+	if r.Method != http.MethodGet {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// TODO: check the content?
+
+	// check the accept header
+	if r.Header.Get("Accept") != "application/cbor" {
+		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	adminName := "admin@example.com"
+	entity, err := h.tam.FindEntity(adminName)
+	if err != nil {
+		h.logger.Printf("failed to find Device Admin entity: %v", err)
+		http.Error(w, "failed to find Device Admin entity", http.StatusBadRequest)
+		return
+	}
+	agentStatus, err := h.tam.GetAgentStatus(entity, []byte("dummy-teep-agent-kid-for-dev-123"))
+	if err != nil {
+		h.logger.Printf("failed to get TEEP Agent status: %v", err)
+		http.Error(w, "failed to get TEEP Agent status", http.StatusInternalServerError)
+		return
+	}
+	h.logger.Printf("got TEEP Agent status: %+v", agentStatus)
+
+	if agentStatus == nil {
+		resp := responseSpec{
+			status:      http.StatusNoContent,
+			contentType: "application/cbor",
+		}
+		h.writeResponse(w, resp)
+		return
+	}
+	encoded, err := cbor.Marshal([]*model.AgentStatus{agentStatus})
+	if err != nil {
+		h.logger.Printf("failed to encode TEEP Agent status: %v", err)
+		http.Error(w, "failed to encode TEEP Agent status", http.StatusInternalServerError)
+		return
+	}
+
+	resp := responseSpec{
+		status:      http.StatusOK,
+		body:        encoded,
+		contentType: "application/cbor",
 	}
 	h.writeResponse(w, resp)
 }
