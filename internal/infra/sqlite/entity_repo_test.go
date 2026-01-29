@@ -14,7 +14,7 @@ import (
 	"github.com/kentakayama/tam-over-http/internal/domain/model"
 )
 
-func TestTCDeveloper_CreateFindByID_OK(t *testing.T) {
+func TestEntity_CreateFindByID_OK(t *testing.T) {
 	ctx := context.Background()
 	db, err := InitDB(ctx, ":memory:")
 	if err != nil {
@@ -22,10 +22,10 @@ func TestTCDeveloper_CreateFindByID_OK(t *testing.T) {
 	}
 	defer CloseDB(db)
 
-	repo := NewTCDeveloperRepository(db)
+	repo := NewEntityRepository(db)
 	now := time.Now().UTC().Truncate(time.Second)
 
-	dev := &model.TCDeveloper{
+	dev := &model.Entity{
 		Name:      "Acme Corp",
 		CreatedAt: now,
 	}
@@ -50,7 +50,7 @@ func TestTCDeveloper_CreateFindByID_OK(t *testing.T) {
 	}
 }
 
-func TestTCDeveloper_FindByID_NotFound(t *testing.T) {
+func TestEntity_FindByID_NotFound(t *testing.T) {
 	ctx := context.Background()
 	db, err := InitDB(ctx, ":memory:")
 	if err != nil {
@@ -58,7 +58,7 @@ func TestTCDeveloper_FindByID_NotFound(t *testing.T) {
 	}
 	defer CloseDB(db)
 
-	repo := NewTCDeveloperRepository(db)
+	repo := NewEntityRepository(db)
 
 	got, err := repo.FindByID(ctx, 9999)
 	if err != nil {
@@ -69,7 +69,7 @@ func TestTCDeveloper_FindByID_NotFound(t *testing.T) {
 	}
 }
 
-func TestTCDeveloper_FindByName_OK(t *testing.T) {
+func TestEntity_FindByName_OK(t *testing.T) {
 	ctx := context.Background()
 	db, err := InitDB(ctx, ":memory:")
 	if err != nil {
@@ -77,10 +77,10 @@ func TestTCDeveloper_FindByName_OK(t *testing.T) {
 	}
 	defer CloseDB(db)
 
-	repo := NewTCDeveloperRepository(db)
+	repo := NewEntityRepository(db)
 	now := time.Now().UTC().Truncate(time.Second)
 
-	dev := &model.TCDeveloper{
+	dev := &model.Entity{
 		Name:      "TestCorp",
 		CreatedAt: now,
 	}
@@ -105,7 +105,7 @@ func TestTCDeveloper_FindByName_OK(t *testing.T) {
 	}
 }
 
-func TestTCDeveloper_FindByName_NotFound(t *testing.T) {
+func TestEntity_FindByName_NotFound(t *testing.T) {
 	ctx := context.Background()
 	db, err := InitDB(ctx, ":memory:")
 	if err != nil {
@@ -113,7 +113,7 @@ func TestTCDeveloper_FindByName_NotFound(t *testing.T) {
 	}
 	defer CloseDB(db)
 
-	repo := NewTCDeveloperRepository(db)
+	repo := NewEntityRepository(db)
 
 	got, err := repo.FindByName(ctx, "NonExistent")
 	if err != nil {

@@ -27,11 +27,11 @@ func TestSentUpdateMessageRepository_FindWithManifestsByToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to insert agent: %v", err)
 	}
-	_, err = db.ExecContext(ctx, "INSERT INTO tc_developers (name, created_at) VALUES (?, ?)", "test dev", time.Now())
+	_, err = db.ExecContext(ctx, "INSERT INTO entities (name, is_tc_developer, created_at) VALUES (?, ?, ?)", "test dev", 1, time.Now())
 	if err != nil {
 		t.Fatalf("failed to insert tc developer: %v", err)
 	}
-	_, err = db.ExecContext(ctx, "INSERT INTO manifest_signing_keys (kid, tc_developer_id, public_key, created_at, expired_at) VALUES (?, ?, ?, ?, ?)", []byte("kid2"), 1, []byte("pubkey2"), time.Now(), time.Now().Add(time.Hour))
+	_, err = db.ExecContext(ctx, "INSERT INTO manifest_signing_keys (kid, entity_id, public_key, created_at, expired_at) VALUES (?, ?, ?, ?, ?)", []byte("kid2"), 1, []byte("pubkey2"), time.Now(), time.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("failed to insert manifest signing key: %v", err)
 	}
@@ -55,11 +55,12 @@ func TestSentUpdateMessageRepository_FindWithManifestsByToken(t *testing.T) {
 
 	// Create a SUIT manifest
 	manifest := &model.SuitManifest{
-		Manifest:             []byte("dummy manifest"),
-		ManifestSigningKeyID: 1,
-		TrustedComponentID:   []byte("tc123"),
-		SequenceNumber:       1,
-		CreatedAt:            time.Now(),
+		Manifest:           []byte("dummy manifest"),
+		Digest:             []byte("dummy digest"),
+		SigningKeyID:       1,
+		TrustedComponentID: []byte("tc123"),
+		SequenceNumber:     1,
+		CreatedAt:          time.Now(),
 	}
 	manifestID, err := suitManifestRepo.Create(ctx, manifest)
 	if err != nil {

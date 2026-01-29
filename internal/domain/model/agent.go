@@ -11,6 +11,7 @@ import "time"
 type Agent struct {
 	ID        int64
 	KID       []byte // Primary Key
+	DeviceID  *int64
 	CreatedAt time.Time
 	ExpiredAt time.Time  // from eat['exp']
 	RevokedAt *time.Time // NULL if not revoked

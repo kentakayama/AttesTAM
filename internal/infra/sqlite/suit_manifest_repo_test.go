@@ -25,9 +25,9 @@ func TestSuitManifest_CreateFindLatest_OK(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Create TC Developer
-	devRepo := NewTCDeveloperRepository(db)
-	dev := &model.TCDeveloper{Name: "Test Corp", CreatedAt: now}
-	devID, err := devRepo.Create(ctx, dev)
+	entityRepo := NewEntityRepository(db)
+	dev := &model.Entity{Name: "Test Corp", IsTCDeveloper: true, CreatedAt: now}
+	devID, err := entityRepo.Create(ctx, dev)
 	if err != nil {
 		t.Fatalf("Create developer error: %v", err)
 	}
@@ -35,11 +35,11 @@ func TestSuitManifest_CreateFindLatest_OK(t *testing.T) {
 	// Create manifest signing key
 	keyRepo := NewManifestSigningKeyRepository(db)
 	key := &model.ManifestSigningKey{
-		KID:           []byte("key-1"),
-		TCDeveloperID: devID,
-		PublicKey:     []byte("pub-key-1"),
-		CreatedAt:     now,
-		ExpiredAt:     now.Add(1 * time.Hour),
+		KID:       []byte("key-1"),
+		EntityID:  devID,
+		PublicKey: []byte("pub-key-1"),
+		CreatedAt: now,
+		ExpiredAt: now.Add(1 * time.Hour),
 	}
 	keyID, err := keyRepo.Create(ctx, key)
 	if err != nil {
@@ -51,18 +51,20 @@ func TestSuitManifest_CreateFindLatest_OK(t *testing.T) {
 	trusted := []byte("tc-1")
 
 	m1 := &model.SuitManifest{
-		Manifest:             []byte("mfst-1"),
-		ManifestSigningKeyID: keyID,
-		TrustedComponentID:   trusted,
-		SequenceNumber:       1,
-		CreatedAt:            now,
+		Manifest:           []byte("mfst-1"),
+		Digest:             []byte("digest-1"),
+		SigningKeyID:       keyID,
+		TrustedComponentID: trusted,
+		SequenceNumber:     1,
+		CreatedAt:          now,
 	}
 	m2 := &model.SuitManifest{
-		Manifest:             []byte("mfst-2"),
-		ManifestSigningKeyID: keyID,
-		TrustedComponentID:   trusted,
-		SequenceNumber:       2,
-		CreatedAt:            now.Add(1 * time.Minute),
+		Manifest:           []byte("mfst-2"),
+		Digest:             []byte("digest-2"),
+		SigningKeyID:       keyID,
+		TrustedComponentID: trusted,
+		SequenceNumber:     2,
+		CreatedAt:          now.Add(1 * time.Minute),
 	}
 
 	id1, err := repo.Create(ctx, m1)

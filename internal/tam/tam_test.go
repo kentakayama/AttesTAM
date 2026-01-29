@@ -17,7 +17,9 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/domain/model"
 	"github.com/kentakayama/tam-over-http/internal/infra/rats"
+	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
 	"github.com/kentakayama/tam-over-http/internal/suit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,8 +94,8 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	if err = tam.InitWithPath(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultTCDeveloper(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultTCDeveloper error: %v", err)
+	if err = tam.EnsureDefaultEntity(false); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
 	}
 	// tam.EnsureDefaultTEEPAgent is not required, because EAT can carry the public key of the TEEP Agent
 
@@ -208,10 +210,10 @@ func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 	if err = tam.InitWithPath(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultTCDeveloper(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultTCDeveloper error: %v", err)
+	if err = tam.EnsureDefaultEntity(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
 	}
-	if err = tam.EnsureDefaultTEEPAgent(); err != nil {
+	if err = tam.EnsureDefaultTEEPAgent(true); err != nil {
 		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
 	}
 
@@ -282,10 +284,10 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	if err = tam.InitWithPath(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultTCDeveloper(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultTCDeveloper error: %v", err)
+	if err = tam.EnsureDefaultEntity(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
 	}
-	if err = tam.EnsureDefaultTEEPAgent(); err != nil {
+	if err = tam.EnsureDefaultTEEPAgent(false); err != nil {
 		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
 	}
 
@@ -335,4 +337,45 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	secondEmpty, err := tam.ResolveTEEPMessage(signedQueryResponse)
 	require.Equal(t, ErrAttestationPayloadNotFound, err)
 	assert.Nil(t, secondEmpty)
+}
+
+func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
+	logger := log.Default()
+	verifier := MockEATVerifier{}
+	tam, err := NewTAM(false, &verifier, logger)
+	if err != nil {
+		t.Fatalf("NewTAM error: %v", err)
+	}
+	if err = tam.InitWithPath(":memory:"); err != nil {
+		t.Fatalf("TAM Init error: %v", err)
+	}
+	if err = tam.EnsureDefaultEntity(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
+	}
+	if err = tam.EnsureDefaultTEEPAgent(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	}
+
+	agentKID := []byte("dummy-teep-agent-kid-for-dev-123")
+	ueid := append([]byte{0x01}, []byte("building-dev-123")...)
+	agentStatusRepo := sqlite.NewAgentStatusRepository(tam.db)
+	agentStatus, err := agentStatusRepo.GetAgentStatus(tam.ctx, agentKID)
+	require.Nil(t, err)
+	require.NotNil(t, agentStatus)
+	assert.Equal(t, agentKID, agentStatus.AgentKID)
+	assert.Equal(t, ueid, agentStatus.DeviceUEID)
+	assert.Equal(t, 2, len(agentStatus.SuitManifests))
+
+	expected := []byte{
+		0x81, 0x82, 0x58, 0x20, 0x64, 0x75, 0x6D, 0x6D, 0x79, 0x2D, 0x74, 0x65, 0x65, 0x70, 0x2D, 0x61,
+		0x67, 0x65, 0x6E, 0x74, 0x2D, 0x6B, 0x69, 0x64, 0x2D, 0x66, 0x6F, 0x72, 0x2D, 0x64, 0x65, 0x76,
+		0x2D, 0x31, 0x32, 0x33, 0xA2, 0x6A, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73,
+		0xA1, 0x19, 0x01, 0x00, 0x51, 0x01, 0x62, 0x75, 0x69, 0x6C, 0x64, 0x69, 0x6E, 0x67, 0x2D, 0x64,
+		0x65, 0x76, 0x2D, 0x31, 0x32, 0x33, 0x69, 0x77, 0x61, 0x70, 0x70, 0x5F, 0x6C, 0x69, 0x73, 0x74,
+		0x82, 0x82, 0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x03, 0x82,
+		0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x02,
+	}
+	encoded, err := cbor.Marshal([]*model.AgentStatus{agentStatus})
+	require.Nil(t, err)
+	assert.Equal(t, expected, encoded)
 }

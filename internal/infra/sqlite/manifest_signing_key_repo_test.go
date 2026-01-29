@@ -23,10 +23,10 @@ func TestManifestSigningKey_CreateFindByKID_OK(t *testing.T) {
 	defer CloseDB(db)
 
 	// Create a TC Developer first
-	devRepo := NewTCDeveloperRepository(db)
+	entityRepo := NewEntityRepository(db)
 	now := time.Now().UTC().Truncate(time.Second)
-	dev := &model.TCDeveloper{Name: "Test Corp", CreatedAt: now}
-	devID, err := devRepo.Create(ctx, dev)
+	dev := &model.Entity{Name: "Test Corp", IsTCDeveloper: true, CreatedAt: now}
+	devID, err := entityRepo.Create(ctx, dev)
 	if err != nil {
 		t.Fatalf("Create developer error: %v", err)
 	}
@@ -34,11 +34,11 @@ func TestManifestSigningKey_CreateFindByKID_OK(t *testing.T) {
 	// Create a manifest signing key
 	keyRepo := NewManifestSigningKeyRepository(db)
 	key := &model.ManifestSigningKey{
-		KID:           []byte("key-1"),
-		TCDeveloperID: devID,
-		PublicKey:     []byte("pub-key-1"),
-		CreatedAt:     now,
-		ExpiredAt:     now.Add(1 * time.Hour),
+		KID:       []byte("key-1"),
+		EntityID:  devID,
+		PublicKey: []byte("pub-key-1"),
+		CreatedAt: now,
+		ExpiredAt: now.Add(1 * time.Hour),
 	}
 
 	id, err := keyRepo.Create(ctx, key)
@@ -56,8 +56,8 @@ func TestManifestSigningKey_CreateFindByKID_OK(t *testing.T) {
 	if got == nil {
 		t.Fatalf("expected key, got nil")
 	}
-	if got.TCDeveloperID != devID {
-		t.Fatalf("developer id mismatch: want %d got %d", devID, got.TCDeveloperID)
+	if got.EntityID != devID {
+		t.Fatalf("developer id mismatch: want %d got %d", devID, got.EntityID)
 	}
 }
 

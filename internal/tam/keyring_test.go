@@ -51,7 +51,7 @@ func TestKeyring_GetSet(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// set and get must success
-	err = tam.setTEEPAgentKey(&key)
+	err = tam.setTEEPAgentKey(&key, nil)
 	assert.Nil(t, err)
 	kid, err := key.Thumbprint(crypto.SHA256)
 	assert.Nil(t, err)

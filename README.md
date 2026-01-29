@@ -95,12 +95,43 @@ For more detailed design, [External Design](./doc/EXTERNAL_DESIGN.md) and Intern
 ## Development Workflow
 
 ```bash
-go build ./...   # Compile against Go 1.25
-go test  ./...   # Run unit and integration tests
-go run   ./cmd/tam-over-http  # Local smoke check
+make # Compile against Go 1.25
+make test # Run unit tests
+make test-integrated # Run tests including integration tests requires provisioned VERAISON server
+make run # Local smoke check
 ```
 
 The handler logs every received TEEP message. The resulting verifier response is decoded, logged, and the confirmed TEEP Agent keys are stored in the DB.
+
+### Get Dummy TEEP Agent status
+
+The TAM creates some dummy TEEP Agents, and this command below 
+
+```bash
+$ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
+[[h'64756D6D792D746565702D6167656E742D6B69642D666F722D6465762D313233', {"attributes": {256: h'016275696C64696E672D6465762D313233'}, "wapp_list": [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]}]]
+```
+The results are equivalent to the diagnostic notation below:
+```cbor-diag
+[
+  'dummy-teep-agent-kid-for-dev-123',
+  {
+    "attributes": {
+      / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+    },
+    "wapp_list": [
+      [
+        / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
+        / manifest-sequence-number: / 3
+      ],
+      [
+        / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
+        / manifest-sequence-number: / 2
+      ]
+    ]
+  }
+]
+```
 
 ## Contributing
 

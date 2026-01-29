@@ -20,7 +20,7 @@ import (
 //   - they are signed with the same TC Developer
 //
 // may accessed from outside the TAM, such as management API handler
-func (t *TAM) SetEnvelope(envelopeBytes []byte, kid []byte, componentID []byte, sequenceNumber uint64) error {
+func (t *TAM) SetEnvelope(envelopeBytes []byte, digest []byte, kid []byte, componentID []byte, sequenceNumber uint64) error {
 	if envelopeBytes == nil {
 		return errors.New("manifest is nil")
 	}
@@ -44,16 +44,17 @@ func (t *TAM) SetEnvelope(envelopeBytes []byte, kid []byte, componentID []byte, 
 		if existingManifest.SequenceNumber >= sequenceNumber {
 			return suit.ErrSUITManifestSmallerSequenceNumber
 		}
-		if existingManifest.ManifestSigningKeyID != key.ID {
+		if existingManifest.SigningKeyID != key.ID {
 			return suit.ErrSUITManifestSigningKeyMismatch
 		}
 	}
 
 	manifest := &model.SuitManifest{
-		Manifest:             envelopeBytes,
-		ManifestSigningKeyID: key.ID,
-		TrustedComponentID:   componentID,
-		SequenceNumber:       sequenceNumber,
+		Manifest:           envelopeBytes,
+		Digest:             digest,
+		SigningKeyID:       key.ID,
+		TrustedComponentID: componentID,
+		SequenceNumber:     sequenceNumber,
 	}
 
 	if _, err := mrepo.Create(t.ctx, manifest); err != nil {

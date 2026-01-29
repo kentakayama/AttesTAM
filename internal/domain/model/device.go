@@ -8,9 +8,9 @@ package model
 
 import "time"
 
-// TCDeveloper represents a Trusted Component Developer.
-type TCDeveloper struct {
+type Device struct {
 	ID        int64
-	Name      string
+	UEID      []byte
+	AdminID   int64
 	CreatedAt time.Time
 }

@@ -25,6 +25,36 @@ func NewAgentRepository(db *sql.DB) *AgentRepository {
 	return &AgentRepository{db: db}
 }
 
+func (r *AgentRepository) GetAll(ctx context.Context) ([]model.Agent, error) {
+	const query = `
+		SELECT a.id, a.kid, a.created_at, a.expired_at, a.revoked_at, a.public_key
+		FROM agents a
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var agents []model.Agent
+	for rows.Next() {
+		var agent model.Agent
+		var revokedAtUnix sql.NullInt64
+		if err := rows.Scan(&agent.ID, &agent.KID, &agent.CreatedAt, &agent.ExpiredAt, &revokedAtUnix, &agent.PublicKey); err != nil {
+			return nil, err
+		}
+
+		if revokedAtUnix.Valid {
+			t := time.Unix(revokedAtUnix.Int64, 0).UTC()
+			agent.RevokedAt = &t
+		}
+
+		agents = append(agents, agent)
+	}
+
+	return agents, nil
+}
+
 func (r *AgentRepository) FindByKID(ctx context.Context, kid []byte) (*model.Agent, error) {
 	const query = `
 		SELECT id, kid, created_at, expired_at, revoked_at, public_key
@@ -94,13 +124,17 @@ func (r *AgentRepository) FindByKIDIgnoreRevoked(ctx context.Context, kid []byte
 	return &a, nil
 }
 
-func (r *AgentRepository) Create(ctx context.Context, a *model.Agent) error {
+func (r *AgentRepository) Create(ctx context.Context, a *model.Agent) (int64, error) {
 	const query = `
-		INSERT INTO agents (kid, created_at, expired_at, revoked_at, public_key)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO agents (kid, device_id, created_at, expired_at, revoked_at, public_key)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query, a.KID, a.CreatedAt, a.ExpiredAt, a.RevokedAt, a.PublicKey)
-	return err
+	result, err := r.db.ExecContext(ctx, query, a.KID, a.DeviceID, a.CreatedAt, a.ExpiredAt, a.RevokedAt, a.PublicKey)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	return id, err
 }
 
 // RevokeByKID marks an agent as revoked by setting revoked_at to the current Unix timestamp.
@@ -112,30 +146,6 @@ func (r *AgentRepository) RevokeByKID(ctx context.Context, kid []byte) error {
 	`
 	now := time.Now().UTC()
 	res, err := r.db.ExecContext(ctx, query, now.Unix(), kid)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
-		return domain.ErrNotFound
-	}
-
-	return nil
-}
-
-// UnrevokeByKID restores a revoked agent by setting revoked_at to NULL.
-func (r *AgentRepository) UnrevokeByKID(ctx context.Context, kid []byte) error {
-	const query = `
-		UPDATE agents
-		SET revoked_at = NULL
-		WHERE kid = ? AND revoked_at IS NOT NULL
-	`
-	res, err := r.db.ExecContext(ctx, query, kid)
 	if err != nil {
 		return err
 	}

@@ -141,7 +141,7 @@ func (r *SentUpdateMessageRepository) FindWithManifestsByToken(ctx context.Conte
 	const q = `
 		SELECT t.id, t.token, t.created_at, t.expired_at, t.consumed,
 		       sum.id, sum.agent_id, sum.token_id, sum.created_at,
-		       sm.id, sm.manifest, sm.manifest_signing_key_id, sm.trusted_component_id, sm.sequence_number, sm.created_at
+		       sm.id, sm.manifest, sm.signing_key_id, sm.trusted_component_id, sm.sequence_number, sm.created_at
 		FROM tokens t
 		JOIN sent_update_messages sum ON t.id = sum.token_id
 		LEFT JOIN sent_manifests_in_update_messages smium ON sum.id = smium.sent_update_id
@@ -160,7 +160,7 @@ func (r *SentUpdateMessageRepository) FindWithManifestsByToken(ctx context.Conte
 		var msg model.SentUpdateMessage
 		var manifestID sql.NullInt64
 		var manifestData sql.NullString
-		var manifestSigningKeyID sql.NullInt64
+		var SigningKeyID sql.NullInt64
 		var trustedComponentID sql.NullString
 		var sequenceNumber sql.NullInt64
 		var manifestCreatedAt sql.NullTime
@@ -168,7 +168,7 @@ func (r *SentUpdateMessageRepository) FindWithManifestsByToken(ctx context.Conte
 		err := rows.Scan(
 			&tok.ID, &tok.Token, &tok.CreatedAt, &tok.ExpiredAt, &tok.Consumed,
 			&msg.ID, &msg.AgentID, &msg.TokenID, &msg.CreatedAt,
-			&manifestID, &manifestData, &manifestSigningKeyID, &trustedComponentID, &sequenceNumber, &manifestCreatedAt,
+			&manifestID, &manifestData, &SigningKeyID, &trustedComponentID, &sequenceNumber, &manifestCreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
@@ -184,12 +184,12 @@ func (r *SentUpdateMessageRepository) FindWithManifestsByToken(ctx context.Conte
 
 		if manifestID.Valid {
 			manifest := model.SuitManifest{
-				ID:                   manifestID.Int64,
-				Manifest:             []byte(manifestData.String),
-				ManifestSigningKeyID: manifestSigningKeyID.Int64,
-				TrustedComponentID:   []byte(trustedComponentID.String),
-				SequenceNumber:       uint64(sequenceNumber.Int64),
-				CreatedAt:            manifestCreatedAt.Time,
+				ID:                 manifestID.Int64,
+				Manifest:           []byte(manifestData.String),
+				SigningKeyID:       SigningKeyID.Int64,
+				TrustedComponentID: []byte(trustedComponentID.String),
+				SequenceNumber:     uint64(sequenceNumber.Int64),
+				CreatedAt:          manifestCreatedAt.Time,
 			}
 			result.Manifests = append(result.Manifests, manifest)
 		}

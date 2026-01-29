@@ -36,7 +36,8 @@ func TestSQLite_InitCreateFindClose_OK(t *testing.T) {
 		PublicKey: []byte("pk-1"), // NOTE: COSE Key in production.
 	}
 
-	if err := repo.Create(ctx, a); err != nil {
+	id, err := repo.Create(ctx, a)
+	if err != nil {
 		t.Fatalf("Create error: %v", err)
 	}
 
@@ -45,6 +46,9 @@ func TestSQLite_InitCreateFindClose_OK(t *testing.T) {
 		t.Fatalf("FindByKID error: %v", err)
 	}
 
+	if got.ID != id {
+		t.Fatalf("ID mismatch: got %v want %v", got.ID, id)
+	}
 	if !bytes.Equal(got.KID, a.KID) {
 		t.Fatalf("KID mismatch: got %v want %v", got.KID, a.KID)
 	}
@@ -88,7 +92,7 @@ func TestSQLite_FindByID_NotFound_And_Expired(t *testing.T) {
 		ExpiredAt: now.Add(-1 * time.Hour),
 		PublicKey: []byte("pk-exp"),
 	}
-	if err := repo.Create(ctx, expired); err != nil {
+	if _, err := repo.Create(ctx, expired); err != nil {
 		t.Fatalf("Create expired agent error: %v", err)
 	}
 
@@ -117,7 +121,8 @@ func TestSQLite_RevokeByKID_And_FindByKID_Revoked(t *testing.T) {
 		PublicKey: []byte("pk-revoke"),
 	}
 
-	if err := repo.Create(ctx, agent); err != nil {
+	id, err := repo.Create(ctx, agent)
+	if err != nil {
 		t.Fatalf("Create agent error: %v", err)
 	}
 
@@ -128,6 +133,9 @@ func TestSQLite_RevokeByKID_And_FindByKID_Revoked(t *testing.T) {
 	}
 	if got == nil {
 		t.Fatalf("expected agent, got nil")
+	}
+	if got.ID != id {
+		t.Fatalf("ID mismatch: got %v want %v", got.ID, id)
 	}
 
 	// Revoke the agent

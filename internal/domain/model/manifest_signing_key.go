@@ -10,10 +10,10 @@ import "time"
 
 // ManifestSigningKey represents a manifest signing key for a TC Developer.
 type ManifestSigningKey struct {
-	ID            int64
-	KID           []byte
-	TCDeveloperID int64
-	PublicKey     []byte
-	CreatedAt     time.Time
-	ExpiredAt     time.Time
+	ID        int64
+	KID       []byte
+	EntityID  int64
+	PublicKey []byte
+	CreatedAt time.Time
+	ExpiredAt time.Time
 }

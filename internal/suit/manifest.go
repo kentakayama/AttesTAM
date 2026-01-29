@@ -90,7 +90,7 @@ func (e *Envelope) Verify(key *cose.Key) error {
 
 	// step 1: compare the digest with hash(bstr-wrapped SUIT_Manifest)
 	var digest Digest
-	if err := cbor.Unmarshal(e.AuthenticationWrapper.Value.digestBstr, &digest); err != nil {
+	if err := cbor.Unmarshal(e.AuthenticationWrapper.Value.DigestBstr, &digest); err != nil {
 		return ErrSUITManifestNotAuthenticated
 	}
 	switch digest.DigestAlg {
@@ -128,7 +128,7 @@ func (e *Envelope) Verify(key *cose.Key) error {
 		if sign1.Value.Payload != nil {
 			return ErrSUITManifestInvalidFormat
 		}
-		sign1.Value.Payload = e.AuthenticationWrapper.Value.digestBstr
+		sign1.Value.Payload = e.AuthenticationWrapper.Value.DigestBstr
 		err = sign1.Value.Verify(nil, verifier)
 		if err == nil {
 			// authenticated
@@ -140,7 +140,7 @@ func (e *Envelope) Verify(key *cose.Key) error {
 
 type AuthenticationWrapper struct {
 	// the bstr-wrapped SUIT_Digest
-	digestBstr []byte
+	DigestBstr []byte
 	// NOTE: accepts manifests with only one authentication block
 	//
 	// To avoid deciding these options below, we are currently limits the number of authentication-block to ONE.
@@ -163,7 +163,7 @@ func (a *AuthenticationWrapper) UnmarshalCBOR(data []byte) error {
 	if len(suitAuthenticationElements) != 2 {
 		return ErrSUITManifestInvalidFormat
 	}
-	if err := cbor.Unmarshal(suitAuthenticationElements[0], &a.digestBstr); err != nil {
+	if err := cbor.Unmarshal(suitAuthenticationElements[0], &a.DigestBstr); err != nil {
 		return ErrSUITManifestInvalidFormat
 	}
 	a.AuthenticationBlocks[0].authenticationBlockBstr = suitAuthenticationElements[1]
