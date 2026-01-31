@@ -787,6 +787,7 @@ func (t *TAM) EnsureDefaultEntity(withManifest bool) error {
 			t.logger.Printf("create manifest signing key error: %v", err)
 		} else {
 			adminKeyID = k
+			t.logger.Printf("Created default TAM Admin key with ID: %d", adminKeyID)
 		}
 	} else {
 		adminKeyID = adminKey.ID
@@ -865,18 +866,41 @@ func (t *TAM) EnsureDefaultEntity(withManifest bool) error {
 		t.logger.Printf("Created default TC Developer with ID: %d", devKeyID)
 	}
 
+	// add default device manager admin if not exists
+	defaultDevAdmin := &model.Entity{
+		Name:          "dev-admin1@example.com",
+		IsDeviceAdmin: true,
+		CreatedAt:     time.Now().UTC(),
+	}
+
+	var devAdminID int64
+	devAdmin, err := entityRepo.FindByName(t.ctx, defaultDevAdmin.Name)
+	if err != nil {
+		return fmt.Errorf("failed to find default TC Developer: %w", err)
+	}
+	if devAdmin != nil {
+		devAdminID = devAdmin.ID
+		// OK, already exists
+	} else {
+		devAdminID, err = entityRepo.Create(t.ctx, defaultDevAdmin)
+		if err != nil {
+			return fmt.Errorf("failed to create default Device Admin: %w", err)
+		}
+		t.logger.Printf("Created default Device Admin: %d", devAdminID)
+	}
+
 	if withManifest {
 		manifestRepo := sqlite.NewSuitManifestRepository(t.db)
 		trusted1 := []byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D} // ['app1.wasm']
 		digestM1 := []byte("digest1")
-		m1 := &model.SuitManifest{Manifest: []byte("m1"), Digest: digestM1, SigningKeyID: adminKeyID, TrustedComponentID: trusted1, SequenceNumber: 3}
+		m1 := &model.SuitManifest{Manifest: []byte("m1"), Digest: digestM1, SigningKeyID: devKeyID, TrustedComponentID: trusted1, SequenceNumber: 3}
 		_, err = manifestRepo.Create(t.ctx, m1)
 		if err != nil {
 			t.logger.Printf("create manifest m1 error: %v", err)
 		}
 		trusted2 := []byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D} // ['app2.wasm']
 		digestM2 := []byte("digest2")
-		m2 := &model.SuitManifest{Manifest: []byte("m2"), Digest: digestM2, SigningKeyID: adminKeyID, TrustedComponentID: trusted2, SequenceNumber: 2}
+		m2 := &model.SuitManifest{Manifest: []byte("m2"), Digest: digestM2, SigningKeyID: devKeyID, TrustedComponentID: trusted2, SequenceNumber: 2}
 		_, err = manifestRepo.Create(t.ctx, m2)
 		if err != nil {
 			t.logger.Printf("create manifest m2 error: %v", err)
@@ -1096,8 +1120,8 @@ func (t *TAM) EnsureDefaultTEEPAgent(withStatus bool) error {
 	if withStatus {
 		now := time.Now().UTC().Truncate(time.Second)
 
-		// Create an admin with full privileges
-		adminName := "admin@example.com"
+		// search the default device admin
+		adminName := "dev-admin1@example.com"
 		entityRepo := sqlite.NewEntityRepository(t.db)
 		admin, err := entityRepo.FindByName(t.ctx, adminName)
 		if err != nil || admin == nil {

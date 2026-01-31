@@ -105,7 +105,7 @@ The handler logs every received TEEP message. The resulting verifier response is
 
 ### Get Dummy TEEP Agent status
 
-The TAM creates some dummy TEEP Agents, and this command below 
+You can get some dummy TEEP Agent status with this command one liner below:
 
 ```bash
 $ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
@@ -130,6 +130,29 @@ The results are equivalent to the diagnostic notation below:
       ]
     ]
   }
+]
+```
+
+### Get SUIT Manifests
+
+You can get some dummy SUIT Manifests with this command one liner below:
+
+```bash
+$ curl -X GET http://localhost:8080/admin/getManifests -H "Accept: application/cbor" -s | cbor2diag.rb
+[[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]
+```
+
+The results are equivalent to the diagnostic notation below:
+```cbor-diag
+[
+  [
+    / SUIT_Component_Identifier: / h'8149617070312E7761736D' / ['app1.wasm'] /,
+    / manifest-sequence-number: / 3
+  ],
+  [
+    / SUIT_Component_Identifier: / h'8149617070322E7761736D' / ['app2.wasm'] /,
+    / manifest-sequence-number: / 2
+  ]
 ]
 ```
 

@@ -55,6 +55,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/tam":
 		h.tamOverHttp(w, r)
 		return
+	case "/admin/getManifests":
+		h.getManifests(w, r)
+		return
 	case "/tc-developer/addManifest":
 		h.addTCManifest(w, r)
 		return
@@ -111,6 +114,76 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 				contentType: "application/teep+cbor",
 			}
 		}
+	}
+	h.writeResponse(w, resp)
+}
+
+func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
+	// TODO: authenticate and authorize TC Developer to add new SUIT Manifest for the TC
+
+	if r.Method != http.MethodGet {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// check the content
+	if r.Header.Get("Accept") != "application/cbor" {
+		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	// devName := "developer1@example.com" // get developer id
+	// entity, err := h.tam.FindEntity(devName)
+	// if err != nil {
+	// 	h.logger.Printf("failed to find TC Developer entity: %v", err)
+	// 	http.Error(w, "failed to find TC Developer entity", http.StatusBadRequest)
+	// 	return
+	// }
+	tcIDs := [][]byte{
+		[]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D}, // ['app1.wasm']
+		[]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D}, // ['app2.wasm']
+	}
+
+	var manifests []*model.SuitManifestOverview
+	for i := 0; i < len(tcIDs); i++ {
+		manifest, err := h.tam.GetManifest(tcIDs[i])
+		if err != nil {
+			h.logger.Printf("failed to get SUIT Manifest: %v", err)
+			http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
+			return
+		}
+		if manifest == nil {
+			h.logger.Printf("SUIT Manifest for TC %v not found", tcIDs[i])
+			continue
+		}
+
+		overview := model.SuitManifestOverview{
+			TrustedComponentID: manifest.TrustedComponentID,
+			SequenceNumber:     manifest.SequenceNumber,
+		}
+		manifests = append(manifests, &overview)
+	}
+
+	if len(manifests) == 0 {
+		resp := responseSpec{
+			status:      http.StatusNoContent,
+			contentType: "application/cbor",
+		}
+		h.writeResponse(w, resp)
+		return
+	}
+	encoded, err := cbor.Marshal(manifests)
+	if err != nil {
+		h.logger.Printf("failed to encode SUIT Manifests: %v", err)
+		http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
+		return
+	}
+
+	resp := responseSpec{
+		status:      http.StatusOK,
+		body:        encoded,
+		contentType: "application/cbor",
 	}
 	h.writeResponse(w, resp)
 }
