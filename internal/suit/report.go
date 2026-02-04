@@ -55,13 +55,8 @@ type TrueOrDetailedResult struct {
 }
 
 func (tdr *TrueOrDetailedResult) UnmarshalCBOR(data []byte) error {
-	var m cbor.RawMessage
-	if err := cbor.Unmarshal(data, &m); err != nil {
-		return err
-	}
-
 	var b bool
-	if err := cbor.Unmarshal(m, &b); err == nil {
+	if err := cbor.Unmarshal(data, &b); err == nil {
 		if !b {
 			return fmt.Errorf("simple value must be true")
 		}
@@ -70,12 +65,12 @@ func (tdr *TrueOrDetailedResult) UnmarshalCBOR(data []byte) error {
 	}
 
 	var dr DetailedResult
-	if err := cbor.Unmarshal(m, &dr); err == nil {
+	if err := cbor.Unmarshal(data, &dr); err == nil {
 		tdr.DetailedResult = &dr
 		return nil
 	}
 
-	return fmt.Errorf("unknown type for TrueOrDetailedResult: %T", m)
+	return fmt.Errorf("unknown type for TrueOrDetailedResult: %T", data)
 }
 
 type Record struct {
@@ -88,7 +83,7 @@ type Record struct {
 }
 
 type DetailedResult struct {
-	ResultCode   bool          `cbor:"5,keyasint"`
+	ResultCode   int           `cbor:"5,keyasint"`
 	ResultRecord Record        `cbor:"6,keyasint"`
 	ResultReason ReportReasons `cbor:"7,keyasint"`
 }
