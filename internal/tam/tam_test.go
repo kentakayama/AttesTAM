@@ -375,7 +375,15 @@ func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 		0x82, 0x82, 0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x03, 0x82,
 		0x4B, 0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D, 0x02,
 	}
-	encoded, err := cbor.Marshal([]*model.AgentStatus{agentStatus})
+
+	opts := cbor.EncOptions{
+		Sort: cbor.SortCanonical,
+	}
+	em, err := opts.EncMode()
+	if err != nil {
+		panic(err)
+	}
+	encoded, err := em.Marshal([]*model.AgentStatus{agentStatus})
 	require.Nil(t, err)
 	assert.Equal(t, expected, encoded)
 }
