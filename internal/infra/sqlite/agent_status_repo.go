@@ -24,10 +24,10 @@ func NewAgentStatusRepository(db *sql.DB) *AgentStatusRepository {
 	return &AgentStatusRepository{db: db}
 }
 
-// AddForAgent logically deletes existing holdings for the same trusted_component and inserts a new holding.
+// ReflectManifestSuccess logically deletes existing holdings for the same trusted_component and inserts a new holding.
 // This operation is performed in a transaction to ensure atomicity.
 // After successful insertion, it updates the agent's updated_at timestamp.
-func (r *AgentStatusRepository) AddForAgent(ctx context.Context, agentKID []byte, SuitManifestDigest []byte) error {
+func (r *AgentStatusRepository) ReflectManifestSuccess(ctx context.Context, agentKID []byte, manifestDigest []byte, reportBytes []byte) error {
 	// Find agent ID and manifest ID and trusted_component_id in a single query
 	var agentID int64
 	var manifestID int64
@@ -38,7 +38,7 @@ func (r *AgentStatusRepository) AddForAgent(ctx context.Context, agentKID []byte
 		WHERE a.kid = ? AND sm.digest = ?
 		LIMIT 1
 	`
-	err := r.db.QueryRowContext(ctx, lookupQuery, agentKID, SuitManifestDigest).Scan(&agentID, &manifestID, &trustedComponentID)
+	err := r.db.QueryRowContext(ctx, lookupQuery, agentKID, manifestDigest).Scan(&agentID, &manifestID, &trustedComponentID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("agent or manifest not found")
@@ -75,11 +75,65 @@ func (r *AgentStatusRepository) AddForAgent(ctx context.Context, agentKID []byte
 		return fmt.Errorf("insert holding: %w", err)
 	}
 
+	// Insert it to the SUIT_Report store
+	rep := `
+		INSERT INTO suit_reports (suit_report, agent_id, suit_manifest_id, created_at, resolved)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)`
+
+	if _, err := tx.ExecContext(ctx, rep, reportBytes, agentID, manifestID); err != nil {
+		return fmt.Errorf("insert report: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
+}
+
+func (r *AgentStatusRepository) RecordManifestProcessingFailure(ctx context.Context, agentKID []byte, manifestDigest []byte, reportBytes []byte) error {
+	// Look up agent_id and suit_manifest_id (if any) from provided agent KID and manifest digest
+	var agentID sql.NullInt64
+	var manifestID sql.NullInt64
+	const lookup = `
+		SELECT a.id, sm.id
+		FROM agents a
+		LEFT JOIN suit_manifests sm ON sm.digest = ?
+		WHERE a.kid = ?
+		LIMIT 1
+	`
+	if err := r.db.QueryRowContext(ctx, lookup, manifestDigest, agentKID).Scan(&agentID, &manifestID); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("agent not found")
+		}
+		return fmt.Errorf("lookup agent and manifest: %w", err)
+	}
+
+	// Insert failure report.
+	const ins = `
+		INSERT INTO suit_reports (agent_id, suit_manifest_id, suit_report, created_at, resolved)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 0)
+	`
+
+	var aID interface{}
+	if agentID.Valid {
+		aID = agentID.Int64
+	} else {
+		aID = nil
+	}
+	var sID interface{}
+	if manifestID.Valid {
+		sID = manifestID.Int64
+	} else {
+		sID = nil
+	}
+
+	res, err := r.db.ExecContext(ctx, ins, aID, sID, manifestDigest, reportBytes)
+	if err != nil {
+		return fmt.Errorf("insert failure report: %w", err)
+	}
+	_, err = res.LastInsertId()
+	return err
 }
 
 // GetAgentStatus retrieves the current status of an agent with its active SUIT manifest holdings.

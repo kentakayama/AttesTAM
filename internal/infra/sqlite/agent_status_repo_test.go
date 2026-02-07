@@ -81,6 +81,9 @@ func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {
 	m1 := &model.SuitManifest{Manifest: []byte("m1"), Digest: digestM1, SigningKeyID: keyID, TrustedComponentID: trusted, SequenceNumber: 1, CreatedAt: now}
 	m2 := &model.SuitManifest{Manifest: []byte("m2"), Digest: digestM2, SigningKeyID: keyID, TrustedComponentID: trusted, SequenceNumber: 2, CreatedAt: now.Add(1 * time.Minute)}
 	m3 := &model.SuitManifest{Manifest: []byte("m3"), Digest: digestM3, SigningKeyID: keyID, TrustedComponentID: []byte("another-tc"), SequenceNumber: 1, CreatedAt: now}
+	report1 := []byte("report1")
+	report2 := []byte("report2")
+	report3 := []byte("report3")
 
 	_, err = manifestRepo.Create(ctx, m1)
 	if err != nil {
@@ -98,8 +101,8 @@ func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {
 	hrepo := NewAgentStatusRepository(db)
 
 	// add first manifest
-	if err := hrepo.AddForAgent(ctx, agentKID, digestM1); err != nil {
-		t.Fatalf("AddForAgent m1 error: %v", err)
+	if err := hrepo.ReflectManifestSuccess(ctx, agentKID, digestM1, report1); err != nil {
+		t.Fatalf("ReflectManifestSuccess m1 error: %v", err)
 	}
 
 	agentStatus1, err := hrepo.GetAgentStatus(ctx, agentKID)
@@ -117,8 +120,8 @@ func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {
 	}
 
 	// add second manifest (same trusted component) -> first should be logically deleted
-	if err := hrepo.AddForAgent(ctx, agentKID, digestM2); err != nil {
-		t.Fatalf("AddForAgent m2 error: %v", err)
+	if err := hrepo.ReflectManifestSuccess(ctx, agentKID, digestM2, report2); err != nil {
+		t.Fatalf("ReflectManifestSuccess m2 error: %v", err)
 	}
 
 	agentStatus2, err := hrepo.GetAgentStatus(ctx, agentKID)
@@ -133,13 +136,13 @@ func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {
 	}
 
 	// add second manifest (same trusted component) -> first should be logically deleted
-	if err := hrepo.AddForAgent(ctx, agentKID, digestM2); err != nil {
-		t.Fatalf("AddForAgent m2 error: %v", err)
+	if err := hrepo.ReflectManifestSuccess(ctx, agentKID, digestM2, report2); err != nil {
+		t.Fatalf("ReflectManifestSuccess m2 error: %v", err)
 	}
 
 	// add third manifest (different trusted component)
-	if err := hrepo.AddForAgent(ctx, agentKID, digestM3); err != nil {
-		t.Fatalf("AddForAgent m2 error: %v", err)
+	if err := hrepo.ReflectManifestSuccess(ctx, agentKID, digestM3, report3); err != nil {
+		t.Fatalf("ReflectManifestSuccess m2 error: %v", err)
 	}
 
 	agentStatus3, err := hrepo.GetAgentStatus(ctx, agentKID)

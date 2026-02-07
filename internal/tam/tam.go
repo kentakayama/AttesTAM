@@ -23,7 +23,6 @@ import (
 	"github.com/kentakayama/tam-over-http/internal/infra/rats"
 	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
 	"github.com/kentakayama/tam-over-http/internal/suit"
-	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/kentakayama/tam-over-http/resources"
 	"github.com/veraison/eat"
 	"github.com/veraison/go-cose"
@@ -195,7 +194,29 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 			return nil, ErrNotAResponse
 		}
 
-		// TODO: process SUIT_Report
+		// handle SUIT_Report
+		for i := 0; i < len(incomingMessage.Options.SUITReports); i++ {
+			var report suit.Report
+			if err := cbor.Unmarshal(incomingMessage.Options.SUITReports[i], &report); err != nil {
+				t.logger.Printf("failed to Unmarshal SUIT Report: %v", err)
+				continue
+			}
+			if report.Reference.Digest.DigestAlg != cose.AlgorithmSHA256 ||
+				len(report.Reference.Digest.DigestBytes) != crypto.SHA256.Size() {
+				// malformed
+				t.logger.Printf("digest of a SUIT Report is malformed: %v", report.Reference.Digest)
+				continue
+			}
+			manifestDigest, err := cbor.Marshal(report.Reference.Digest)
+			if err != nil {
+				t.logger.Printf("failed to encode a SUIT_Digest in SUIT_Report: %v", err)
+			}
+			if (report.Result.True != nil && *report.Result.True == true) ||
+				(report.Result.DetailedResult != nil && report.Result.DetailedResult.ResultReason == suit.ReportReasonOK) {
+				// record as success
+				t.updateAgentStatusOnManifestSuccess(agentKID, manifestDigest, incomingMessage.Options.SUITReports[i])
+			}
+		}
 
 		response = nil
 
@@ -207,7 +228,31 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 			return nil, ErrNotAResponse
 		}
 
-		// TODO: process SUIT_Report
+		// handle SUIT_Report
+		for i := 0; i < len(incomingMessage.Options.SUITReports); i++ {
+			var report suit.Report
+			if err := cbor.Unmarshal(incomingMessage.Options.SUITReports[i], &report); err != nil {
+				t.logger.Printf("failed to Unmarshal SUIT Report: %v", err)
+				continue
+			}
+			if report.Reference.Digest.DigestAlg != cose.AlgorithmSHA256 ||
+				len(report.Reference.Digest.DigestBytes) != crypto.SHA256.Size() {
+				// malformed
+				t.logger.Printf("digest of a SUIT Report is malformed: %v", report.Reference.Digest)
+				continue
+			}
+			manifestDigest, err := cbor.Marshal(report.Reference.Digest)
+			if err != nil {
+				t.logger.Printf("failed to encode a SUIT_Digest in SUIT_Report: %v", err)
+			}
+			if (report.Result.True != nil && *report.Result.True == true) ||
+				(report.Result.DetailedResult != nil && report.Result.DetailedResult.ResultReason == suit.ReportReasonOK) {
+				// record as success
+				t.updateAgentStatusOnManifestError(agentKID, manifestDigest, incomingMessage.Options.SUITReports[i])
+			}
+		}
+
+		// TODO: record other TEEP-level errors
 
 		response = nil
 
@@ -668,8 +713,8 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 		},
 	}
 
-	manifestRepo := sqlite.NewSuitManifestRepository(t.db)
-	manifestSet := util.NewSet[int64]()
+	// allow O(n^2) here because the n is expected small
+	componentSet := make([][]byte, 0)
 	// handle requested-tc-list
 	for i := 0; i < len(incomingMessage.Options.RequestedTCList); i++ {
 		requestedTC := incomingMessage.Options.RequestedTCList[i]
@@ -677,14 +722,14 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 		if err != nil {
 			return nil, ErrFatal
 		}
-		manifest, err := manifestRepo.FindLatestByTrustedComponentID(t.ctx, encodedComponentID)
-		if err != nil {
-			return nil, ErrFatal
+		j := 0
+		for ; j < len(componentSet); j++ {
+			if bytes.Equal(componentSet[j], encodedComponentID) {
+				break
+			}
 		}
-		if manifest == nil {
-			t.logger.Printf("unknown SUIT Manifest is requested for ComponentID: %s", hex.EncodeToString(encodedComponentID))
-		} else {
-			manifestSet.Add(manifest.ID)
+		if j >= len(componentSet) {
+			componentSet = append(componentSet, encodedComponentID)
 		}
 	}
 	// handle tc-list
@@ -694,22 +739,40 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 		if err != nil {
 			return nil, ErrFatal
 		}
-		manifest, err := manifestRepo.FindLatestByTrustedComponentID(t.ctx, encodedComponentID)
-		if err != nil {
-			return nil, ErrFatal
+		j := 0
+		for ; j < len(componentSet); j++ {
+			if bytes.Equal(componentSet[j], encodedComponentID) {
+				break
+			}
 		}
-		manifestSet.Add(manifest.ID)
-	}
-	// make manifest list
-	var manifests []model.SuitManifest
-	for k := range manifestSet {
-		manifests = append(manifests, model.SuitManifest{ID: k})
+		if j >= len(componentSet) {
+			componentSet = append(componentSet, encodedComponentID)
+		}
 	}
 
-	if len(manifests) == 0 {
+	// TODO: add Trusted Component by the TAM decision
+
+	if len(componentSet) == 0 {
 		// ok, nothing should be installed or updated
 		// replying empty message means session termination
 		return nil, nil
+	}
+
+	// make manifest list
+	sendingUpdate.Options.ManifestList = make([]SUITManifestBstr, 0)
+	manifests := make([]model.SuitManifest, 0)
+	manifestRepo := sqlite.NewSuitManifestRepository(t.db)
+	for i := 0; i < len(componentSet); i++ {
+		manifest, err := manifestRepo.FindLatestByTrustedComponentID(t.ctx, componentSet[i])
+		if err != nil {
+			return nil, ErrFatal
+		}
+		if manifest == nil {
+			t.logger.Printf("unknown SUIT Manifest is requested for ComponentID: %s", hex.EncodeToString(componentSet[i]))
+		} else {
+			sendingUpdate.Options.ManifestList = append(sendingUpdate.Options.ManifestList, manifest.Manifest)
+			manifests = append(manifests, model.SuitManifest{ID: manifest.ID})
+		}
 	}
 
 	// sign
@@ -1165,13 +1228,15 @@ func (t *TAM) EnsureDefaultTEEPAgent(withStatus bool) error {
 			t.logger.Printf("failed to find agent status: %v", err)
 		} else {
 			digestM1 := []byte("digest1")
-			err = agentStatusRepo.AddForAgent(t.ctx, agentKID, digestM1)
+			report1 := []byte("report1")
+			err = agentStatusRepo.ReflectManifestSuccess(t.ctx, agentKID, digestM1, report1)
 			if err != nil {
 				t.logger.Printf("create agent status 1 error: %v", err)
 			}
 
 			digestM2 := []byte("digest2")
-			err = agentStatusRepo.AddForAgent(t.ctx, agentKID, digestM2)
+			report2 := []byte("report2")
+			err = agentStatusRepo.ReflectManifestSuccess(t.ctx, agentKID, digestM2, report2)
 			if err != nil {
 				t.logger.Printf("create agent status 2 error: %v", err)
 			}
