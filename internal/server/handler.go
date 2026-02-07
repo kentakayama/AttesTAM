@@ -316,7 +316,7 @@ func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Requ
 		h.writeResponse(w, resp)
 		return
 	}
-	encoded, err := cbor.Marshal([]*model.AgentStatus{agentStatus})
+	encoded, err := cbor.Marshal([]*tam.AgentStatusRecord{agentStatus})
 	if err != nil {
 		h.logger.Printf("failed to encode TEEP Agent status: %v", err)
 		http.Error(w, "failed to encode TEEP Agent status", http.StatusInternalServerError)
