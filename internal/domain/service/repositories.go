@@ -29,7 +29,7 @@ type SuitManifestRepository interface {
 
 // AgentHoldingSuitManifestRepository defines the interface for agent attributes and holding SUIT manifest persistence.
 type AgentHoldingSuitManifestRepository interface {
-	AddForAgent(ctx context.Context, agentID int64, suitManifestID int64) error
+	ReflectManifestSuccess(ctx context.Context, agentID int64, suitManifestID int64) error
 	ListActiveByAgent(ctx context.Context, agentID int64) ([]*model.AgentStatus, error)
 }
 

@@ -232,6 +232,24 @@ func createSchema(ctx context.Context, db *sql.DB) error {
 
 	-- Partial unique index to prevent duplicate active holdings (requires SQLite >= 3.8.0)
 	CREATE UNIQUE INDEX IF NOT EXISTS uniq_agent_manifest_active ON agent_holding_suit_manifests(agent_id, suit_manifest_id) WHERE deleted = 0;
+
+	-- SUIT Reports table: stores results of manifest processing (success/failure and details)
+	CREATE TABLE IF NOT EXISTS suit_reports (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		agent_id INTEGER,
+		suit_manifest_id INTEGER,
+		suit_report BLOB NOT NULL,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		resolved INTEGER NOT NULL DEFAULT 0,
+		-- foreign keys
+		FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE SET NULL,
+		FOREIGN KEY (suit_manifest_id) REFERENCES suit_manifests(id) ON DELETE SET NULL
+	);
+
+	-- Indexes for suit_reports to accelerate common queries
+	CREATE INDEX IF NOT EXISTS idx_suit_reports_agent_id ON suit_reports(agent_id);
+	CREATE INDEX IF NOT EXISTS idx_suit_reports_suit_manifest_id ON suit_reports(suit_manifest_id);
+	CREATE INDEX IF NOT EXISTS idx_suit_reports_resolved_created_at ON suit_reports(resolved, created_at);
 	`
 
 	// Execute schema using transaction

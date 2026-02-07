@@ -210,15 +210,6 @@ type Common struct {
 
 type ComponentID [][]byte
 
-// draft-ietf-suit-report
-type Report []byte
-type SystemPropertyClaims struct {
-	SystemComponentID ComponentID `cbor:"0,keyasint,omitempty"`
-	ImageDigest       []byte      `cbor:"3,keyasint,omitempty"`
-	ImageSize         uint        `cbor:"14,keyasint,omitempty"`
-	// NOTE: not all SUIT_Parameters are supported
-}
-
 type Digest struct {
 	_           struct{}       `cbor:",toarray"`
 	DigestAlg   cose.Algorithm `cbor:"0,keyasint"` // SHA-256 (-16), etc.

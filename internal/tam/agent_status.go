@@ -47,3 +47,15 @@ func (t *TAM) GetAgentStatuses(entity *model.Entity) ([]*model.AgentStatus, erro
 
 	return agentStatuses, nil
 }
+
+func (t *TAM) updateAgentStatusOnManifestSuccess(agentKID []byte, manifestDigest []byte, reportBytes []byte) {
+	arepo := sqlite.NewAgentStatusRepository(t.db)
+
+	arepo.ReflectManifestSuccess(t.ctx, agentKID, manifestDigest, reportBytes)
+}
+
+func (t *TAM) updateAgentStatusOnManifestError(agentKID []byte, manifestDigest []byte, reportBytes []byte) {
+	arepo := sqlite.NewAgentStatusRepository(t.db)
+
+	arepo.RecordManifestProcessingFailure(t.ctx, agentKID, manifestDigest, reportBytes)
+}

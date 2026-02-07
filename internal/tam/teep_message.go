@@ -218,7 +218,7 @@ type TEEPOptions struct {
 	AttestationPayloadFormat     *string                     `cbor:"13,keyasint,omitempty"`
 	RequestedTCList              []RequestedTCInfo           `cbor:"14,keyasint,omitempty"`
 	UnneededManifestList         []SUITManifestBstr          `cbor:"15,keyasint,omitempty"`
-	SUITReports                  []suit.Report               `cbor:"19,keyasint,omitempty"`
+	SUITReports                  [][]byte                    `cbor:"19,keyasint,omitempty"`
 	Token                        []byte                      `cbor:"20,keyasint,omitempty"`
 	SupportedFreshnessMechanisms []FreshnessMechanism        `cbor:"21,keyasint,omitempty"`
 	ErrCode                      TEEPErrCode                 `cbor:"23,keyasint,omitempty"`
