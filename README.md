@@ -114,22 +114,24 @@ $ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor
 The results are equivalent to the diagnostic notation below:
 ```cbor-diag
 [
-  'dummy-teep-agent-kid-for-dev-123',
-  {
-    "attributes": {
-      / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
-    },
-    "wapp_list": [
-      [
-        / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
-        / manifest-sequence-number: / 3
+  [
+    'dummy-teep-agent-kid-for-dev-123',
+    {
+      "wapp_list": [
+        [
+          / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
+          / manifest-sequence-number: / 3
+        ],
+        [
+          / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
+          / manifest-sequence-number: / 2
+        ]
       ],
-      [
-        / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
-        / manifest-sequence-number: / 2
-      ]
-    ]
-  }
+      "attributes": {
+        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+      }
+    }
+  ]
 ]
 ```
 
