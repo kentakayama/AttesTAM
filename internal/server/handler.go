@@ -110,7 +110,7 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		} else {
 			resp = responseSpec{
 				status:      http.StatusOK,
-				body:        body,
+				body:        responseBody,
 				contentType: "application/teep+cbor",
 			}
 		}
