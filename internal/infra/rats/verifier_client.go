@@ -26,7 +26,7 @@ const (
 	challengeNonce              = "QUp8F0FBs9DpodKK8xUg8NQimf6sQAfe2J1ormzZLxk="
 	defaultChallengeTimeout     = 60 * time.Second
 	defaultChallengeUserAgent   = "tam4wasm-mock/cha-client"
-	defaultChallengeContentType = "application/psa-attestation-token"
+	defaultChallengeContentType = `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`
 )
 
 type VerifierClient struct {
