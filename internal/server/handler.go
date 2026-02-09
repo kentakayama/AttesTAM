@@ -102,17 +102,20 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		resp = responseSpec{
 			status: http.StatusInternalServerError,
 		}
+		h.logger.Printf("Internal Server Error occurred: %v", err)
 	} else {
 		if len(responseBody) == 0 {
 			resp = responseSpec{
 				status: http.StatusNoContent,
 			}
+			h.logger.Printf("Returns NoContent")
 		} else {
 			resp = responseSpec{
 				status:      http.StatusOK,
 				body:        responseBody,
 				contentType: "application/teep+cbor",
 			}
+			h.logger.Printf("Returns %d bytes message", len(responseBody))
 		}
 	}
 	h.writeResponse(w, resp)
