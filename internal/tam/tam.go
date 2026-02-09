@@ -141,6 +141,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 
 				// validate that the EAT payload is generated with the challenge the TAM sent
 				if err := eat.Nonce.Validate(); err != nil {
+					t.logger.Printf("failed to validate nonce: %v", err)
 					return nil, ErrNotAuthenticated
 				}
 				if eat.Nonce.Len() != 1 {
