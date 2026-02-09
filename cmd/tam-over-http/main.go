@@ -34,7 +34,7 @@ func main() {
 		addr                 = flag.String("addr", ":8080", "listen address in host:port form")
 		disableCOSE          = flag.Bool("disable-cose", false, "serve unsigned CBOR artifacts where available")
 		challengeServer      = flag.String("challenge-server", "https://localhost:8443", "base URL for verifier challenge-response server")
-		challengeContentType = flag.String("challenge-content-type", "application/psa-attestation-token", "Content-Type for attestation payload submission")
+		challengeContentType = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")
 		challengeTimeout     = flag.Duration("challenge-timeout", time.Minute, "timeout for verifier challenge-response interactions")
 	)

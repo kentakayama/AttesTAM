@@ -34,7 +34,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 	logger := log.Default()
 	verifierClient, err := rats.NewVerifierClient(config.RAConfig{
 		BaseURL:     "https://localhost:8443/",
-		ContentType: `application/eat-cwt; profile="urn:ietf:rfc:rfc9711"`,
+		ContentType: `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`,
 		InsecureTLS: true,
 		Timeout:     60 * time.Second,
 		Logger:      logger,
