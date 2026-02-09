@@ -42,6 +42,10 @@ flowchart LR
     TAM -- 204 No Content: (empty) --> TEEPAgent
 ```
 
+### Requirements for TEEP Protocol Messages from TEEP Agent
+
+TODO: set kid(4) with sha256 RFC 9679 COSE_Key Thumbprint, ...
+
 ### TEEP with Remote Attestation
 
 For the TAM to securely manage the Trusted Components inside TEEs, our TAM implementation requires Remote Attestation of TEEP Agents.
