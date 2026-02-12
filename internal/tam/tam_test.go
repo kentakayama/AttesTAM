@@ -20,6 +20,7 @@ import (
 	"github.com/kentakayama/tam-over-http/internal/infra/rats"
 	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
 	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/veraison/eat"
@@ -320,7 +321,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 			Type: TEEPTypeSuccess,
 			Options: TEEPOptions{
 				Token:       outgoingUpdate.Options.Token,
-				SUITReports: [][]byte{encodedReport},
+				SUITReports: util.DiagList[util.BytesHexMax32]{util.BytesHexMax32(encodedReport)},
 			},
 		}
 		signedSuccess, err := successWithReport.COSESign1Sign(agentKey)
@@ -371,7 +372,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 			Type: TEEPTypeError,
 			Options: TEEPOptions{
 				Token:       outgoingUpdate.Options.Token,
-				SUITReports: [][]byte{encodedReport},
+				SUITReports: util.DiagList[util.BytesHexMax32]{util.BytesHexMax32(encodedReport)},
 			},
 		}
 		signedError, err := errorWithReport.COSESign1Sign(agentKey)

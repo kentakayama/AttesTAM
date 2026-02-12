@@ -11,6 +11,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/veraison/go-cose"
@@ -83,10 +84,10 @@ func TestTEEPMessage_RoundTrip_QueryRequest_OK(t *testing.T) {
 	err := cbor.Unmarshal(encodedQueryRequest, &queryRequest)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, queryRequest.Type)
-	assert.Equal(t, []TEEPVersion{0}, queryRequest.Options.Versions)
-	assert.Equal(t, []byte{
+	assert.Equal(t, util.DiagList[TEEPVersion]{0}, queryRequest.Options.Versions)
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
-	}, queryRequest.Options.Token)
+	}), queryRequest.Options.Token)
 	assert.Equal(t, 2, len(queryRequest.SupportedTEEPCipherSuites))
 	assert.Equal(t, TEEPCipherSuite{Type: 18, Algorithm: -9}, queryRequest.SupportedTEEPCipherSuites[0][0])
 	assert.Equal(t, TEEPCipherSuite{Type: 18, Algorithm: -19}, queryRequest.SupportedTEEPCipherSuites[1][0])
@@ -132,21 +133,22 @@ func TestTEEPMessage_RoundTrip_QueryResponse_OK(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryResponse, queryResponse.Type)
 	assert.Equal(t, TEEPVersion(0), *queryResponse.Options.SelectedVersion)
+	require.NotNil(t, queryResponse.Options.TCList)
 	assert.Equal(t, 1, len(queryResponse.Options.TCList))
 	assert.Equal(t, suit.ComponentID{[]byte{
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-	}}, queryResponse.Options.TCList[0].SystemComponentID)
+	}}, (queryResponse.Options.TCList)[0].SystemComponentID)
 	var digest suit.Digest
-	err = cbor.Unmarshal(queryResponse.Options.TCList[0].ImageDigest, &digest)
+	err = cbor.Unmarshal((queryResponse.Options.TCList)[0].ImageDigest, &digest)
 	assert.Nil(t, err)
 	assert.Equal(t, cose.AlgorithmSHA256, digest.DigestAlg)
 	assert.Equal(t, []byte{
 		0xa7, 0xfd, 0x65, 0x93, 0xea, 0xc3, 0x2e, 0xb4, 0xbe, 0x57, 0x82, 0x78, 0xe6, 0x54, 0x0c, 0x5c,
 		0x09, 0xcf, 0xd7, 0xd4, 0xd2, 0x34, 0x97, 0x30, 0x54, 0x83, 0x3b, 0x2b, 0x93, 0x03, 0x06, 0x09,
 	}, digest.DigestBytes)
-	assert.Equal(t, []byte{
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
-	}, queryResponse.Options.Token)
+	}), queryResponse.Options.Token)
 
 	encoded, err := cbor.Marshal(queryResponse)
 	assert.Nil(t, err)
@@ -247,7 +249,7 @@ func TestTEEPMessage_RoundTrip_Update_OK(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, TEEPTypeUpdate, update.Type)
 	assert.Equal(t, 1, len(update.Options.ManifestList))
-	assert.Equal(t, SUITManifestBstr([]byte{
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0xa2, 0x02, 0x58, 0x73, 0x82, 0x58, 0x24, 0x82, 0x2f, 0x58, 0x20, 0xdb, 0x60, 0x1a, 0xde, 0x73,
 		0x09, 0x2b, 0x58, 0x53, 0x2c, 0xa0, 0x3f, 0xbb, 0x66, 0x3d, 0xe4, 0x95, 0x32, 0x43, 0x53, 0x36,
 		0xf1, 0x55, 0x8b, 0x49, 0xbb, 0x62, 0x27, 0x26, 0xa2, 0xfe, 0xdd, 0x58, 0x4a, 0xd2, 0x84, 0x43,
@@ -270,9 +272,9 @@ func TestTEEPMessage_RoundTrip_Update_OK(t *testing.T) {
 		0x2d, 0x34, 0x37, 0x35, 0x34, 0x2d, 0x39, 0x33, 0x35, 0x33, 0x2d, 0x33, 0x32, 0x64, 0x63, 0x32,
 		0x39, 0x39, 0x39, 0x37, 0x66, 0x37, 0x34, 0x2e, 0x74, 0x61, 0x15, 0x0f, 0x03, 0x0f,
 	}), update.Options.ManifestList[0])
-	assert.Equal(t, []byte{
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
-	}, update.Options.Token)
+	}), update.Options.Token)
 
 	encoded, err := cbor.Marshal(update)
 	assert.Nil(t, err)
@@ -329,9 +331,9 @@ func TestTEEPMessage_RoundTrip_Success_OK(t *testing.T) {
 	err := cbor.Unmarshal(encodedSuccess, &success)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeSuccess, success.Type)
-	assert.Equal(t, []byte{
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-	}, success.Options.Token)
+	}), success.Options.Token)
 
 	assert.Equal(t, 1, len(success.Options.SUITReports))
 	var report suit.Report
@@ -429,9 +431,9 @@ func TestTEEPMessage_RoundTrip_Error_OK(t *testing.T) {
 	err := cbor.Unmarshal(encodedError, &teepError)
 	assert.Nil(t, err)
 	assert.Equal(t, TEEPTypeError, teepError.Type)
-	assert.Equal(t, []byte{
+	assert.Equal(t, util.BytesHexMax32([]byte{
 		0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-	}, teepError.Options.Token)
+	}), teepError.Options.Token)
 	assert.Equal(t, TEEPErrCode(17), teepError.ErrCode)
 
 	assert.Equal(t, 1, len(teepError.Options.SUITReports))
@@ -527,9 +529,9 @@ func TestTEEPMessage_SignVerify_OK(t *testing.T) {
 	message := TEEPMessage{
 		Type: TEEPTypeQueryRequest,
 		Options: TEEPOptions{
-			Versions: []TEEPVersion{0},
+			Versions: util.DiagList[TEEPVersion]{0},
 			Token:    []byte{0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf},
-			SupportedTEEPCipherSuites: [][]TEEPCipherSuite{
+			SupportedTEEPCipherSuites: util.DiagList[util.DiagList[TEEPCipherSuite]]{
 				{
 					{
 						Type:      cose.CBORTagSign1Message,
@@ -543,7 +545,7 @@ func TestTEEPMessage_SignVerify_OK(t *testing.T) {
 					},
 				},
 			},
-			SupportedSUITCOSEProfiles: []suit.COSEProfile{
+			SupportedSUITCOSEProfiles: util.DiagList[suit.COSEProfile]{
 				{
 					DigestAlg:      cose.AlgorithmSHA256,
 					AuthAlg:        cose.AlgorithmESP256,
@@ -562,4 +564,97 @@ func TestTEEPMessage_SignVerify_OK(t *testing.T) {
 	err = payload.COSESign1Verify(&key, signed)
 	require.Nil(t, err)
 	assert.Equal(t, message, payload)
+}
+
+func TestTEEPMessage_String(t *testing.T) {
+	m1 := TEEPMessage{
+		Type: TEEPTypeQueryRequest,
+		Options: TEEPOptions{
+			Versions: util.DiagList[TEEPVersion]{0},
+		},
+		SupportedTEEPCipherSuites: util.DiagList[util.DiagList[TEEPCipherSuite]]{
+			{
+				{
+					Type:      cose.CBORTagSign1Message,
+					Algorithm: int(cose.AlgorithmESP256),
+				},
+			},
+			{
+				{
+					Type:      cose.CBORTagSign1Message,
+					Algorithm: int(cose.AlgorithmEd25519EdDSA),
+				},
+			},
+		},
+		SupportedSUITCOSEProfiles: []suit.COSEProfile{
+			{
+				DigestAlg:      cose.AlgorithmSHA256,
+				AuthAlg:        cose.AlgorithmESP256,
+				KeyExchangeAlg: cose.Algorithm(-29),
+				EncryptionAlg:  cose.Algorithm(-65534),
+			},
+		},
+	}
+	expected := `/ TEEPMessage: / [
+  / type: / 1 / query-request /,
+  / options: / {
+    / versions / 3: [0]
+  },
+  / supported-teep-cipher-suites: / [[[18, -9]], [[18, -19]]],
+  / supported-suit-cose-profiles: / [[-16, -9, -29, -65534]],
+  / data-item-requested: / 0 / none /
+]`
+	assert.Equal(t, expected, m1.String())
+
+	errMsg := util.DiagString("manifest processing failed")
+	m2 := TEEPMessage{
+		Type: TEEPTypeError,
+		Options: TEEPOptions{
+			ErrMsg: &errMsg,
+		},
+		ErrCode: TEEPErrManifestProcessingFailed,
+	}
+	expected = `/ TEEPMessage: / [
+  / type: / 6 / error /,
+  / options: / {
+    / err-msg / 12: "manifest processing failed"
+  },
+  / err-code: / 17 / ERR_MANIFEST_PROCESSING_FAILED /
+]`
+	assert.Equal(t, expected, m2.String())
+
+	m3 := TEEPMessage{
+		Type: TEEPTypeQueryResponse,
+		Options: TEEPOptions{
+			TCList: util.DiagList[suit.SystemPropertyClaims]{
+				{
+					SystemComponentID: suit.ComponentID{
+						{0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x2E, 0x74, 0x78, 0x74}, // hello.txt
+					},
+					ImageDigest: []byte{
+						0x82, 0x2F, // [-16,
+						0x58, 0x20, // h'
+						0x21, 0xD2, 0xE4, 0xB1, 0x9E, 0x44, 0xC1, 0x90,
+						0x6E, 0x58, 0x05, 0x05, 0x77, 0x92, 0x2D, 0x60,
+						0x4C, 0x20, 0x4C, 0xCC, 0x2F, 0xD2, 0xCB, 0x97,
+						0x7F, 0xEE, 0x8E, 0xD5, 0x6B, 0x62, 0xFD, 0x36,
+					},
+					ImageSize: 65132,
+				},
+			},
+			Token: util.BytesHexMax32{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77},
+		},
+	}
+	expected = `/ TEEPMessage: / [
+  / type: / 2 / query-response /,
+  / options: / {
+    / tc-list / 8: [{
+      / system-component-id / 0: ['hello.txt'],
+      / image-digest / 3: << [-16, h'21D2E4B19E44C1906E58050577922D604C204CCC2FD2CB977FEE8ED56B62FD36'] >>,
+      / image-size / 14: 65132
+    }],
+    / token / 20: h'0011223344556677'
+  }
+]`
+	assert.Equal(t, expected, m3.String())
 }

@@ -1,9 +1,11 @@
 package util
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 )
@@ -101,4 +103,35 @@ func stringifyCBORKey(key any) string {
 	default:
 		return fmt.Sprint(k)
 	}
+}
+
+type CBORDiagFormattable interface {
+	CBORDiagString(indent int) string
+}
+
+// utility function to format a list of items with comma seperation
+type DiagList[T CBORDiagFormattable] []T
+
+func (l DiagList[T]) CBORDiagString(indent int) string {
+	var formattedString []string
+	for _, v := range l {
+		formattedString = append(formattedString, v.CBORDiagString(indent))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(formattedString, ", "))
+}
+
+type BytesHexMax32 []byte
+
+func (b BytesHexMax32) CBORDiagString(indent int) string {
+	l := len(b)
+	if l > 32 {
+		return fmt.Sprintf("h'%s'", strings.ToUpper(hex.EncodeToString(b[:32]))+"/ ... /") // truncate
+	}
+	return fmt.Sprintf("h'%s'", strings.ToUpper(hex.EncodeToString(b)))
+}
+
+type DiagString string
+
+func (d DiagString) CBORDiagString(indent int) string {
+	return fmt.Sprintf("\"%s\"", string(d))
 }
