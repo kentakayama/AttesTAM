@@ -57,7 +57,7 @@ func TestSUITReport_UnmarshalOK(t *testing.T) {
 	assert.Equal(t, 1, len(report.ReportRecords))
 	require.NotNil(t, report.ReportRecords[0].SystemClaims)
 	assert.Equal(t, &SystemPropertyClaims{
-		SystemComponentID: [][]byte{{0x00}},
+		SystemComponentID: []ComponentIDBytes{{0x00}},
 		ImageSize:         34768,
 	}, report.ReportRecords[0].SystemClaims)
 
