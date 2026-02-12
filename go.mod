@@ -22,6 +22,6 @@ require (
 )
 
 replace (
-	github.com/veraison/eat => github.com/kentakayama/eat v0.0.0-20260122080136-553813e54877
+	github.com/veraison/eat => github.com/kentakayama/eat v0.0.0-20260212030121-9441b6b7cbb3
 	github.com/veraison/go-cose => github.com/kentakayama/go-cose v0.0.0-20260122035816-b936aa60847b
 )

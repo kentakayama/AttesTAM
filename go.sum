@@ -8,8 +8,8 @@ github.com/fxamacker/cbor/v2 v2.9.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj2
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/kentakayama/eat v0.0.0-20260122080136-553813e54877 h1:JZnKoL1mcr4UMnZVb/KOZQW7ww7hN4DbML/tbV0EVqo=
-github.com/kentakayama/eat v0.0.0-20260122080136-553813e54877/go.mod h1:LJytELnmBplHNkk1fLRMczbXGSste3ORVdBqgZWgeN8=
+github.com/kentakayama/eat v0.0.0-20260212030121-9441b6b7cbb3 h1:w1ve58AMIwOtToO0V40OZQ5SiSpiLY9rlLs09Ttv8rc=
+github.com/kentakayama/eat v0.0.0-20260212030121-9441b6b7cbb3/go.mod h1:LJytELnmBplHNkk1fLRMczbXGSste3ORVdBqgZWgeN8=
 github.com/kentakayama/go-cose v0.0.0-20260122035816-b936aa60847b h1:/dMLvhdR13tA0dIpB9WKhjtR2O3+tb/PzCuUqNHzdKo=
 github.com/kentakayama/go-cose v0.0.0-20260122035816-b936aa60847b/go.mod h1:PYGaGDvfZdgzCWZodC+oRl8k/6mI41zi426B7M9ZEaE=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
