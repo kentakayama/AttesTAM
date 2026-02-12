@@ -256,7 +256,7 @@ func (o TEEPOptions) CBORDiagString(indent int) string {
 		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-teep-cipher-suites / 1: %v", pad2, o.SupportedTEEPCipherSuites.CBORDiagString(indent+1)))
 	}
 	if o.Challenge != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ challenge / 2: %x", pad2, o.Challenge.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ challenge / 2: %s", pad2, o.Challenge.CBORDiagString(indent+1)))
 	}
 	if o.Versions != nil {
 		outputStrings = append(outputStrings, fmt.Sprintf("%s/ versions / 3: %v", pad2, o.Versions.CBORDiagString(indent+1)))
@@ -268,7 +268,7 @@ func (o TEEPOptions) CBORDiagString(indent int) string {
 		outputStrings = append(outputStrings, fmt.Sprintf("%s/ selected-version / 6: %v", pad2, *o.SelectedVersion))
 	}
 	if o.AttestationPayload != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload / 7: %x", pad2, o.AttestationPayload.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload / 7: %s", pad2, o.AttestationPayload.CBORDiagString(indent+1)))
 	}
 	if o.TCList != nil {
 		outputStrings = append(outputStrings, fmt.Sprintf("%s/ tc-list / 8: %v", pad2, o.TCList.CBORDiagString(indent+1)))
@@ -334,21 +334,21 @@ const suitReportsMask = 0b1000
 func (v DataItemRequested) CBORDiagString(indent int) string {
 	var items []string
 	if v.AttestationRequested() {
-		items = append(items, "1 / attestation /")
+		items = append(items, "attestation")
 	}
 	if v.TCListRequested() {
-		items = append(items, "2 / tc-list /")
+		items = append(items, "tc-list")
 	}
 	if v.ExtensionsRequested() {
-		items = append(items, "3 / extensions /")
+		items = append(items, "extensions")
 	}
 	if v.SUITReportsRequested() {
-		items = append(items, "4 / suit-reports /")
+		items = append(items, "suit-reports")
 	}
 	if len(items) == 0 {
 		return "0 / none /"
 	}
-	return strings.Join(items, " | ")
+	return fmt.Sprintf("%d / %s /", uint(v), strings.Join(items, " | "))
 }
 
 func RequestDataItem(attestation bool, tcList bool, extensions bool, suitReports bool) DataItemRequested {
@@ -452,7 +452,7 @@ func (c TEEPCipherSuite) CBORDiagString(indent int) string {
 
 type RequestedTCInfo struct {
 	ComponentID              suit.ComponentID `cbor:"16,keyasint,omitempty"`
-	TCManifestSequenceNumber *uint8           `cbor:"17,keyasint,omitempty"`
+	TCManifestSequenceNumber *uint64          `cbor:"17,keyasint,omitempty"`
 	HaveBinary               *bool            `cbor:"18,keyasint,omitempty"`
 }
 
@@ -460,14 +460,14 @@ func (r RequestedTCInfo) CBORDiagString(indent int) string {
 	var pad1 = strings.Repeat("  ", indent)
 	var pad2 = strings.Repeat("  ", indent+1)
 	var encodedStrings []string
-	encodedStrings = append(encodedStrings, fmt.Sprintf("\n%s/ component-id / 16: %s", pad2, r.ComponentID.CBORDiagString(0)))
+	encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ component-id / 16: %s", pad2, r.ComponentID.CBORDiagString(0)))
 	if r.TCManifestSequenceNumber != nil {
-		encodedStrings = append(encodedStrings, fmt.Sprintf("\n%s/ tc-manifest-sequence-number / 17: %d", pad2, *r.TCManifestSequenceNumber))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ tc-manifest-sequence-number / 17: %d", pad2, *r.TCManifestSequenceNumber))
 	}
 	if r.HaveBinary != nil {
-		encodedStrings = append(encodedStrings, fmt.Sprintf("\n%s/ have-binary / 18: %t", pad2, *r.HaveBinary))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ have-binary / 18: %t", pad2, *r.HaveBinary))
 	}
-	return fmt.Sprintf("%s{\n%s\n%s}", pad1, strings.Join(encodedStrings, ", "), pad1)
+	return fmt.Sprintf("{\n%s\n%s}", strings.Join(encodedStrings, ",\n"), pad1)
 }
 
 type FreshnessMechanism uint

@@ -125,7 +125,7 @@ type BytesHexMax32 []byte
 func (b BytesHexMax32) CBORDiagString(indent int) string {
 	l := len(b)
 	if l > 32 {
-		return fmt.Sprintf("h'%s'", strings.ToUpper(hex.EncodeToString(b[:32]))+"/ ... /") // truncate
+		return fmt.Sprintf("h'%s'/.../", strings.ToUpper(hex.EncodeToString(b[:32]))) // truncate
 	}
 	return fmt.Sprintf("h'%s'", strings.ToUpper(hex.EncodeToString(b)))
 }

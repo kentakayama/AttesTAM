@@ -570,7 +570,8 @@ func TestTEEPMessage_String(t *testing.T) {
 	m1 := TEEPMessage{
 		Type: TEEPTypeQueryRequest,
 		Options: TEEPOptions{
-			Versions: util.DiagList[TEEPVersion]{0},
+			Challenge: util.BytesHexMax32{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F},
+			Versions:  util.DiagList[TEEPVersion]{0},
 		},
 		SupportedTEEPCipherSuites: util.DiagList[util.DiagList[TEEPCipherSuite]]{
 			{
@@ -593,36 +594,54 @@ func TestTEEPMessage_String(t *testing.T) {
 				KeyExchangeAlg: cose.Algorithm(-29),
 				EncryptionAlg:  cose.Algorithm(-65534),
 			},
+			{
+				DigestAlg:      cose.AlgorithmSHA256,
+				AuthAlg:        cose.AlgorithmEd25519EdDSA,
+				KeyExchangeAlg: cose.Algorithm(-29),
+				EncryptionAlg:  cose.Algorithm(-65534),
+			},
 		},
 	}
 	expected := `/ TEEPMessage: / [
   / type: / 1 / query-request /,
   / options: / {
+    / challenge / 2: h'000102030405060708090A0B0C0D0E0F',
     / versions / 3: [0]
   },
   / supported-teep-cipher-suites: / [[[18, -9]], [[18, -19]]],
-  / supported-suit-cose-profiles: / [[-16, -9, -29, -65534]],
+  / supported-suit-cose-profiles: / [[-16, -9, -29, -65534], [-16, -19, -29, -65534]],
   / data-item-requested: / 0 / none /
 ]`
 	assert.Equal(t, expected, m1.String())
+
+	d1 := RequestDataItem(true, true, true, true)
+	assert.Equal(t, "15 / attestation | tc-list | extensions | suit-reports /", d1.CBORDiagString(0))
 
 	errMsg := util.DiagString("manifest processing failed")
 	m2 := TEEPMessage{
 		Type: TEEPTypeError,
 		Options: TEEPOptions{
 			ErrMsg: &errMsg,
+			SUITReports: util.DiagList[util.BytesHexMax32]{[]byte{
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+				0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
+			}},
 		},
 		ErrCode: TEEPErrManifestProcessingFailed,
 	}
 	expected = `/ TEEPMessage: / [
   / type: / 6 / error /,
   / options: / {
-    / err-msg / 12: "manifest processing failed"
+    / err-msg / 12: "manifest processing failed",
+    / suit-reports / 19: [h'000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F'/.../]
   },
   / err-code: / 17 / ERR_MANIFEST_PROCESSING_FAILED /
 ]`
 	assert.Equal(t, expected, m2.String())
 
+	sec := uint64(2)
+	tr := true
 	m3 := TEEPMessage{
 		Type: TEEPTypeQueryResponse,
 		Options: TEEPOptions{
@@ -642,6 +661,15 @@ func TestTEEPMessage_String(t *testing.T) {
 					ImageSize: 65132,
 				},
 			},
+			RequestedTCList: util.DiagList[RequestedTCInfo]{
+				{
+					ComponentID: suit.ComponentID{
+						{0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x2E, 0x74, 0x78, 0x74}, // hello.txt
+					},
+					TCManifestSequenceNumber: &sec,
+					HaveBinary:               &tr,
+				},
+			},
 			Token: util.BytesHexMax32{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77},
 		},
 	}
@@ -653,8 +681,60 @@ func TestTEEPMessage_String(t *testing.T) {
       / image-digest / 3: << [-16, h'21D2E4B19E44C1906E58050577922D604C204CCC2FD2CB977FEE8ED56B62FD36'] >>,
       / image-size / 14: 65132
     }],
+    / requested-tc-list / 14: [{
+      / component-id / 16: ['hello.txt'],
+      / tc-manifest-sequence-number / 17: 2,
+      / have-binary / 18: true
+    }],
     / token / 20: h'0011223344556677'
   }
 ]`
 	assert.Equal(t, expected, m3.String())
+	r := RequestedTCInfo{
+		ComponentID: suit.ComponentID{
+			{0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x2E, 0x74, 0x78, 0x74}, // hello.txt
+		},
+	}
+	assert.Equal(t, `{
+  / component-id / 16: ['hello.txt']
+}`, r.CBORDiagString(0))
+
+	m4 := TEEPMessage{
+		Type: TEEPTypeSuccess,
+		Options: TEEPOptions{
+			Token: util.BytesHexMax32{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77},
+		},
+	}
+	expected = `/ TEEPMessage: / [
+  / type: / 5 / success /,
+  / options: / {
+    / token / 20: h'0011223344556677'
+  }
+]`
+	assert.Equal(t, expected, m4.String())
+
+	m5 := TEEPMessage{
+		Type: TEEPTypeUpdate,
+		Options: TEEPOptions{
+			ManifestList: util.DiagList[util.BytesHexMax32]{
+				[]byte{
+					0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+					0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+					0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F,
+				},
+				[]byte{
+					0x00,
+				},
+			},
+			Token: util.BytesHexMax32{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77},
+		},
+	}
+	expected = `/ TEEPMessage: / [
+  / type: / 3 / update /,
+  / options: / {
+    / manifest-list / 10: [h'000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F'/.../, h'00'],
+    / token / 20: h'0011223344556677'
+  }
+]`
+	assert.Equal(t, expected, m5.String())
 }
