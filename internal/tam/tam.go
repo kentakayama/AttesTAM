@@ -23,6 +23,7 @@ import (
 	"github.com/kentakayama/tam-over-http/internal/infra/rats"
 	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
 	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/kentakayama/tam-over-http/resources"
 	"github.com/veraison/eat"
 	"github.com/veraison/go-cose"
@@ -94,7 +95,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	// case 1) TAM sent QueryRequest with challenge & request-attestation
 	// case 2) someone created malformed TEEP Protocol messages
 
-	t.logger.Printf("received TEEP Message %s.", incomingMessage.Type)
+	t.logger.Printf("received TEEP Message %s.", incomingMessage.Type.CBORDiagString(0))
 
 	switch incomingMessage.Type {
 	case TEEPTypeQueryResponse:
@@ -279,7 +280,7 @@ func (t *TAM) generateQueryRequest() ([]byte, error) {
 		Options: TEEPOptions{
 			Token: token,
 		},
-		SupportedTEEPCipherSuites: [][]TEEPCipherSuite{
+		SupportedTEEPCipherSuites: util.DiagList[util.DiagList[TEEPCipherSuite]]{
 			{
 				{
 					Type:      cose.CBORTagSign1Message,
@@ -287,7 +288,7 @@ func (t *TAM) generateQueryRequest() ([]byte, error) {
 				},
 			},
 		},
-		SupportedSUITCOSEProfiles: []suit.COSEProfile{
+		SupportedSUITCOSEProfiles: util.DiagList[suit.COSEProfile]{
 			{
 				DigestAlg:      cose.AlgorithmSHA256,
 				AuthAlg:        cose.AlgorithmESP256,
@@ -321,7 +322,7 @@ func (t *TAM) generateQueryRequestWithAttestation() ([]byte, error) {
 		Options: TEEPOptions{
 			Challenge: challenge,
 		},
-		SupportedTEEPCipherSuites: [][]TEEPCipherSuite{
+		SupportedTEEPCipherSuites: util.DiagList[util.DiagList[TEEPCipherSuite]]{
 			{
 				{
 					Type:      cose.CBORTagSign1Message,
@@ -329,7 +330,7 @@ func (t *TAM) generateQueryRequestWithAttestation() ([]byte, error) {
 				},
 			},
 		},
-		SupportedSUITCOSEProfiles: []suit.COSEProfile{
+		SupportedSUITCOSEProfiles: util.DiagList[suit.COSEProfile]{
 			{
 				DigestAlg:      cose.AlgorithmSHA256,
 				AuthAlg:        cose.AlgorithmESP256,
@@ -644,9 +645,9 @@ func (t *TAM) searchSentMessageWithToken(token []byte) *TEEPMessage {
 		return nil
 	}
 	if sentUpdate != nil {
-		var manifestList []SUITManifestBstr
+		var manifestList []util.BytesHexMax32
 		for i := 0; i < len(sentUpdate.Manifests); i++ {
-			manifestList = append(manifestList, sentUpdate.Manifests[0].Manifest)
+			manifestList = append(manifestList, sentUpdate.Manifests[i].Manifest)
 		}
 		sent := TEEPMessage{
 			Type: TEEPTypeUpdate,
@@ -763,7 +764,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 	}
 
 	// make manifest list
-	sendingUpdate.Options.ManifestList = make([]SUITManifestBstr, 0)
+	sendingUpdate.Options.ManifestList = make([]util.BytesHexMax32, 0)
 	manifests := make([]model.SuitManifest, 0)
 	manifestRepo := sqlite.NewSuitManifestRepository(t.db)
 	for i := 0; i < len(componentSet); i++ {

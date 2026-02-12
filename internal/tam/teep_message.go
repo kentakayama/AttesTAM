@@ -10,9 +10,11 @@ import (
 	"crypto"
 	"crypto/rand"
 	"fmt"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/veraison/go-cose"
 )
 
@@ -24,12 +26,33 @@ type TEEPMessage struct {
 	Options TEEPOptions     `cbor:"1,keyasint"`
 
 	// for QueryRequest
-	SupportedTEEPCipherSuites [][]TEEPCipherSuite
-	SupportedSUITCOSEProfiles []suit.COSEProfile
+	SupportedTEEPCipherSuites util.DiagList[util.DiagList[TEEPCipherSuite]]
+	SupportedSUITCOSEProfiles util.DiagList[suit.COSEProfile]
 	DataItemRequested         DataItemRequested
 
 	// for Error
 	ErrCode TEEPErrCode
+}
+
+func (m TEEPMessage) String() string {
+	return m.CBORDiagString(0)
+}
+
+func (m TEEPMessage) CBORDiagString(indent int) string {
+	pad1 := strings.Repeat("  ", indent)
+	pad2 := strings.Repeat("  ", indent+1)
+	var encodedStrings []string
+	encodedStrings = append(encodedStrings, fmt.Sprintf("/ TEEPMessage: / [\n%s/ type: / %s", pad2, m.Type.CBORDiagString(0)))
+	encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ options: / %s", pad2, m.Options.CBORDiagString(indent+1)))
+	switch m.Type {
+	case TEEPTypeQueryRequest:
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ supported-teep-cipher-suites: / %v", pad2, m.SupportedTEEPCipherSuites.CBORDiagString(0)))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ supported-suit-cose-profiles: / %v", pad2, m.SupportedSUITCOSEProfiles.CBORDiagString(0)))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ data-item-requested: / %v", pad2, m.DataItemRequested.CBORDiagString(0)))
+	case TEEPTypeError:
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ err-code: / %s", pad2, m.ErrCode.CBORDiagString(0)))
+	}
+	return strings.Join(encodedStrings, ",\n") + "\n" + pad1 + "]"
 }
 
 func (m TEEPMessage) MarshalCBOR() ([]byte, error) {
@@ -186,46 +209,120 @@ const (
 	TEEPTypeError         TEEPMessageType = 6
 )
 
-func (t TEEPMessageType) String() string {
+func (t TEEPMessageType) CBORDiagString(indent int) string {
 	switch t {
 	case TEEPTypeQueryRequest:
-		return "query-request"
+		return "1 / query-request /"
 	case TEEPTypeQueryResponse:
-		return "query-response"
+		return "2 / query-response /"
 	case TEEPTypeUpdate:
-		return "update"
+		return "3 / update /"
 	case TEEPTypeSuccess:
-		return "teep-success"
+		return "5 / success /"
 	case TEEPTypeError:
-		return "teep-error"
+		return "6 / error /"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(t))
 	}
 }
 
 type TEEPOptions struct {
-	SupportedTEEPCipherSuites    [][]TEEPCipherSuite         `cbor:"1,keyasint,omitempty"`
-	Challenge                    []byte                      `cbor:"2,keyasint,omitempty"`
-	Versions                     []TEEPVersion               `cbor:"3,keyasint,omitempty"`
-	SupportedSUITCOSEProfiles    []suit.COSEProfile          `cbor:"4,keyasint,omitempty"`
-	SelectedVersion              *TEEPVersion                `cbor:"6,keyasint,omitempty"`
-	AttestationPayload           []byte                      `cbor:"7,keyasint,omitempty"`
-	TCList                       []suit.SystemPropertyClaims `cbor:"8,keyasint,omitempty"`
-	ExtList                      []TEEPExtInfo               `cbor:"9,keyasint,omitempty"`
-	ManifestList                 []SUITManifestBstr          `cbor:"10,keyasint,omitempty"`
-	Msg                          *string                     `cbor:"11,keyasint,omitempty"`
-	ErrMsg                       *string                     `cbor:"12,keyasint,omitempty"`
-	AttestationPayloadFormat     *string                     `cbor:"13,keyasint,omitempty"`
-	RequestedTCList              []RequestedTCInfo           `cbor:"14,keyasint,omitempty"`
-	UnneededManifestList         []SUITManifestBstr          `cbor:"15,keyasint,omitempty"`
-	SUITReports                  [][]byte                    `cbor:"19,keyasint,omitempty"`
-	Token                        []byte                      `cbor:"20,keyasint,omitempty"`
-	SupportedFreshnessMechanisms []FreshnessMechanism        `cbor:"21,keyasint,omitempty"`
-	ErrCode                      TEEPErrCode                 `cbor:"23,keyasint,omitempty"`
+	SupportedTEEPCipherSuites    util.DiagList[util.DiagList[TEEPCipherSuite]] `cbor:"1,keyasint,omitempty"`
+	Challenge                    util.BytesHexMax32                            `cbor:"2,keyasint,omitempty"`
+	Versions                     util.DiagList[TEEPVersion]                    `cbor:"3,keyasint,omitempty"`
+	SupportedSUITCOSEProfiles    util.DiagList[suit.COSEProfile]               `cbor:"4,keyasint,omitempty"`
+	SelectedVersion              *TEEPVersion                                  `cbor:"6,keyasint,omitempty"`
+	AttestationPayload           util.BytesHexMax32                            `cbor:"7,keyasint,omitempty"`
+	TCList                       util.DiagList[suit.SystemPropertyClaims]      `cbor:"8,keyasint,omitempty"`
+	ExtList                      util.DiagList[TEEPExtInfo]                    `cbor:"9,keyasint,omitempty"`
+	ManifestList                 util.DiagList[util.BytesHexMax32]             `cbor:"10,keyasint,omitempty"`
+	Msg                          *util.DiagString                              `cbor:"11,keyasint,omitempty"`
+	ErrMsg                       *util.DiagString                              `cbor:"12,keyasint,omitempty"`
+	AttestationPayloadFormat     *util.DiagString                              `cbor:"13,keyasint,omitempty"`
+	RequestedTCList              util.DiagList[RequestedTCInfo]                `cbor:"14,keyasint,omitempty"`
+	UnneededManifestList         util.DiagList[util.BytesHexMax32]             `cbor:"15,keyasint,omitempty"`
+	SUITReports                  util.DiagList[util.BytesHexMax32]             `cbor:"19,keyasint,omitempty"`
+	Token                        util.BytesHexMax32                            `cbor:"20,keyasint,omitempty"`
+	SupportedFreshnessMechanisms util.DiagList[FreshnessMechanism]             `cbor:"21,keyasint,omitempty"`
+	ErrLang                      *util.DiagString                              `cbor:"22,keyasint,omitempty"`
+	ErrCode                      *TEEPErrCode                                  `cbor:"23,keyasint,omitempty"`
+}
+
+func (o TEEPOptions) CBORDiagString(indent int) string {
+	pad1 := strings.Repeat("  ", indent)
+	pad2 := strings.Repeat("  ", indent+1)
+	var outputStrings []string
+	if o.SupportedTEEPCipherSuites != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-teep-cipher-suites / 1: %v", pad2, o.SupportedTEEPCipherSuites.CBORDiagString(indent+1)))
+	}
+	if o.Challenge != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ challenge / 2: %s", pad2, o.Challenge.CBORDiagString(indent+1)))
+	}
+	if o.Versions != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ versions / 3: %v", pad2, o.Versions.CBORDiagString(indent+1)))
+	}
+	if o.SupportedSUITCOSEProfiles != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-suit-cose-profiles / 4: %v", pad2, o.SupportedSUITCOSEProfiles.CBORDiagString(indent+1)))
+	}
+	if o.SelectedVersion != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ selected-version / 6: %v", pad2, *o.SelectedVersion))
+	}
+	if o.AttestationPayload != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload / 7: %s", pad2, o.AttestationPayload.CBORDiagString(indent+1)))
+	}
+	if o.TCList != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ tc-list / 8: %v", pad2, o.TCList.CBORDiagString(indent+1)))
+	}
+	if o.ExtList != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ ext-list / 9: %v", pad2, o.ExtList.CBORDiagString(indent+1)))
+	}
+	if o.ManifestList != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ manifest-list / 10: %v", pad2, o.ManifestList.CBORDiagString(indent+1)))
+	}
+	if o.Msg != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ msg / 11: %s", pad2, o.Msg.CBORDiagString(indent+1)))
+	}
+	if o.ErrMsg != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-msg / 12: %s", pad2, o.ErrMsg.CBORDiagString(indent+1)))
+	}
+	if o.AttestationPayloadFormat != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload-format / 13: %s", pad2, o.AttestationPayloadFormat.CBORDiagString(indent+1)))
+	}
+	if o.RequestedTCList != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ requested-tc-list / 14: %v", pad2, o.RequestedTCList.CBORDiagString(indent+1)))
+	}
+	if o.UnneededManifestList != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ unneeded-manifest-list / 15: %v", pad2, o.UnneededManifestList.CBORDiagString(indent+1)))
+	}
+	if o.SUITReports != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ suit-reports / 19: %v", pad2, o.SUITReports.CBORDiagString(indent+1)))
+	}
+	if o.Token != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ token / 20: %s", pad2, o.Token.CBORDiagString(indent+1)))
+	}
+	if o.SupportedFreshnessMechanisms != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-freshness-mechanisms / 21: %v", pad2, o.SupportedFreshnessMechanisms.CBORDiagString(indent+1)))
+	}
+	if o.ErrLang != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-lang / 22: %s", pad2, o.ErrLang.CBORDiagString(indent+1)))
+	}
+	if o.ErrCode != nil {
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-code / 23: %s", pad2, o.ErrCode.CBORDiagString(indent+1)))
+	}
+	return fmt.Sprintf("{\n%s\n%s}", strings.Join(outputStrings, ",\n"), pad1)
 }
 
 type TEEPVersion uint32
+
+func (v TEEPVersion) CBORDiagString(indent int) string {
+	return fmt.Sprintf("%d", uint32(v))
+}
+
 type TEEPExtInfo uint32
+
+func (e TEEPExtInfo) CBORDiagString(indent int) string {
+	return fmt.Sprintf("%d", uint32(e))
+}
 
 type DataItemRequested uint
 
@@ -233,6 +330,26 @@ const attestationMask = 0b1
 const tcListMask = 0b10
 const extensionsMask = 0b100
 const suitReportsMask = 0b1000
+
+func (v DataItemRequested) CBORDiagString(indent int) string {
+	var items []string
+	if v.AttestationRequested() {
+		items = append(items, "attestation")
+	}
+	if v.TCListRequested() {
+		items = append(items, "tc-list")
+	}
+	if v.ExtensionsRequested() {
+		items = append(items, "extensions")
+	}
+	if v.SUITReportsRequested() {
+		items = append(items, "suit-reports")
+	}
+	if len(items) == 0 {
+		return "0 / none /"
+	}
+	return fmt.Sprintf("%d / %s /", uint(v), strings.Join(items, " | "))
+}
 
 func RequestDataItem(attestation bool, tcList bool, extensions bool, suitReports bool) DataItemRequested {
 	var v DataItemRequested
@@ -284,33 +401,43 @@ const (
 	TEEPErrManifestProcessingFailed       = 17
 )
 
-func (e TEEPErrCode) String() string {
+func (e TEEPErrCode) CBORDiagString(indent int) string {
 	switch e {
 	case TEEPErrPermanentError:
-		return "ERR_PERMANENT_ERROR"
+		return "1 / ERR_PERMANENT_ERROR /"
 	case TEEPErrUnsupportedExtension:
-		return "ERR_UNSUPPORTED_EXTENSION"
+		return "2 / ERR_UNSUPPORTED_EXTENSION /"
 	case TEEPErrUnsupportedFreshnessMechanisms:
-		return "ERR_UNSUPPORTED_FRESHNESS_MECHANISMS"
+		return "3 / ERR_UNSUPPORTED_FRESHNESS_MECHANISMS /"
 	case TEEPErrUnsupportedMsgVersion:
-		return "ERR_UNSUPPORTED_MSG_VERSION"
+		return "4 / ERR_UNSUPPORTED_MSG_VERSION /"
 	case TEEPErrUnsupportedCipherSuites:
-		return "ERR_UNSUPPORTED_CIPHER_SUITES"
+		return "5 / ERR_UNSUPPORTED_CIPHER_SUITES /"
 	case TEEPErrBadCertificate:
-		return "ERR_BAD_CERTIFICATE"
+		return "6 / ERR_BAD_CERTIFICATE /"
 	case TEEPErrAttestationRequired:
-		return "ERR_ATTESTATION_REQUIRED"
+		return "7 / ERR_ATTESTATION_REQUIRED /"
 	case TEEPErrUnsupportedSUITReport:
-		return "ERR_UNSUPPORTED_SUIT_REPORT"
+		return "8 / ERR_UNSUPPORTED_SUIT_REPORT /"
 	case TEEPErrCertificateExpired:
-		return "ERR_CERTIFICATE_EXPIRED"
+		return "9 / ERR_CERTIFICATE_EXPIRED /"
 	case TEEPErrTemporaryError:
-		return "ERR_TEMPORARY_ERROR"
+		return "10 / ERR_TEMPORARY_ERROR /"
 	case TEEPErrManifestProcessingFailed:
-		return "ERR_MANIFEST_PROCESSING_FAILED"
+		return "17 / ERR_MANIFEST_PROCESSING_FAILED /"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(e))
 	}
+}
+
+type TEEPCipherSuites []TEEPCipherSuite
+
+func (c TEEPCipherSuites) CBORDiagString(indent int) string {
+	var suiteStrings []string
+	for _, suite := range c {
+		suiteStrings = append(suiteStrings, suite.CBORDiagString(indent))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(suiteStrings, ", "))
 }
 
 type TEEPCipherSuite struct {
@@ -319,12 +446,32 @@ type TEEPCipherSuite struct {
 	Algorithm int      `cbor:"1,keyasint"`
 }
 
+func (c TEEPCipherSuite) CBORDiagString(indent int) string {
+	return fmt.Sprintf("[%d, %d]", c.Type, c.Algorithm)
+}
+
 type RequestedTCInfo struct {
 	ComponentID              suit.ComponentID `cbor:"16,keyasint,omitempty"`
-	TCManifestSequenceNumber uint8            `cbor:"17,keyasint,omitempty"`
-	HaveBinary               bool             `cbor:"18,keyasint,omitempty"`
+	TCManifestSequenceNumber *uint64          `cbor:"17,keyasint,omitempty"`
+	HaveBinary               *bool            `cbor:"18,keyasint,omitempty"`
+}
+
+func (r RequestedTCInfo) CBORDiagString(indent int) string {
+	var pad1 = strings.Repeat("  ", indent)
+	var pad2 = strings.Repeat("  ", indent+1)
+	var encodedStrings []string
+	encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ component-id / 16: %s", pad2, r.ComponentID.CBORDiagString(0)))
+	if r.TCManifestSequenceNumber != nil {
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ tc-manifest-sequence-number / 17: %d", pad2, *r.TCManifestSequenceNumber))
+	}
+	if r.HaveBinary != nil {
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ have-binary / 18: %t", pad2, *r.HaveBinary))
+	}
+	return fmt.Sprintf("{\n%s\n%s}", strings.Join(encodedStrings, ",\n"), pad1)
 }
 
 type FreshnessMechanism uint
 
-type SUITManifestBstr []byte
+func (f FreshnessMechanism) CBORDiagString(indent int) string {
+	return fmt.Sprintf("%d", uint(f))
+}

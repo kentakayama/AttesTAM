@@ -8,6 +8,7 @@ package suit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 )
@@ -144,4 +145,23 @@ type SystemPropertyClaims struct {
 	ImageDigest       []byte      `cbor:"3,keyasint,omitempty"`
 	ImageSize         uint        `cbor:"14,keyasint,omitempty"`
 	// NOTE: not all SUIT_Parameters are supported
+}
+
+func (s SystemPropertyClaims) CBORDiagString(indent int) string {
+	pad1 := strings.Repeat("  ", indent)
+	pad2 := strings.Repeat("  ", indent+1)
+	var stringList []string
+	if len(s.SystemComponentID) > 0 {
+		stringList = append(stringList, fmt.Sprintf("%s/ system-component-id / 0: %s", pad2, s.SystemComponentID.CBORDiagString(indent+1)))
+	}
+	if len(s.ImageDigest) > 0 {
+		var digest Digest
+		if err := cbor.Unmarshal(s.ImageDigest, &digest); err == nil {
+			stringList = append(stringList, fmt.Sprintf("%s/ image-digest / 3: << %s >>", pad2, digest.CBORDiagString(indent+1)))
+		}
+	}
+	if s.ImageSize != 0 {
+		stringList = append(stringList, fmt.Sprintf("%s/ image-size / 14: %d", pad2, s.ImageSize))
+	}
+	return fmt.Sprintf("{\n%s\n%s}", strings.Join(stringList, ",\n"), pad1)
 }

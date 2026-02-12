@@ -245,12 +245,12 @@ func TestSUITComponentID_String(t *testing.T) {
 		{0x70, 0x72, 0x65, 0x66, 0x69, 0x78},                   // 'prefix'
 		{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74}, // 'hello.txt'
 	}
-	assert.Equal(t, "['prefix', 'hello.txt']", componentID.String())
+	assert.Equal(t, "['prefix', 'hello.txt']", componentID.CBORDiagString(0))
 }
 
 func TestSUITComponentID_String_NonUTF8(t *testing.T) {
 	componentID := ComponentID{{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // non-UTF8 bytes
 	}}
-	assert.Equal(t, "[h'000102030405060708']", componentID.String())
+	assert.Equal(t, "[h'000102030405060708']", componentID.CBORDiagString(0))
 }

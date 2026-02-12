@@ -215,10 +215,10 @@ type Common struct {
 
 type ComponentID []ComponentIDBytes
 
-func (c *ComponentID) String() string {
+func (c *ComponentID) CBORDiagString(indent int) string {
 	var s []string
 	for i := range *c {
-		s = append(s, (*c)[i].String())
+		s = append(s, (*c)[i].CBORDiagString(indent))
 	}
 	return fmt.Sprintf("[%s]", strings.Join(s, ", "))
 }
@@ -226,7 +226,7 @@ func (c *ComponentID) String() string {
 type ComponentIDBytes []byte
 
 // String returns a human-readable representation of the ComponentIDBytes with CBOR Diagnostic Notation.
-func (c ComponentIDBytes) String() string {
+func (c ComponentIDBytes) CBORDiagString(indent int) string {
 	// try to represent with UTF-8 string => 'foo-bar'
 	utf8EncodedString := string(c)
 	if utf8.ValidString(utf8EncodedString) && isPrintableUTF8(c) {
@@ -256,6 +256,10 @@ type Digest struct {
 	DigestBytes []byte         `cbor:"1,keyasint"`
 }
 
+func (d Digest) CBORDiagString(indent int) string {
+	return fmt.Sprintf("[%d, h'%s']", d.DigestAlg, strings.ToUpper(hex.EncodeToString(d.DigestBytes)))
+}
+
 // draft-ietf-suit-mti
 type COSEProfile struct {
 	_              struct{}       `cbor:",toarray"`
@@ -263,4 +267,8 @@ type COSEProfile struct {
 	AuthAlg        cose.Algorithm `cbor:"1,keyasint"` // HMAC w/ SHA-256 (5), ESP256 (-9), etc.
 	KeyExchangeAlg cose.Algorithm `cbor:"2,keyasint"` // ECDH-ES+A128KW (-29), etc.
 	EncryptionAlg  cose.Algorithm `cbor:"3,keyasint"` // AES-CTR (-65534), AES-GCM (1), ChaCha/Poly (24), etc.
+}
+
+func (p COSEProfile) CBORDiagString(indent int) string {
+	return fmt.Sprintf("[%d, %d, %d, %d]", p.DigestAlg, p.AuthAlg, p.KeyExchangeAlg, p.EncryptionAlg)
 }
