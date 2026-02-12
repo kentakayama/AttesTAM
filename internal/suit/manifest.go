@@ -9,6 +9,11 @@ package suit
 import (
 	"bytes"
 	"crypto"
+	"encoding/hex"
+	"fmt"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/veraison/go-cose"
@@ -208,7 +213,42 @@ type Common struct {
 	// TODO: $$SUIT_Common-extensions
 }
 
-type ComponentID [][]byte
+type ComponentID []ComponentIDBytes
+
+func (c *ComponentID) String() string {
+	var s []string
+	for i := range *c {
+		s = append(s, (*c)[i].String())
+	}
+	return fmt.Sprintf("[%s]", strings.Join(s, ", "))
+}
+
+type ComponentIDBytes []byte
+
+// String returns a human-readable representation of the ComponentIDBytes with CBOR Diagnostic Notation.
+func (c ComponentIDBytes) String() string {
+	// try to represent with UTF-8 string => 'foo-bar'
+	utf8EncodedString := string(c)
+	if utf8.ValidString(utf8EncodedString) && isPrintableUTF8(c) {
+		return fmt.Sprintf("'%s'", utf8EncodedString)
+	}
+	// otherwise, represent with hex string => h'1234abcd'
+	return fmt.Sprintf("h'%s'", hex.EncodeToString(c))
+}
+
+func isPrintableUTF8(b []byte) bool {
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if r == utf8.RuneError && size == 1 {
+			return false // invalid rune
+		}
+		if !unicode.IsPrint(r) {
+			return false // non-printable rune
+		}
+		b = b[size:]
+	}
+	return true
+}
 
 type Digest struct {
 	_           struct{}       `cbor:",toarray"`
