@@ -119,20 +119,11 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 
 			if agentKID == nil {
 				// TODO: extract AttestationResult in EAT form, not Evidence
-				// TODO: remove COSE_Sign support
-				s, err := tryCOSESign1OrSign(incomingMessage.Options.AttestationPayload)
-				if err != nil {
+				var sign1 cose.Sign1Message
+				if err := sign1.UnmarshalCBOR(incomingMessage.Options.AttestationPayload); err != nil {
 					return nil, ErrAttestationFailed
 				}
-				var rawAttestationPayload []byte
-				switch m := any(s).(type) {
-				case cose.Sign1Message:
-					rawAttestationPayload = m.Payload
-				case cose.SignMessage:
-					rawAttestationPayload = m.Payload
-				default:
-					return nil, ErrNotSupported
-				}
+				rawAttestationPayload := sign1.Payload
 
 				var eat eat.Eat
 				if err := eat.FromCBOR(rawAttestationPayload); err != nil {
@@ -389,11 +380,11 @@ func verifyCOSESignature(raw []byte, pubKey *cose.Key) error {
 }
 
 func (t *TAM) tryAuthenticateTeepMessage(raw []byte) (*TEEPMessage, []byte, error) {
-	s, err := tryCOSESign1OrSign(raw)
-	if err != nil {
+	var sign1 cose.Sign1Message
+	if err := sign1.UnmarshalCBOR(raw); err != nil {
 		return nil, nil, err
 	}
-	message, kid, err := t.checkSignature(s)
+	message, kid, err := t.checkSignatureWithKID(sign1)
 	if err != nil {
 		t.logger.Print(err)
 		return message, nil, err
@@ -401,46 +392,15 @@ func (t *TAM) tryAuthenticateTeepMessage(raw []byte) (*TEEPMessage, []byte, erro
 	return message, kid, nil
 }
 
-func tryCOSESign1OrSign(raw []byte) (any, error) {
-	// Try COSE_Sign1
-	var sign1 cose.Sign1Message
-	if err := sign1.UnmarshalCBOR(raw); err == nil {
-		return sign1, nil
-	}
-
-	// Try COSE_Sign
-	var sign cose.SignMessage
-	if err := sign.UnmarshalCBOR(raw); err == nil {
-		return sign, nil
-	}
-
-	return nil, ErrNotSupported
-}
-
-func (t *TAM) checkSignature(msg any) (*TEEPMessage, []byte, error) {
+func (t *TAM) checkSignatureWithKID(msg cose.Sign1Message) (*TEEPMessage, []byte, error) {
 	var teepMessage TEEPMessage
 	var kid []byte
-	switch m := msg.(type) {
-	case cose.Sign1Message:
-		err := cbor.Unmarshal(m.Payload, &teepMessage)
-		if err != nil {
-			return nil, nil, ErrNotTEEPMessage
-		}
-		kid = getKid(m.Headers.Unprotected)
-		if kid == nil {
-			return &teepMessage, nil, ErrKidIsMissing
-		}
-	case cose.SignMessage:
-		err := cbor.Unmarshal(m.Payload, &teepMessage)
-		if err != nil {
-			return nil, nil, ErrNotTEEPMessage
-		}
-		kid = getKid(m.Headers.Unprotected)
-		if kid == nil {
-			return &teepMessage, nil, ErrKidIsMissing
-		}
-	default:
-		return nil, nil, ErrNotSupported
+	if err := cbor.Unmarshal(msg.Payload, &teepMessage); err != nil {
+		return nil, nil, ErrNotTEEPMessage
+	}
+	kid = getKid(msg.Headers.Unprotected)
+	if kid == nil {
+		return &teepMessage, nil, ErrKidIsMissing
 	}
 
 	key, err := t.getTEEPAgentKey(kid)
@@ -462,19 +422,9 @@ func (t *TAM) checkSignature(msg any) (*TEEPMessage, []byte, error) {
 		return &teepMessage, nil, ErrFatal
 	}
 
-	switch m := msg.(type) {
-	case cose.Sign1Message:
-		err = m.Verify(nil, verifier)
-		if err != nil {
-			return &teepMessage, nil, ErrNotAuthenticated
-		}
-	case cose.SignMessage:
-		err = m.Verify(nil, verifier)
-		if err != nil {
-			return &teepMessage, nil, ErrNotAuthenticated
-		}
-	default:
-		return &teepMessage, nil, ErrNotSupported
+	err = msg.Verify(nil, verifier)
+	if err != nil {
+		return &teepMessage, nil, ErrNotAuthenticated
 	}
 
 	return &teepMessage, kid, nil
