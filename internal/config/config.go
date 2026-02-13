@@ -8,7 +8,6 @@ import (
 // Config captures the tunables required to start the TAM mock server.
 type TAMConfig struct {
 	Addr                 string
-	DisableCOSE          bool
 	Logger               *log.Logger
 	ChallengeServerURL   string
 	ChallengeContentType string

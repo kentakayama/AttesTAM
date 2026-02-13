@@ -22,7 +22,6 @@ import (
 
 const (
 	envAddr                 = "TAM4WASM_ADDR"
-	envDisableCOSE          = "TAM4WASM_DISABLE_COSE"
 	envChallengeServer      = "TAM4WASM_CHALLENGE_SERVER"
 	envChallengeContentType = "TAM4WASM_CHALLENGE_CONTENT_TYPE"
 	envChallengeInsecureTLS = "TAM4WASM_CHALLENGE_INSECURE_TLS"
@@ -32,7 +31,6 @@ const (
 func main() {
 	var (
 		addr                 = flag.String("addr", ":8080", "listen address in host:port form")
-		disableCOSE          = flag.Bool("disable-cose", false, "serve unsigned CBOR artifacts where available")
 		challengeServer      = flag.String("challenge-server", "https://localhost:8443", "base URL for verifier challenge-response server")
 		challengeContentType = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")
@@ -43,7 +41,6 @@ func main() {
 	logger := log.New(os.Stdout, "[tam4wasm] ", log.LstdFlags|log.LUTC)
 
 	addrVal := stringFromEnv(logger, envAddr, *addr)
-	disableCOSEVal := boolFromEnv(logger, envDisableCOSE, *disableCOSE)
 	challengeServerVal := stringFromEnv(logger, envChallengeServer, *challengeServer)
 	challengeContentTypeVal := stringFromEnv(logger, envChallengeContentType, *challengeContentType)
 	challengeInsecureTLSVal := boolFromEnv(logger, envChallengeInsecureTLS, *challengeInsecureTLS)
@@ -51,7 +48,6 @@ func main() {
 
 	cfg := config.TAMConfig{
 		Addr:                 addrVal,
-		DisableCOSE:          disableCOSEVal,
 		Logger:               logger,
 		ChallengeServerURL:   challengeServerVal,
 		ChallengeContentType: challengeContentTypeVal,

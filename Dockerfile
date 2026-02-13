@@ -34,7 +34,6 @@ COPY --from=build /src/resources ./resources
 
 # Default configuration mirrors the CLI flags defined in cmd/tam-over-http/main.go.
 ENV TAM4WASM_ADDR=":8080" \
-    TAM4WASM_DISABLE_COSE="false" \
     TAM4WASM_CHALLENGE_SERVER="" \
     TAM4WASM_CHALLENGE_CONTENT_TYPE="application/psa-attestation-token" \
     TAM4WASM_CHALLENGE_INSECURE_TLS="true" \

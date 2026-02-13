@@ -44,7 +44,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, err
 	}
 
-	tam, err := tam.NewTAM(false, verifierClient, logger)
+	tam, err := tam.NewTAM(verifierClient, logger)
 	if err != nil {
 		return nil, err
 	}

@@ -115,7 +115,7 @@ var (
 
 func TestTCHandler_Update_OK(t *testing.T) {
 	logger := log.Default()
-	tam, err := tam.NewTAM(false, nil, logger)
+	tam, err := tam.NewTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestTCHandler_Update_OK(t *testing.T) {
 
 func TestGetAgentStatus_OK(t *testing.T) {
 	logger := log.Default()
-	tam, err := tam.NewTAM(false, nil, logger)
+	tam, err := tam.NewTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 
 func TestGetAgentStatus_NoContent(t *testing.T) {
 	logger := log.Default()
-	tam, err := tam.NewTAM(false, nil, logger)
+	tam, err := tam.NewTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
