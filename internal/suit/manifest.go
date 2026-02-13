@@ -45,7 +45,9 @@ func (n *Nested[T]) UnmarshalCBOR(data []byte) error {
 	return cbor.Unmarshal(raw, &n.Value)
 }
 
-// draft-ietf-suit-manifest
+// Envelope is a TAM-focused parser/validator for draft-ietf-suit-manifest payloads.
+// The implementation is intentionally limited to what TAM needs for manifest
+// registration and verification, and should not be treated as a full SUIT library.
 
 type Envelope struct {
 	Tagged                bool
@@ -210,7 +212,6 @@ type Manifest struct {
 type Common struct {
 	Components     []ComponentID `cbor:"2,keyasint,omitempty"`
 	SharedSequence []byte        `cbor:"4,keyasint,omitempty"` // no need to extract SUIT_Shared_Sequence
-	// TODO: $$SUIT_Common-extensions
 }
 
 type ComponentID []ComponentIDBytes

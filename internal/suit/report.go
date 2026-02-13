@@ -13,7 +13,9 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
-// draft-ietf-suit-report
+// Report models the subset of draft-ietf-suit-report used by TAM when parsing
+// SUIT reports from TEEP Success/Error messages. It is parse-oriented and does
+// not aim to provide complete SUIT report encode/decode coverage.
 
 type Report struct {
 	Reference     Reference            `cbor:"99,keyasint"`

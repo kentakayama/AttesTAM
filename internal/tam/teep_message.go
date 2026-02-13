@@ -18,7 +18,10 @@ import (
 	"github.com/veraison/go-cose"
 )
 
-// draft-ietf-teep-protocol
+// TEEPMessage is a TAM-oriented representation of draft-ietf-teep-protocol messages.
+// It intentionally covers only the message shapes and options required by this server
+// (marshal/unmarshal/CBOR diagnostic rendering for current TAM flows), not a full
+// generic TEEP SDK surface.
 
 type TEEPMessage struct {
 	_       struct{}        `cbor:",toarray"`
