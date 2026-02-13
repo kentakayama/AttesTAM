@@ -40,7 +40,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 		Logger:      logger,
 	})
 	require.Nil(t, err)
-	tam, err := NewTAM(false, verifierClient, logger)
+	tam, err := NewTAM(verifierClient, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 
 	// tam.EnsureDefaultTEEPAgent is not required, because EAT can carry the public key of the TEEP Agent
 
-	kid, err := tam.assets.tamKey.Thumbprint(crypto.SHA256)
+	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
 	fmt.Printf("TAM's kid: %s\n", hex.EncodeToString(kid))
 	require.Nil(t, err)
 	require.NotNil(t, kid)
@@ -88,7 +88,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 	require.Nil(t, err)
 
 	var outgoingQueryRequestWithToken TEEPMessage
-	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.assets.tamKey, responseEmpty)
+	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.tamKey, responseEmpty)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithToken.Type)
 
@@ -116,7 +116,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 	require.NotNil(t, responseTCList)
 
 	var outgoingQueryRequestWithChallenge TEEPMessage
-	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.assets.tamKey, responseTCList)
+	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.tamKey, responseTCList)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithChallenge.Type)
 

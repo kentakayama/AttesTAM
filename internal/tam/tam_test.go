@@ -104,7 +104,7 @@ func (e *MockEATVerifier) Process(data []byte) (*rats.ProcessedAttestation, erro
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(false, &verifier, logger)
+	tam, err := NewTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	}
 	// tam.EnsureDefaultTEEPAgent is not required, because EAT can carry the public key of the TEEP Agent
 
-	kid, err := tam.assets.tamKey.Thumbprint(crypto.SHA256)
+	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
 	fmt.Printf("TAM's kid: %s\n", hex.EncodeToString(kid))
 	require.Nil(t, err)
 	require.NotNil(t, kid)
@@ -140,7 +140,7 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	require.Nil(t, err)
 
 	var outgoingQueryRequestWithToken TEEPMessage
-	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.assets.tamKey, responseEmpty)
+	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.tamKey, responseEmpty)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithToken.Type)
 
@@ -168,7 +168,7 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	require.NotNil(t, responseTCList)
 
 	var outgoingQueryRequestWithChallenge TEEPMessage
-	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.assets.tamKey, responseTCList)
+	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.tamKey, responseTCList)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithChallenge.Type)
 
@@ -225,7 +225,7 @@ func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(false, &verifier, logger)
+	tam, err := NewTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -239,7 +239,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
 	}
 
-	kid, err := tam.assets.tamKey.Thumbprint(crypto.SHA256)
+	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
 	fmt.Printf("TAM's kid: %s\n", hex.EncodeToString(kid))
 	require.Nil(t, err)
 	require.NotNil(t, kid)
@@ -257,7 +257,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	require.Nil(t, err)
 
 	var outgoingQueryRequestWithToken TEEPMessage
-	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.assets.tamKey, responseEmpty)
+	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.tamKey, responseEmpty)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithToken.Type)
 
@@ -291,7 +291,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	require.NotNil(t, responseTCList)
 
 	var outgoingUpdate TEEPMessage
-	err = outgoingUpdate.COSESign1Verify(tam.assets.tamKey, responseTCList)
+	err = outgoingUpdate.COSESign1Verify(tam.tamKey, responseTCList)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeUpdate, outgoingUpdate.Type)
 
@@ -397,7 +397,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(false, &verifier, logger)
+	tam, err := NewTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
 	}
 
-	kid, err := tam.assets.tamKey.Thumbprint(crypto.SHA256)
+	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
 	fmt.Printf("TAM's kid: %s\n", hex.EncodeToString(kid))
 	require.Nil(t, err)
 	require.NotNil(t, kid)
@@ -429,7 +429,7 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	require.Nil(t, err)
 
 	var outgoingQueryRequestWithToken TEEPMessage
-	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.assets.tamKey, responseEmpty)
+	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.tamKey, responseEmpty)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithToken.Type)
 
@@ -462,7 +462,7 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(false, &verifier, logger)
+	tam, err := NewTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}

@@ -30,48 +30,27 @@ import (
 )
 
 type TAM struct {
-	verifier    rats.IRAVerifier
-	disableCOSE bool           // TODO: remove
-	assets      responseAssets // TODO: remove
-	logger      *log.Logger
-	db          *sql.DB         // Database connection for TAM state
-	ctx         context.Context // Background context for database operations
+	verifier rats.IRAVerifier
+	tamKey   *cose.Key
+	logger   *log.Logger
+	db       *sql.DB         // Database connection for TAM state
+	ctx      context.Context // Background context for database operations
 }
 
 type responseAssets struct {
-	queryCOSE   []byte
-	queryPlain  []byte
-	updateCOSE  []byte
-	updatePlain []byte
-	tamKey      *cose.Key
 }
 
-func NewTAM(disableCOSE bool, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+func NewTAM(verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
 	var key cose.Key
 	err := cbor.Unmarshal(resources.TAMCoseKeyBytes, &key)
 	if err != nil {
 		return nil, errors.New("failed to load TAM's private key")
 	}
 
-	a := responseAssets{
-		queryCOSE:   bytes.Clone(resources.QueryRequestCOSE),
-		queryPlain:  bytes.Clone(resources.QueryRequestPlain),
-		updateCOSE:  bytes.Clone(resources.UpdateCOSE),
-		updatePlain: bytes.Clone(resources.UpdatePlain),
-		tamKey:      &key,
-	}
-	if len(a.queryCOSE) == 0 {
-		return nil, errors.New("missing embedded query request COSE payload")
-	}
-	if len(a.updateCOSE) == 0 {
-		return nil, errors.New("missing embedded update COSE payload")
-	}
-
 	return &TAM{
-		verifier:    verifier,
-		disableCOSE: disableCOSE,
-		assets:      a,
-		logger:      logger,
+		verifier: verifier,
+		tamKey:   &key,
+		logger:   logger,
 	}, nil
 }
 
@@ -89,7 +68,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO: search sent message by myself with token
+	// search the sent message by myself with token
 	sentMessage := t.searchSentMessageWithToken(incomingMessage.Options.Token)
 	// NOTE: sentMessage may be nil because the incomingMessage does not contain the token
 	// case 1) TAM sent QueryRequest with challenge & request-attestation
@@ -289,7 +268,7 @@ func (t *TAM) generateQueryRequest() ([]byte, error) {
 		},
 		DataItemRequested: RequestDataItem(false, true, false, false),
 	}
-	response, err := sendingQueryRequest.COSESign1Sign(t.assets.tamKey)
+	response, err := sendingQueryRequest.COSESign1Sign(t.tamKey)
 	if err != nil {
 		return nil, ErrFatal
 	}
@@ -332,7 +311,7 @@ func (t *TAM) generateQueryRequestWithAttestation() ([]byte, error) {
 		// NOTE: request only attestation for simplicity
 		DataItemRequested: RequestDataItem(true, false, false, false),
 	}
-	response, err := sendingQueryRequest.COSESign1Sign(t.assets.tamKey)
+	response, err := sendingQueryRequest.COSESign1Sign(t.tamKey)
 	if err != nil {
 		return nil, ErrFatal
 	}
@@ -731,7 +710,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 	}
 
 	// sign
-	response, err := sendingUpdate.COSESign1Sign(t.assets.tamKey)
+	response, err := sendingUpdate.COSESign1Sign(t.tamKey)
 	if err != nil {
 		return nil, ErrFatal
 	}

@@ -37,7 +37,7 @@ var (
 
 func TestKeyring_GetSet(t *testing.T) {
 	logger := log.Default()
-	tam, err := NewTAM(false, nil, logger)
+	tam, err := NewTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}

@@ -9,11 +9,9 @@ package server
 import (
 	"crypto"
 	"encoding/hex"
-	"errors"
 	"io"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
@@ -24,12 +22,6 @@ import (
 
 const (
 	maxRequestBodyBytes = 1 << 20 // 1 MiB should cover all test vectors.
-)
-
-// TODO: remove these unused variables when implementing attestation payload handling.
-var (
-	attestationPayloadPath        = filepath.Join("resources", "attestation_payload.bin")
-	errAttestationPayloadNotFound = errors.New("attestation payload (TEEP field 7) not found")
 )
 
 type handler struct {
