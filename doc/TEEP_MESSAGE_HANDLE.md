@@ -1,8 +1,8 @@
-## TAM's TEEP Message handling
+# TAM TEEP Message Handling
 
-### TEEP Protocol interactions defined in (Draft) RFCs
+## TEEP Protocol interactions defined in (Draft) RFCs
 
-The [section 3 of TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-21#section-3) defines how TEEP Agents to reply messages from TAM:
+[Section 3 of the TEEP Protocol draft](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-21#section-3) defines how TEEP Agents reply to TAM messages:
 
 ```mermaid
 flowchart LR
@@ -18,11 +18,11 @@ flowchart LR
     TEEPAgent -- Error --> TAM
 ```
 
-However, in some cases the TAM cannot initiate sending the messages, for example,
+However, in some cases the TAM cannot initiate messages, for example:
 the TEEP Agent (or the TEEP Broker) does not provide listening sockets,
 the TAM cannot reach the TEEP Agent due to NAT traversal issues, etc.
 
-[TEEP over HTTP](https://datatracker.ietf.org/doc/draft-ietf-teep-otrp-over-http) resolves such situations the TAM providing HTTP server to accepts messages from TEEP Agents:
+[TEEP over HTTP](https://datatracker.ietf.org/doc/draft-ietf-teep-otrp-over-http) resolves this by having TAM expose an HTTP server that accepts messages from TEEP Agents:
 
 ```mermaid
 flowchart LR
@@ -42,7 +42,7 @@ flowchart LR
     TAM -- 204 No Content: (empty) --> TEEPAgent
 ```
 
-### Requirements for TEEP Protocol Messages from TEEP Agent
+## Requirements for TEEP Protocol Messages from TEEP Agent
 
 This TAM implementation enforces the following requirements for incoming `POST /tam` messages:
 
@@ -54,7 +54,7 @@ This TAM implementation enforces the following requirements for incoming `POST /
 2. Message format and signature requirements
    - Non-empty messages are expected to be COSE Sign1-encoded TEEP messages.
    - For normal authenticated flow, the COSE unprotected header `kid` (label `4`) is required.
-   - `kid` is treated as SHA-256 COSE_Key thumbprint and expected to be 32 bytes.
+   - `kid` is treated as an RFC 9679 SHA-256 COSE_Key thumbprint and expected to be 32 bytes.
    - TAM looks up the corresponding agent public key from DB and verifies the COSE signature.
 
 3. Correlation and replay-protection requirements
@@ -68,13 +68,13 @@ This TAM implementation enforces the following requirements for incoming `POST /
    - QueryResponse signature is re-verified using the key extracted from attestation result.
    - Confirmed key is stored for future message authentication.
 
-### TEEP with Remote Attestation
+## TEEP with Remote Attestation
 
 For the TAM to securely manage the Trusted Components inside TEEs, our TAM implementation requires Remote Attestation of TEEP Agents.
-The TAM wamts to confirm following points:
+The TAM wants to confirm the following points:
 1. the TEEP Agent is running inside a genuine TEE
-2. the TEE softwares including TEEP Agents keep integrity and authentication
-3. the signing key of TEEP Agent's was securely generated inside the TEE
+2. the TEE software including the TEEP Agent keeps integrity and authenticity
+3. the TEEP Agent signing key was securely generated inside the TEE
 
 To achieve these requirements,
 the TEEP Agent requests the Attesting Environment (e.g. Intel SGX Quoting Enclave) to generate Evidence (e.g. SGX Quote) and sends it in QueryResponse message,
@@ -90,7 +90,56 @@ flowchart LR
 > [!NOTE]
 > The above chart is based on background-check model
 
-In our implementation, we use customized [VERAISON](https://github.com/kentakayama/services) (the original one is under the [VERAISON project repository](https://github.com/veraison)) for Verifier to verify the SGX Quote.
+In this section, we'll explain two verification schemes: EAT-based and Intel SGX DCAP Quote-based.
+You can find the customized [VERAISON](https://github.com/kentakayama/services), and the original one is under the [VERAISON project repository](https://github.com/veraison).
+
+### With RFC 9711 EAT + Measured Component
+
+In this scheme, the `attestation-payload` in QueryResponse is a COSE Sign1 object whose payload is EAT (CBOR).
+TAM delegates the most part of verification to VERAISON, and locally checks the claims before trusting the TEEP Agent key.
+
+```mermaid
+sequenceDiagram
+    participant Agent as TEEP Agent
+    participant TAM as TAM
+    participant V as VERAISON
+    participant DB as SQLite
+
+    Agent->>TAM: QueryResponse(attestation-payload, token/challenge)
+    TAM->>V: Process(attestation-payload)
+    V-->>TAM: ProcessedAttestation (EAR status)
+    alt EAR status is affirming
+        note over TAM: Local validation:<br/>decode attestation-payload as COSE Sign1<br/>decode EAT claims from Sign1 payload<br/>validate nonce and match sent challenge<br/>extract cnf.key (agent public key)<br/>verify QueryResponse signature with cnf.key
+        TAM->>DB: store confirmed agent key (and UEID when available)
+        TAM-->>Agent: continue protocol (Update or next response)
+    else EAR status is not affirming
+        TAM-->>Agent: reject authentication path
+    end
+```
+
+Expected EAT/attestation inputs:
+1. `eat.eat_nonce`
+   - must be present and valid.
+   - must match the challenge previously sent by TAM.
+2. `cwt.cnf.key`
+   - must contain the public key to authenticate subsequent TEEP messages.
+3. `eat.ueid` (optional but recommended)
+   - when available, TAM can bind agent key to device identity in persistence.
+
+Validation layers:
+1. Verifier appraisal layer (`IRAVerifier.Process`)
+   - validates evidence and returns attestation result (`affirming` required).
+   - for VERAISON challenge-response endpoint, `verifier_client.go` implements the `Process` routine
+2. TAM local binding layer
+   - validates nonce/challenge correspondence.
+   - extracts `cwt.cnf.key` and verifies QueryResponse COSE signature using that key.
+3. Persistence/update layer
+   - stores newly confirmed key.
+   - continues normal QueryResponse handling (manifest resolution and Update generation).
+
+This two-step model avoids trusting attestation output alone: TAM also proves that the same key in EAT actually signed the live QueryResponse bound to TAM-issued freshness.
+
+### With Intel SGX DCAP Remote Attestation (TODO)
 
 ```mermaid
 flowchart LR
@@ -101,15 +150,21 @@ flowchart LR
 
 Our customized VERAISON verifies that:
 1. the SGX Quote has been generated by the authorized Quoting Enclave under the certificate chain from Intel Certificate Authority (CA)
-2. MRENCLAVE and MRSIGNER are expected values respectively
+2. MRENCLAVE and MRSIGNER are expected values, respectively
 3. the TEEP Agent bound to the MRENCLAVE is programmed generating its signing key inside TEE
 
-While SGX Quote is defined by the products, our customized VERAISON produces Attestation Results in [IETF RATS EAT](https://datatracker.ietf.org/doc/rfc9711) format based on the [EAT Profile of TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol#section-5).
-We leverages the [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/): the VERAISON extracts the TEEP Agent's key from SGX Quote Report Data and stores it inside [EAT Attestation Results](https://datatracker.ietf.org/doc/draft-ietf-rats-ear/).
+While SGX Quote format is product-specific, our customized VERAISON produces Attestation Results in [EAT Attestation Results](https://datatracker.ietf.org/doc/draft-ietf-rats-ear/) format based on the [EAT Profile of TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol#section-5).
+Due to the limitation of 64-byte `report_data` in SGX Quote, TEEP Agents and TAM agree on this rule:
+1. TEEP Agent encodes an EAT raw Evidence with `{eat_nonce: challenge in QueryRequest, cnf: generated TEEP Agent public key}`,
+2. hashes on it with SHA-256 and stores it into `report_data`, and
+3. stores it in `raw-report-data` and the SGX Quote to `attestation-payload` in QueryResponse.
+4. TAM extracts the SGX Quote from `attestation-payload` and requests VERAISON to verify, and
+5. on affirming Attestation Results, the TAM extracts the hash from `report_data` in SGX Quote and compares the one calculated on `raw-report-data`.
 
-TODO: SGX Quote constraction and Report Data => EAT Attestation Results conversion (external link to our customized VERAISON)
+> [!NOTE]
+> [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove the posession of a key.
 
-### Handling QueryResponse with tc-list
+## Handling QueryResponse with tc-list
 
 When TAM receives an authenticated `QueryResponse`, it generates `Update` from requested Trusted Components.
 
@@ -121,7 +176,7 @@ sequenceDiagram
 
     Agent->>TAM: QueryResponse (token, tc-list/requested-tc-list)
     TAM->>DB: consume token + find sent QueryRequest
-    TAM->>TAM: deduplicate component IDs from both lists
+    note over TAM: Build a unique component set<br/>from tc-list and requested-tc-list
     loop each component
         TAM->>DB: find latest SUIT manifest
         DB-->>TAM: manifest or not found
@@ -144,9 +199,9 @@ Detailed behavior:
 5. If resulting manifest list is empty, TAM returns no response body (`204` from HTTP layer).
 6. If manifests exist, TAM signs an `Update`, saves sent-update metadata for later correlation, and returns it.
 
-### How this TAM implementation Acts
+## How this TAM implementation Acts
 
-Based on these (draft) RFCs, we implemented this TAM over HTTP as following:
+Based on these draft RFCs, this TAM over HTTP currently behaves as follows:
 
 ```mermaid
 ---

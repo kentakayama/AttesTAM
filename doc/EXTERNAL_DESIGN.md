@@ -1,8 +1,8 @@
-## TAM's External Design
+# TAM External Design
 
 ```mermaid
 ---
-title: Conceptual Design of 
+title: TAM over HTTP - External Conceptual Design
 ---
 
 flowchart TB
@@ -34,4 +34,4 @@ GET | `/admin/getAgents` | TAM Admin | `{TBD}` | 200: `{TBD}` (status of Agents 
 POST | `/tam` | TEEP Agent | empty<br/>QueryResponse<br/>Success<br/>Error | 200: QueryRequest<br/>200: Update / QueryRequest<br/>204: empty<br/>204: empty | [TEEP_MESSAGE_HANDLE](TEEP_MESSAGE_HANDLE.md)
 
 > [!NOTE]
-> Currently, the endpoints with `{TBD}` inputs return fixed manifests and agents, ignoring the incoming message body for implementation issue.
+> Endpoints with `{TBD}` input currently return fixed demo data and do not yet fully reflect request-specific filters.

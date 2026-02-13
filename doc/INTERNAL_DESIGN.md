@@ -1,7 +1,7 @@
 # Internal Design
 
 ## Purpose
-This document explains the internal relationship between the HTTP server, TAM core logic, domain models, SQLite persistence, and Verifier client.
+This document explains the internal relationship between the HTTP server, TAM core logic, domain models, SQLite persistence, and verifier client.
 
 ## Layered Architecture
 
@@ -70,11 +70,11 @@ sequenceDiagram
 Key points:
 - `TAM` is the orchestration boundary. HTTP layer never touches SQL directly.
 - Tokens/challenges are one-time correlation handles; token is marked consumed when resolving response context.
-    - `challenge` is used for QueryRequest with Remote Attestation request, and the same value should be inside the signature of Evidence
-    - `token` is used other cases, such as QueryRequest with Trusted Component request, Update messages, etc.
+  - `challenge` is used for QueryRequest with remote attestation, and the same value must be bound to attestation evidence.
+  - `token` is used for regular QueryRequest/Update correlation.
 - `sent_query_request_messages` and `sent_update_messages` let TAM validate that incoming messages are responses to TAM-originated messages.
-    - the "key" to identify the sent message is `token`
-    - for QueryResponse message without `token` and with `attestation-payload`, the `challange` can be another "key" on affriming Remote Attestation Results
+  - The primary correlation key is `token`.
+  - For QueryResponse without `token` but with `attestation-payload`, `challenge` can be used after affirming remote attestation results.
 
 ### 2) Admin and TC Developer endpoints
 - `GET /admin/getAgents`: handler resolves admin entity, calls `tam.GetAgentStatus`, returns CBOR.

@@ -47,7 +47,7 @@ sequenceDiagram
     H->>T: SetEnvelope(envelope,digest,kid,component,sequence)
     T->>DB: find signing key by KID
     T->>DB: find latest manifest by component
-    T->>T: enforce sequence/key constraints
+    note over T: enforce sequence and signing-key continuity constraints
     T->>DB: insert suit_manifests row
     T-->>H: success/failure
 ```
@@ -62,7 +62,7 @@ This prevents downgrade and key-switch attacks within one component stream.
 
 ## Read Flow
 ### A) Admin view (`GET /admin/getManifests`)
-Current implementation uses fixed demo component IDs in handler and then fetches the latest manifest for each component.
+Current implementation uses fixed demo component IDs in handler, then fetches the latest manifest for each component.
 
 ```mermaid
 sequenceDiagram
@@ -75,11 +75,9 @@ sequenceDiagram
     H->>T: GetManifest(componentID_1)
     T->>DB: FindLatestByTrustedComponentID(componentID_1)
     DB-->>T: latest manifest or nil
-    T-->>H:
     H->>T: GetManifest(componentID_2)
     T->>DB: FindLatestByTrustedComponentID(componentID_2)
     DB-->>T: latest manifest or nil
-    T-->>H:
     H-->>Admin: 200 + [manifests] or 204
 ```
 
@@ -100,8 +98,7 @@ sequenceDiagram
 
     Agent->>H: POST /tam (QueryResponse)
     H->>T: ResolveTEEPMessage(body)
-    T->>T: processQueryResponse(...)
-    T->>T: build unique component set from tc-list/requested-tc-list
+    note over T: processQueryResponse()<br/>build unique component set from tc-list/requested-tc-list
     loop for each component
         T->>DB: FindLatestByTrustedComponentID(componentID)
         DB-->>T: latest manifest
@@ -117,7 +114,7 @@ Behavior:
 3. Unknown components are logged and skipped; known components are appended to `manifest-list`.
 4. The sent Update and related manifests are persisted for later response correlation.
 
-See [TEEP_MESSAGE_HANDLE.md](TEEP_MESSAGE_HANDLE.md#handling-queryresponse-with-tc-list). 
+See [TEEP_MESSAGE_HANDLE.md](TEEP_MESSAGE_HANDLE.md#handling-queryresponse-with-tc-list).
 
 ## Error Mapping
 - Parsing/signature errors in handler return `400 Bad Request`.
