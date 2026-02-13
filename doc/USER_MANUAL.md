@@ -38,6 +38,24 @@ docker run --rm -p 8080:8080 \
   tam-over-http
 ```
 
+### Command Options
+
+`tam-over-http` accepts CLI flags (also configurable by environment variables):
+
+| Flag | Env Var | Default | Description |
+| ---- | ------- | ------- | ----------- |
+| `-addr` | `TAM4WASM_ADDR` | `:8080` | Listen address for the HTTP server. |
+| `-disable-cose` | `TAM4WASM_DISABLE_COSE` | `false` | Serve unsigned CBOR artefacts instead of COSE-wrapped ones where available. |
+| `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
+| `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
+| `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
+| `-challenge-timeout` | `TAM4WASM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
+
+Print live defaults with:
+```bash
+go run ./cmd/tam-over-http -h
+```
+
 ## Prerequisites
 
 - `curl` for API calls (or any other HTTP client)

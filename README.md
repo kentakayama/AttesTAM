@@ -20,20 +20,8 @@ go run ./cmd/tam-over-http
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
 Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `TAM4WASM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs decoded verifier responses. No attestation files are written to disk.
 
-### Command Options
-
-`tam-over-http` accepts the following CLI flags (also configurable via environment variables exported in the Docker image):
-
-| Flag | Env Var | Default | Description |
-| ---- | ------- | ------- | ----------- |
-| `-addr` | `TAM4WASM_ADDR` | `:8080` | Listen address for the HTTP server. |
-| `-disable-cose` | `TAM4WASM_DISABLE_COSE` | `false` | Serve unsigned CBOR artefacts instead of COSE-wrapped ones where available. |
-| `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
-| `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` header used when posting attestation payloads to the verifier. `application/psa-attestation-token` is another supported profile but dynamic TEEP Agent key authentication with Remote Attestation will not be supported. |
-| `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier; set to `false` in production-like environments. |
-| `-challenge-timeout` | `TAM4WASM_CHALLENGE_TIMEOUT` | `1m` | Timeout for the end-to-end verifier interaction. |
-
-Use `go run ./cmd/tam-over-http -h` to see the latest defaults.
+Use `go run ./cmd/tam-over-http -h` to see available CLI options.
+Detailed flag/environment option references are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
 ### Docker
 
