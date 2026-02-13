@@ -1,3 +1,19 @@
+- [SUIT Manifest Store Design](#suit-manifest-store-design)
+  - [Purpose](#purpose)
+  - [Scope](#scope)
+  - [External Design](#external-design)
+    - [Specification of /getManifests Web API](#specification-of-getmanifests-web-api)
+    - [Specification of /addManifest Web API](#specification-of-addmanifest-web-api)
+    - [Error Mapping](#error-mapping)
+    - [Notes and Current Limitations](#notes-and-current-limitations)
+  - [Internal Design](#internal-design)
+    - [Components](#components)
+    - [Data Model](#data-model)
+    - [Write Flow (Register Manifest)](#write-flow-register-manifest)
+    - [Read Flow](#read-flow)
+      - [A) Admin view (`GET /admin/getManifests`)](#a-admin-view-get-admingetmanifests)
+      - [B) Runtime resolution (`POST /tam` with QueryResponse)](#b-runtime-resolution-post-tam-with-queryresponse)
+
 # SUIT Manifest Store Design
 
 ## Purpose
@@ -10,25 +26,6 @@ It focuses on the path from HTTP API to TAM logic and SQLite persistence.
 - Resolve manifests for Update generation during QueryResponse handling (`POST /tam`)
 
 ## External Design
-
-### Specification of /addManifest Web API
-
-This API registers a SUIT manifest to TAM's manifest store.
-
-URL | Method | Authorized Requester | Request Headers | Request Body | Response
---|--|--|--|--|--
-`/tc-developer/addManifest` | `POST` | TC Developer | `Content-Type: application/suit-envelope+cose` | SUIT Envelope (COSE-signed) | `200 OK` with `OK` (text/plain)
-
-Validation overview:
-1. HTTP method and content-type are validated.
-2. `SUIT_Envelope` is parsed and signature is verified.
-3. TAM verifies that manifest sequence and signer continuity are valid for the target Trusted Component.
-4. On success, manifest bytes and metadata are stored in the DB.
-
-> [!NOTE]
-> Requirements for accepting `/tc-developer/addManifest`:
-> 1. The TC Developer signing public key must already be registered in TAM (`manifest_signing_keys`).
-> 2. The SUIT `authentication-wrapper` must include `kid` for that signing key, encoded as an [RFC 9679 COSE Key Thumbprint](https://datatracker.ietf.org/doc/html/rfc9679).
 
 ### Specification of /getManifests Web API
 
@@ -70,6 +67,25 @@ Current behavior:
 1. Handler currently queries fixed demo component IDs.
 2. For each component, TAM loads latest manifest metadata.
 3. Missing components are skipped; empty result returns `204`.
+
+### Specification of /addManifest Web API
+
+This API registers a SUIT manifest to TAM's manifest store.
+
+URL | Method | Authorized Requester | Request Headers | Request Body | Response
+--|--|--|--|--|--
+`/tc-developer/addManifest` | `POST` | TC Developer | `Content-Type: application/suit-envelope+cose` | SUIT Envelope (COSE-signed) | `200 OK` with `OK` (text/plain)
+
+Validation overview:
+1. HTTP method and content-type are validated.
+2. `SUIT_Envelope` is parsed and signature is verified.
+3. TAM verifies that manifest sequence and signer continuity are valid for the target Trusted Component.
+4. On success, manifest bytes and metadata are stored in the DB.
+
+> [!NOTE]
+> Requirements for accepting `/tc-developer/addManifest`:
+> 1. The TC Developer signing public key must already be registered in TAM (`manifest_signing_keys`).
+> 2. The SUIT `authentication-wrapper` must include `kid` for that signing key, encoded as an [RFC 9679 COSE Key Thumbprint](https://datatracker.ietf.org/doc/html/rfc9679).
 
 ### Error Mapping
 - Parsing/signature errors in handler return `400 Bad Request`.

@@ -1,3 +1,12 @@
+- [TAM TEEP Message Handling](#tam-teep-message-handling)
+  - [TEEP Protocol interactions defined in (Draft) RFCs](#teep-protocol-interactions-defined-in-draft-rfcs)
+  - [Requirements for TEEP Protocol Messages from TEEP Agent](#requirements-for-teep-protocol-messages-from-teep-agent)
+  - [TEEP with Remote Attestation](#teep-with-remote-attestation)
+    - [With RFC 9711 EAT + Measured Component](#with-rfc-9711-eat--measured-component)
+    - [With Intel SGX DCAP Remote Attestation (TODO)](#with-intel-sgx-dcap-remote-attestation-todo)
+  - [Handling QueryResponse with tc-list](#handling-queryresponse-with-tc-list)
+  - [How this TAM implementation Acts](#how-this-tam-implementation-acts)
+
 # TAM TEEP Message Handling
 
 ## TEEP Protocol interactions defined in (Draft) RFCs

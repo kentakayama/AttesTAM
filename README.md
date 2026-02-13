@@ -1,3 +1,16 @@
+- [tam-over-http](#tam-over-http)
+  - [Quick Start](#quick-start)
+    - [Command Options](#command-options)
+    - [Docker](#docker)
+  - [API Endpoints](#api-endpoints)
+    - [Get Dummy TEEP Agent status](#get-dummy-teep-agent-status)
+    - [Get SUIT Manifests](#get-suit-manifests)
+  - [Architecture Overview](#architecture-overview)
+  - [Repository Layout](#repository-layout)
+  - [Development Workflow](#development-workflow)
+  - [Contributing](#contributing)
+  - [Call Graph](#call-graph)
+
 # tam-over-http
 
 `tam-over-http` is a lightweight Trusted Application Manager (TAM) server for exercising WebAssembly-based TEEP (Trusted Execution Environment Provisioning) clients. It serves deterministic QueryRequest / QueryResponse / Update behavior so client implementations can validate COSE/CBOR handling without production infrastructure.
@@ -35,7 +48,7 @@ Send TEEP messages (COSE Sign1) as the request body and inspect logs for respons
 
 Use `go run ./cmd/tam-over-http -h` to see the latest defaults.
 
-## Docker
+### Docker
 
 ```bash
 docker build -t tam-over-http .
@@ -73,6 +86,28 @@ Method | Endpoint | Purpose
 
 See [`doc/EXTERNAL_DESIGN.md`](./doc/EXTERNAL_DESIGN.md) for the API-level design.
 
+### Get Dummy TEEP Agent status
+
+You can get dummy TEEP Agent status with:
+
+```bash
+$ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
+[[h'64756D6D792D746565702D6167656E742D6B69642D666F722D6465762D313233', {"attributes": {256: h'016275696C64696E672D6465762D313233'}, "wapp_list": [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]}]]
+```
+
+See [TEEP_AGENT_STATUS](./doc/TEEP_AGENT_STATUS.md) for more detail.
+
+### Get SUIT Manifests
+
+You can get dummy SUIT manifests with:
+
+```bash
+$ curl -X GET http://localhost:8080/admin/getManifests -H "Accept: application/cbor" -s | cbor2diag.rb
+[[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]
+```
+
+See [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md) for more detail.
+
 ## Architecture Overview
 
 ```mermaid
@@ -98,7 +133,6 @@ Detailed design docs:
   - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
   - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
   - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
-- [Internal Design](./doc/INTERNAL_DESIGN.md)
 
 ## Repository Layout
 
@@ -107,6 +141,9 @@ Detailed design docs:
 - `internal/tam/` - TAM server
 - `internal/infra/sqlite/` - SQLite DBMS managing the TAM status, such as TEEP Agent keys, SUIT Manifests, etc.
 - `resources/` – embedded CBOR fixtures (query/update payloads) and generated artefacts surfaced by the test tools.
+
+Detailed design docs:
+- [Internal Design](./doc/INTERNAL_DESIGN.md)
 
 ## Development Workflow
 
@@ -122,65 +159,6 @@ go test -tags=integration ./...
 ```
 
 The handler logs every received TEEP message. Verifier responses are decoded and logged, and confirmed TEEP Agent keys are stored in SQLite.
-
-### Get Dummy TEEP Agent status
-
-You can get dummy TEEP Agent status with:
-
-```bash
-$ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
-[[h'64756D6D792D746565702D6167656E742D6B69642D666F722D6465762D313233', {"attributes": {256: h'016275696C64696E672D6465762D313233'}, "wapp_list": [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]}]]
-```
-The result is equivalent to:
-```cbor-diag
-[
-  [
-    'dummy-teep-agent-kid-for-dev-123',
-    {
-      "wapp_list": [
-        [
-          / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
-          / manifest-sequence-number: / 3
-        ],
-        [
-          / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
-          / manifest-sequence-number: / 2
-        ]
-      ],
-      "attributes": {
-        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
-      }
-    }
-  ]
-]
-```
-
-See [TEEP_AGENT_STATUS](./doc/TEEP_AGENT_STATUS.md) for more detail.
-
-### Get SUIT Manifests
-
-You can get dummy SUIT manifests with:
-
-```bash
-$ curl -X GET http://localhost:8080/admin/getManifests -H "Accept: application/cbor" -s | cbor2diag.rb
-[[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]
-```
-
-The result is equivalent to:
-```cbor-diag
-[
-  [
-    / component: / << ['app1.wasm'] >>,
-    / manifest-sequence-number: / 3
-  ],
-  [
-    / component: / << ['app2.wasm'] >>,
-    / manifest-sequence-number: / 2
-  ]
-]
-```
-
-See [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md) for more detail.
 
 ## Contributing
 

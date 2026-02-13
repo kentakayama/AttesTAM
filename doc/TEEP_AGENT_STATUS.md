@@ -1,3 +1,9 @@
+- [TEEP Agent Status Handling in TAM](#teep-agent-status-handling-in-tam)
+  - [Why Is This Required?](#why-is-this-required)
+  - [Specification of /getAgents Web API](#specification-of-getagents-web-api)
+  - [Public Key of TEEP Agent](#public-key-of-teep-agent)
+  - [Trusted Components Held by the TEEP Agent](#trusted-components-held-by-the-teep-agent)
+
 # TEEP Agent Status Handling in TAM
 
 ## Why Is This Required?
@@ -9,11 +15,18 @@ This TAM manages the following status for each TEEP Agent:
 
 ## Specification of /getAgents Web API
 
-This TAM provides HTTP GET APIs for TAM Admin and Device Manager Admin.
+This TAM currently exposes one implemented status API and one planned API.
+
+### Implemented
 
 URL | Method | Authorized Requester | Input | Output
 --|--|--|--|--
 `/admin/getAgents` | `GET` | TAM Admin | no query | Status of all TEEP Agents, see the CDDL below
+
+### Planned (not implemented yet)
+
+URL | Method | Authorized Requester | Input | Output
+--|--|--|--|--
 `/device-admin/getAgents` | `GET` | Device Manager Admin | no query | TEEP Agents bound to its device, see the CDDL below
 
 ```cddl

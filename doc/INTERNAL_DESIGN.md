@@ -1,3 +1,14 @@
+- [Internal Design](#internal-design)
+  - [Purpose](#purpose)
+  - [Layered Architecture](#layered-architecture)
+    - [Responsibilities](#responsibilities)
+  - [Startup and Wiring](#startup-and-wiring)
+  - [Request Flow and State Ownership](#request-flow-and-state-ownership)
+    - [1) TEEP flow (`POST /tam`)](#1-teep-flow-post-tam)
+    - [2) Admin and TC Developer endpoints](#2-admin-and-tc-developer-endpoints)
+  - [Model to DB Relationship](#model-to-db-relationship)
+  - [Design Rules](#design-rules)
+
 # Internal Design
 
 ## Purpose
