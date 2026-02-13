@@ -1,0 +1,51 @@
+{
+    / suit-authentication-wrapper / 2: << [
+        / digest over suit-manifest including bstr header / << [
+            -16 / SHA-256 /,
+            h'4313160484182F041197F695A412B7C591CB112CCAAA5D60C03285EF7E20FCB0'
+        ] >>,
+        / authentication block / << 18([
+            << {
+                / alg / 1: -9 / XXX: ESP256 /
+            } >>,
+            {
+                / kid / 4: h'CA9E35F23B2B525FB4FC83F512B0DCAC4AC29E457E873A5D6A7313F71690B33C' / XXX: RFC 9679 /
+            },
+            null,
+            h'9F164D573832239848605B3E89C1CD593C55F5BC8C9A5E23DD04E0DE61841185CE6578225EEAD1EE1A3C46B4849EC4AAAA923B96254AC8654AA46B740AEDBB1B'
+        ]) >>
+    ] >>,
+    / suit-manifest / 3: << {
+        / suit-manifest-version / 1: 1,
+        / suit-manifest-sequence-number / 2: 0,
+        / suit-common / 3: << {
+            / suit-components / 2: [
+                ['hello.txt']
+            ],
+            / suit-shared-sequence / 4: << [
+                / suit-directive-override-parameters / 20, {
+                    / suit-parameter-vendor-identifier / 1: h'FA6B4A53D5AD5FDFBE9DE663E4D41FFE',
+                    / suit-parameter-class-identifier / 2: h'1492AF1425695E48BF429B2D51F2AB45',
+                    / suit-parameter-image-digest / 3: << [
+                        -16 / SHA-256 /,
+                        h'DFFD6021BB2BD5B0AF676290809EC3A53191DD81C7F70A4B28688A362182986F'
+                    ] >>,
+                    / suit-parameter-image-size / 14: 13
+                },
+                / suit-condition-vendor-identifier / 1, 15,
+                / suit-condition-class-identifier / 2, 15
+            ] >>
+        } >>,
+        / suit-manifest-component-id / 5: [
+            'manifest.text.0.suit'
+        ],
+        16: << [
+            / suit-directive-override-parameters / 20, {
+                / suit-parameter-uri / 21: "#hello.txt"
+            },
+            / suit-directive-fetch / 21, 2,
+            / suit-condition-image-match / 3, 15
+        ] >>
+    } >>,
+    "#hello.txt": 'Hello, World!'
+}

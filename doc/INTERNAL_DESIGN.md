@@ -1,14 +1,3 @@
-- [Internal Design](#internal-design)
-  - [Purpose](#purpose)
-  - [Layered Architecture](#layered-architecture)
-    - [Responsibilities](#responsibilities)
-  - [Startup and Wiring](#startup-and-wiring)
-  - [Request Flow and State Ownership](#request-flow-and-state-ownership)
-    - [1) TEEP flow (`POST /tam`)](#1-teep-flow-post-tam)
-    - [2) Admin and TC Developer endpoints](#2-admin-and-tc-developer-endpoints)
-  - [Model to DB Relationship](#model-to-db-relationship)
-  - [Design Rules](#design-rules)
-
 # Internal Design
 
 ## Purpose
@@ -26,6 +15,35 @@ flowchart TD
     F --> H[(SQLite: <br/>tam_state.db)]
     D --> G[internal/infra/rats: <br/>Verifier client]
     G --> V(["VERAISON (external): <br/>Verifier server"])
+```
+
+## Rough DFD
+
+```mermaid
+flowchart LR
+    Agent([TEEP Agent])
+    TCDev([TC Developer])
+    Admin([TAM Admin])
+    Verifier([VERAISON])
+
+    subgraph TAM Server
+        H[HTTP Handler]
+        TAM[TAM Orchestrator]
+        DB[(tam_state.db)]
+    end
+
+    Agent -- "TEEP messages" --> H
+    H -- "TEEP Message" --> Agent
+
+    H -- "Agent Status<br/>SUIT Manifests" --> Admin
+    TCDev -- "SUIT Manifest" --> H
+
+    H -- "TEEP Message" --> TAM
+    TAM -- "attestation payload" --> Verifier
+    Verifier -- "attestation result" --> TAM
+
+    TAM -- "read/write<br/>agents, manifests, tokens,<br/>challenges, reports" --> DB
+    TAM -- "TEEP response /<br/> Agent Status /<br/> SUIT Manifests" --> H
 ```
 
 ### Responsibilities

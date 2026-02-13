@@ -1,10 +1,6 @@
-- [TEEP Agent Status Handling in TAM](#teep-agent-status-handling-in-tam)
-  - [Why Is This Required?](#why-is-this-required)
-  - [Specification of /getAgents Web API](#specification-of-getagents-web-api)
-  - [Public Key of TEEP Agent](#public-key-of-teep-agent)
-  - [Trusted Components Held by the TEEP Agent](#trusted-components-held-by-the-teep-agent)
-
 # TEEP Agent Status Handling in TAM
+
+For internal implementation details, see [TAM Status TEEP Agent Status (Internal Design)](./TAM_STATUS_TEEP_AGENT_STATUS.md).
 
 ## Why Is This Required?
 
@@ -28,6 +24,8 @@ URL | Method | Authorized Requester | Input | Output
 URL | Method | Authorized Requester | Input | Output
 --|--|--|--|--
 `/device-admin/getAgents` | `GET` | Device Manager Admin | no query | TEEP Agents bound to its device, see the CDDL below
+
+### Output Format
 
 ```cddl
 ;# import rfc9711 as eat
@@ -56,7 +54,29 @@ component-list = [
 ]
 ```
 
-See [example output in CBOR diagnostic notation](example-agent-status.diag).
+Example output:
+```cbor-diag
+[
+  [
+    'dummy-teep-agent-kid-for-dev-123',
+    {
+      "wapp_list": [
+        [
+          / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
+          / manifest-sequence-number: / 3
+        ],
+        [
+          / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
+          / manifest-sequence-number: / 2
+        ]
+      ],
+      "attributes": {
+        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+      }
+    }
+  ]
+]
+```
 
 ## Public Key of TEEP Agent
 
@@ -116,7 +136,6 @@ flowchart LR
     Agent[TEEP Agent] -- tc-list --> TAM
     TAM -- SUIT manifests --> Agent
     Agent -- SUIT reports --> TAM
-
 ```
 
 As a result, TAM may store TEEP Agent status like the following table:

@@ -1,15 +1,6 @@
-- [TAM TEEP Message Handling](#tam-teep-message-handling)
-  - [TEEP Protocol interactions defined in (Draft) RFCs](#teep-protocol-interactions-defined-in-draft-rfcs)
-  - [Requirements for TEEP Protocol Messages from TEEP Agent](#requirements-for-teep-protocol-messages-from-teep-agent)
-  - [TEEP with Remote Attestation](#teep-with-remote-attestation)
-    - [With RFC 9711 EAT + Measured Component](#with-rfc-9711-eat--measured-component)
-    - [With Intel SGX DCAP Remote Attestation (TODO)](#with-intel-sgx-dcap-remote-attestation-todo)
-  - [Handling QueryResponse with tc-list](#handling-queryresponse-with-tc-list)
-  - [How this TAM implementation Acts](#how-this-tam-implementation-acts)
-
 # TAM TEEP Message Handling
 
-## TEEP Protocol interactions defined in (Draft) RFCs
+## TEEP Protocol Interactions Defined in Draft RFCs
 
 [Section 3 of the TEEP Protocol draft](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-21#section-3) defines how TEEP Agents reply to TAM messages:
 
@@ -171,7 +162,7 @@ Due to the limitation of 64-byte `report_data` in SGX Quote, TEEP Agents and TAM
 5. on affirming Attestation Results, the TAM extracts the hash from `report_data` in SGX Quote and compares the one calculated on `raw-report-data`.
 
 > [!NOTE]
-> [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove the posession of a key.
+> [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove possession of a key.
 
 ## Handling QueryResponse with tc-list
 
@@ -208,7 +199,7 @@ Detailed behavior:
 5. If resulting manifest list is empty, TAM returns no response body (`204` from HTTP layer).
 6. If manifests exist, TAM signs an `Update`, saves sent-update metadata for later correlation, and returns it.
 
-## How this TAM implementation Acts
+## How This TAM Implementation Acts
 
 Based on these draft RFCs, this TAM over HTTP currently behaves as follows:
 

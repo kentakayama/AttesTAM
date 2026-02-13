@@ -1,16 +1,3 @@
-- [tam-over-http](#tam-over-http)
-  - [Quick Start](#quick-start)
-    - [Command Options](#command-options)
-    - [Docker](#docker)
-  - [API Endpoints](#api-endpoints)
-    - [Get Dummy TEEP Agent status](#get-dummy-teep-agent-status)
-    - [Get SUIT Manifests](#get-suit-manifests)
-  - [Architecture Overview](#architecture-overview)
-  - [Repository Layout](#repository-layout)
-  - [Development Workflow](#development-workflow)
-  - [Contributing](#contributing)
-  - [Call Graph](#call-graph)
-
 # tam-over-http
 
 `tam-over-http` is a lightweight Trusted Application Manager (TAM) server for exercising WebAssembly-based TEEP (Trusted Execution Environment Provisioning) clients. It serves deterministic QueryRequest / QueryResponse / Update behavior so client implementations can validate COSE/CBOR handling without production infrastructure.
@@ -85,28 +72,18 @@ Method | Endpoint | Purpose
 `POST` | `/tc-developer/addManifest` | Register a signed SUIT manifest.
 
 See [`doc/EXTERNAL_DESIGN.md`](./doc/EXTERNAL_DESIGN.md) for the API-level design.
+For usage examples (`curl`, endpoint behavior, test commands), see [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
-### Get Dummy TEEP Agent status
+## Documentation
 
-You can get dummy TEEP Agent status with:
-
-```bash
-$ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
-[[h'64756D6D792D746565702D6167656E742D6B69642D666F722D6465762D313233', {"attributes": {256: h'016275696C64696E672D6465762D313233'}, "wapp_list": [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]}]]
-```
-
-See [TEEP_AGENT_STATUS](./doc/TEEP_AGENT_STATUS.md) for more detail.
-
-### Get SUIT Manifests
-
-You can get dummy SUIT manifests with:
-
-```bash
-$ curl -X GET http://localhost:8080/admin/getManifests -H "Accept: application/cbor" -s | cbor2diag.rb
-[[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]
-```
-
-See [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md) for more detail.
+- [User Manual](./doc/USER_MANUAL.md)
+- [External Design](./doc/EXTERNAL_DESIGN.md)
+  - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
+  - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
+  - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
+- [Internal Design](./doc/INTERNAL_DESIGN.md)
+  - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_STORE.md)
+  - [TAM Status TEEP Agent Status](./doc/TAM_STATUS_TEEP_AGENT_STATUS.md)
 
 ## Architecture Overview
 
@@ -128,22 +105,13 @@ sequenceDiagram
     TAM-->>Client: (Terminate)
 ```
 
-Detailed design docs:
-- [External Design](./doc/EXTERNAL_DESIGN.md)
-  - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
-  - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
-  - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
-
 ## Repository Layout
 
 - `cmd/tam-over-http/` – entrypoint wiring configuration, logging, and HTTP server startup.
-- `internal/server/` – HTTP handler
-- `internal/tam/` - TAM server
-- `internal/infra/sqlite/` - SQLite DBMS managing the TAM status, such as TEEP Agent keys, SUIT Manifests, etc.
+- `internal/server/` – HTTP handler.
+- `internal/tam/` – TAM core orchestration.
+- `internal/infra/sqlite/` – SQLite persistence for TAM state (TEEP Agent keys, SUIT manifests, tokens, etc.).
 - `resources/` – embedded CBOR fixtures (query/update payloads) and generated artefacts surfaced by the test tools.
-
-Detailed design docs:
-- [Internal Design](./doc/INTERNAL_DESIGN.md)
 
 ## Development Workflow
 
