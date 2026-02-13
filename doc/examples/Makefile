@@ -17,7 +17,7 @@ SUIT_MANIFEST_CDDL := draft-ietf-suit-manifest.cddl
 RFC9711_CDDL := rfc9711.cddl
 
 .PHONY: all
-all: $(AGENT_STATUS_CBOR)
+all: $(AGENT_STATUS_CBOR) $(SUIT_MANIFEST_OVERVIEW_CBOR)
 
 %.cbor: %.diag
 	$(DIAG2CBOR) < $< > $@
@@ -49,4 +49,4 @@ test: test-agent-status test-suit-manifest-overview
 
 .PHONY: clean
 clean:
-	$(RM) $(AGENT_STATUS_CBOR) $(AGENT_STATUS_CDDL)
+	$(RM) $(AGENT_STATUS_CBOR) $(AGENT_STATUS_CDDL) $(SUIT_MANIFEST_OVERVIEW_CBOR) $(SUIT_MANIFEST_OVERVIEW_CDDL) $(RFC9711_CDDL) $(SUIT_MANIFEST_CDDL)

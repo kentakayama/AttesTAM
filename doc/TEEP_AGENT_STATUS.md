@@ -153,4 +153,4 @@ Agent-2 | Manifest-C-seq0 | Component-c0 | Installed but not in `tc-list`
 > [!WARNING]
 > As you can see the table above, the status of TEEP Agents could be complicated.
 > For now, the TAM only accepts SUIT Manifest with exactly ONE Trusted Component and reports the Trusted Components with explicit successful SUIT Report to avoid implementation complexity.
-> That's why the example-agent-status.diag does not contain the details.
+> That's why [example-agent-status.diag](./examples/example-agent-status.diag) does not contain the details.
