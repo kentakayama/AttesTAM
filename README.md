@@ -124,6 +124,27 @@ The handler logs every received TEEP message. Verifier responses are decoded and
 4. Ensure `gofmt`/`goimports`, `go test ./...`, and `go vet ./...` succeed before submitting a PR.
 5. Use imperative commit messages (e.g., `Add QueryResponse attestation logging`) and include motivation plus verification details in the pull request description.
 
-## Call Graph
+## TEEP Message Handling Overview
 
-![alt text](image.png)
+```mermaid
+  flowchart TD
+      In[Incoming TEEP Message] --> Parse[Parse + Basic Validation]
+      Parse --> Auth{Authenticated?}
+
+      Auth -- Yes --> Classify[Classify Message Type]
+      Auth -- No --> MaybeAttest{QueryResponse with attestation?}
+
+      MaybeAttest -- No --> Reject[Reject / Request Attestation]
+      MaybeAttest -- Yes --> Attest[Verify Attestation + Bind Agent Key]
+      Attest --> Classify
+
+      Classify -->|QueryResponse| Plan[Plan Update from Requested Components]
+      Plan --> PersistOut[Persist Sent Message Context]
+      PersistOut --> ReplyUpdate[Reply: Update or No Content]
+
+      Classify -->|Success/Error| Report[Process SUIT Reports]
+      Report --> Status[Update Agent Status Store]
+      Status --> ReplyEmpty[Reply: No Content]
+```
+
+See [TEEP_MESSAGE_HANDLE.md](./doc/TEEP_MESSAGE_HANDLE.md) for more detail.
