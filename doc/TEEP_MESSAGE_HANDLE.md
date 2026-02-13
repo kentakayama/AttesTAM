@@ -44,7 +44,29 @@ flowchart LR
 
 ### Requirements for TEEP Protocol Messages from TEEP Agent
 
-TODO: set kid(4) with sha256 RFC 9679 COSE_Key Thumbprint, ...
+This TAM implementation enforces the following requirements for incoming `POST /tam` messages:
+
+1. HTTP-level requirements
+   - Method must be `POST`.
+   - `Content-Type` must be `application/teep+cbor`.
+   - Body size must be within the server limit (`maxRequestBodyBytes`).
+
+2. Message format and signature requirements
+   - Non-empty messages are expected to be COSE Sign1-encoded TEEP messages.
+   - For normal authenticated flow, the COSE unprotected header `kid` (label `4`) is required.
+   - `kid` is treated as SHA-256 COSE_Key thumbprint and expected to be 32 bytes.
+   - TAM looks up the corresponding agent public key from DB and verifies the COSE signature.
+
+3. Correlation and replay-protection requirements
+   - Query/Update correlation relies on one-time `token` and `challenge`.
+   - Received `token` is marked consumed before sent-message lookup.
+   - A message must match a previously sent TAM message (by token/challenge); otherwise it is rejected.
+
+4. Remote attestation fallback path
+   - If QueryResponse cannot be authenticated with stored agent keys, attestation payload is required.
+   - Attestation result must be `affirming`.
+   - QueryResponse signature is re-verified using the key extracted from attestation result.
+   - Confirmed key is stored for future message authentication.
 
 ### TEEP with Remote Attestation
 
@@ -86,6 +108,41 @@ While SGX Quote is defined by the products, our customized VERAISON produces Att
 We leverages the [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/): the VERAISON extracts the TEEP Agent's key from SGX Quote Report Data and stores it inside [EAT Attestation Results](https://datatracker.ietf.org/doc/draft-ietf-rats-ear/).
 
 TODO: SGX Quote constraction and Report Data => EAT Attestation Results conversion (external link to our customized VERAISON)
+
+### Handling QueryResponse with tc-list
+
+When TAM receives an authenticated `QueryResponse`, it generates `Update` from requested Trusted Components.
+
+```mermaid
+sequenceDiagram
+    participant Agent as TEEP Agent
+    participant TAM as TAM
+    participant DB as SQLite
+
+    Agent->>TAM: QueryResponse (token, tc-list/requested-tc-list)
+    TAM->>DB: consume token + find sent QueryRequest
+    TAM->>TAM: deduplicate component IDs from both lists
+    loop each component
+        TAM->>DB: find latest SUIT manifest
+        DB-->>TAM: manifest or not found
+    end
+    alt at least one manifest found
+        TAM->>DB: save sent Update (new token + manifest links)
+        TAM-->>Agent: Update(manifest-list)
+    else none found
+        TAM-->>Agent: empty (session termination)
+    end
+```
+
+Detailed behavior:
+1. `QueryResponse.token` must match the token from TAM's previously sent `QueryRequest`.
+2. TAM builds a unique component set from:
+   - `requested-tc-list[*].component-id`
+   - `tc-list[*].system-component-id`
+3. For each component ID, TAM loads latest manifest (`FindLatestByTrustedComponentID`).
+4. Unknown component IDs are logged and skipped (not fatal).
+5. If resulting manifest list is empty, TAM returns no response body (`204` from HTTP layer).
+6. If manifests exist, TAM signs an `Update`, saves sent-update metadata for later correlation, and returns it.
 
 ### How this TAM implementation Acts
 
