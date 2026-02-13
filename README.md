@@ -1,6 +1,6 @@
 # tam-over-http
 
-`tam-over-http` is a lightweight Trusted Application Manager (TAM) server used to exercise WebAssembly-based TEEP (Trusted Execution Environment Provisioning) clients. It serves deterministic responses that model the TEEP QueryRequest / QueryResponse / Update exchange, helping client implementations validate COSE- and CBOR-encoded payload handling without talking to production infrastructure.
+`tam-over-http` is a lightweight Trusted Application Manager (TAM) server for exercising WebAssembly-based TEEP (Trusted Execution Environment Provisioning) clients. It serves deterministic QueryRequest / QueryResponse / Update behavior so client implementations can validate COSE/CBOR handling without production infrastructure.
 
 ```mermaid
 flowchart LR
@@ -17,8 +17,8 @@ flowchart LR
 go run ./cmd/tam-over-http
 ```
 
-The mock server listens on `localhost:8080` by default and exposes a single endpoint at `POST /tam/`.
-Send TEEP messages (COSE Sign1) as the request body and inspect the mock server logs for the corresponding response behaviour. When a verifier endpoint is configured (via `-challenge-server` or the `TAM4WASM_CHALLENGE_SERVER` environment variable), the server forwards attestation payloads and logs the decoded verifier response as soon as it is received—no attestation files are written to disk.
+The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
+Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `TAM4WASM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs decoded verifier responses. No attestation files are written to disk.
 
 ### Command Options
 
@@ -62,6 +62,17 @@ docker run --rm -p 8080:8080 \
 
 The container bundles the embedded CBOR fixtures under `/app/resources` but no attestation response files are persisted during runtime.
 
+## API Endpoints
+
+Method | Endpoint | Purpose
+--|--|--
+`POST` | `/tam` | TEEP over HTTP session endpoint (empty body, QueryResponse, Success, Error).
+`GET` | `/admin/getAgents` | Return TEEP agent status in CBOR for TAM admin.
+`GET` | `/admin/getManifests` | Return manifest overviews in CBOR.
+`POST` | `/tc-developer/addManifest` | Register a signed SUIT manifest.
+
+See [`doc/EXTERNAL_DESIGN.md`](./doc/EXTERNAL_DESIGN.md) for the API-level design.
+
 ## Architecture Overview
 
 ```mermaid
@@ -82,7 +93,12 @@ sequenceDiagram
     TAM-->>Client: (Terminate)
 ```
 
-For more detailed design, [External Design](./doc/EXTERNAL_DESIGN.md) and Internal Design (WIP) documents help you to understand our implementation.
+Detailed design docs:
+- [External Design](./doc/EXTERNAL_DESIGN.md)
+  - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
+  - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
+  - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
+- [Internal Design](./doc/INTERNAL_DESIGN.md)
 
 ## Repository Layout
 
@@ -95,23 +111,27 @@ For more detailed design, [External Design](./doc/EXTERNAL_DESIGN.md) and Intern
 ## Development Workflow
 
 ```bash
-make # Compile against Go 1.25
-make test # Run unit tests
-make test-integrated # Run tests including integration tests requires provisioned VERAISON server
-make run # Local smoke check
+make run              # Start server locally
+make test             # Run unit tests (go test ./...)
+make test-integrated  # Run integration-tagged tests (requires provisioned VERAISON server)
+
+# Equivalent direct Go commands:
+go run ./cmd/tam-over-http
+go test ./...
+go test -tags=integration ./...
 ```
 
-The handler logs every received TEEP message. The resulting verifier response is decoded, logged, and the confirmed TEEP Agent keys are stored in the DB.
+The handler logs every received TEEP message. Verifier responses are decoded and logged, and confirmed TEEP Agent keys are stored in SQLite.
 
 ### Get Dummy TEEP Agent status
 
-You can get some dummy TEEP Agent status with this command one liner below:
+You can get dummy TEEP Agent status with:
 
 ```bash
 $ curl -X GET http://localhost:8080/admin/getAgents -H "Accept: application/cbor" -s | cbor2diag.rb
 [[h'64756D6D792D746565702D6167656E742D6B69642D666F722D6465762D313233', {"attributes": {256: h'016275696C64696E672D6465762D313233'}, "wapp_list": [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]}]]
 ```
-The results are equivalent to the diagnostic notation below:
+The result is equivalent to:
 ```cbor-diag
 [
   [
@@ -135,35 +155,39 @@ The results are equivalent to the diagnostic notation below:
 ]
 ```
 
+See [TEEP_AGENT_STATUS](./doc/TEEP_AGENT_STATUS.md) for more detail.
+
 ### Get SUIT Manifests
 
-You can get some dummy SUIT Manifests with this command one liner below:
+You can get dummy SUIT manifests with:
 
 ```bash
 $ curl -X GET http://localhost:8080/admin/getManifests -H "Accept: application/cbor" -s | cbor2diag.rb
 [[h'8149617070312E7761736D', 3], [h'8149617070322E7761736D', 2]]
 ```
 
-The results are equivalent to the diagnostic notation below:
+The result is equivalent to:
 ```cbor-diag
 [
   [
-    / SUIT_Component_Identifier: / h'8149617070312E7761736D' / ['app1.wasm'] /,
+    / component: / << ['app1.wasm'] >>,
     / manifest-sequence-number: / 3
   ],
   [
-    / SUIT_Component_Identifier: / h'8149617070322E7761736D' / ['app2.wasm'] /,
+    / component: / << ['app2.wasm'] >>,
     / manifest-sequence-number: / 2
   ]
 ]
 ```
 
+See [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md) for more detail.
+
 ## Contributing
 
-1. Write focused changes organised under `internal/` packages; keep shared code small and single-purpose.
+1. Write focused changes organized under `internal/` packages; keep shared code small and single-purpose.
 2. Format with `gofmt`/`goimports`, use PascalCase for exported identifiers, and wrap errors with context (`fmt.Errorf("...: %w", err)`).
 3. Add or update tests alongside the code in `*_test.go` files; store golden fixtures under `testdata/`.
-4. Ensure `go fmt`, `go test ./...`, and `go vet ./...` succeed before submitting a PR.
+4. Ensure `gofmt`/`goimports`, `go test ./...`, and `go vet ./...` succeed before submitting a PR.
 5. Use imperative commit messages (e.g., `Add QueryResponse attestation logging`) and include motivation plus verification details in the pull request description.
 
 ## Call Graph

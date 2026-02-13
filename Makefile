@@ -1,5 +1,5 @@
-.PHONY: run-tam-server
-run-tam-server:
+.PHONY: run
+run:
 	go run ./cmd/tam-over-http
 
 .PHONY: test

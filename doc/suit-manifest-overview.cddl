@@ -1,0 +1,10 @@
+; requires SUIT Manifest CDDL
+
+get-manifests-output = [
+  * suit-manifest-overview,
+]
+
+suit-manifest-overview = [
+  component: bstr .cbor SUIT_Component_Identifier,
+  manifest-sequence-number: uint,
+]

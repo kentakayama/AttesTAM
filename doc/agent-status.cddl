@@ -1,4 +1,5 @@
 ;# import rfc9711 as eat
+; requires SUIT Manifest CDDL and SUIT Manifest Overview CDDL
 
 get-agent-status-output = [
   * agent-status-record,
@@ -11,14 +12,9 @@ agent-status-record = [
 
 agent-status = {
   "attributes": agent-attributes,
-  "wapp_list": [ * component-list ],
+  "wapp_list": [ * suit-manifest-overview ],
 }
 
 agent-attributes = {
   eat.ueid-label => eat.ueid-type,
 }
-
-component-list = [
-  component: bstr .cbor SUIT_Component_Identifier,
-  manifest-sequence-number: uint,
-]
