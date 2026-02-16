@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Console for Building Security Service Provider</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <header class="app-header">Admin Console for Building Security Service Provider</header>
+    <div class="app-body">
+      <nav class="sidebar">
+        <button id="btn-devices" class="nav-btn active">Show Devices</button>
+        <button id="btn-manifests" class="nav-btn">Show Manifests</button>
+        <button id="btn-upload" class="nav-btn">Upload Manifests</button>
+      </nav>
+      <main class="content">
+        <section id="view-devices" class="view visible">
+          <div class="card">
+            <p class="kicker">Show Devices</p>
+            <h2>Devices</h2>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                    <tr>
+                    <th>Device Name</th>
+                    <th>Wapp Name</th>
+                    <th>Wapp Ver</th>
+                    </tr>
+                </thead>
+                <tbody id="devices-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-manifests" class="view">
+          <div class="card">
+            <p class="kicker">Show Manifests</p>
+            <h2>Manifests</h2>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Manifest Name</th>
+                    <th>Version</th>
+                  </tr>
+                </thead>
+                <tbody id="manifests-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-upload" class="view">
+          <div class="card">
+            <p class="kicker">Upload Manifests</p>
+            <h2>Upload</h2>
+            <form id="upload-form">
+              <div class="form-group">
+                <label>File: <input type="file" name="file" required /></label>
+              </div>
+              <div class="form-group">
+                <label>Version: <input type="text" name="version" /></label>
+              </div>
+              <br/>
+              <button type="submit">Upload</button>
+              <div id="upload-status"></div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

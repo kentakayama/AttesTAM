@@ -1,0 +1,241 @@
+/* Modern admin UI - light/dark aware, responsive, accessible */
+
+/* ===== CSS Variables (Color & Spacing) ===== */
+:root {
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-weak: #e0e7ff;
+  --accent: #10b981;
+  --danger: #ef4444;
+  --shadow: 0 6px 20px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --transition: 180ms cubic-bezier(.2,.8,.2,1);
+}
+
+/* Auto dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020;
+    --panel: #121931;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --border: #24304f;
+    --primary: #60a5fa;
+    --primary-weak: #1f2a44;
+    --accent: #34d399;
+    --danger: #f87171;
+    --shadow: 0 12px 30px rgba(0,0,0,0.35);
+  }
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  color: var(--text);
+  background: radial-gradient(1000px 600px at 10% 0%, rgba(37,99,235,0.06), transparent 50%),
+              radial-gradient(900px 600px at 90% 10%, rgba(16,185,129,0.06), transparent 55%),
+              var(--bg);
+  min-height: 100vh;
+}
+
+/* Util */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ===== App Frame ===== */
+.app-frame {
+  max-width: 1100px;
+  margin: var(--space-6) auto;
+  padding: var(--space-5);
+}
+.app-header {
+  font-weight: 800;
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+  letter-spacing: .2px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+.app-header::before {
+  content: "";
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  box-shadow: 0 6px 18px rgba(37,99,235,.25);
+}
+
+/* ===== Layout (Responsive) ===== */
+.app-body {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: var(--space-5);
+}
+
+@media (max-width: 860px) {
+  .app-body { grid-template-columns: 1fr; }
+}
+
+/* ===== Sidebar / Tabs ===== */
+.sidebar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-2);
+  position: sticky;
+  top: var(--space-6);
+  height: fit-content;
+}
+.nav-btn {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: .2px;
+  transition: background var(--transition), color var(--transition), border var(--transition), transform var(--transition);
+  cursor: pointer;
+}
+.nav-btn + .nav-btn { margin-top: var(--space-2); }
+.nav-btn:hover { background: rgba(99,102,241,0.08); }
+.nav-btn.active {
+  background: var(--primary-weak);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+.nav-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 2px;
+}
+
+/* ===== Content ===== */
+.content {
+  display: grid;
+  gap: var(--space-5);
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}
+.view h2 {
+  margin: 0 0 var(--space-4);
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  letter-spacing: .2px;
+}
+
+/* ===== Table ===== */
+.table-wrap {
+  overflow: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+.table th, .table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.table td{white-space:pre-line}
+.table thead th {
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: .78rem;
+  letter-spacing: .6px;
+}
+.table tbody tr {
+  background: transparent;
+  transition: background var(--transition), transform var(--transition);
+}
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary-weak) 25%, transparent);
+}
+
+/* ===== Form ===== */
+form .form-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+@media (max-width: 600px) {
+  form .form-row { grid-template-columns: 1fr; }
+}
+label { color: var(--muted); font-weight: 600; }
+input[type="text"], input[type="file"] {
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  color: var(--text);
+  border-radius: var(--radius-xs);
+  padding: 10px 12px;
+  transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+}
+input[type="text"]:focus, input[type="file"]:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+/* Buttons */
+.primary {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 18%, var(--panel)), var(--panel));
+  color: var(--primary);
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 30%, var(--panel)), var(--panel));
+}
+.primary:active { transform: translateY(0); }
+.status { margin-top: var(--space-2); color: var(--accent); }
+
+/* ===== View visibility (SPA) ===== */
+.view { display: none; }
+.view.visible { display: block; }
+
+/* ===== Small helper elements ===== */
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-weak) 60%, transparent);
+  color: var(--primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: .72rem;
+  letter-spacing: .6px;
+}
