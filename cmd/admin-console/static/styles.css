@@ -175,6 +175,40 @@ body {
   background: color-mix(in srgb, var(--primary-weak) 25%, transparent);
 }
 
+.devices-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.device-detail-panel {
+  display: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+
+.device-detail-panel.visible {
+  display: block;
+}
+
+.device-detail-panel h3 {
+  margin: 0 0 var(--space-3);
+  font-size: .95rem;
+}
+
+.device-clickable {
+  cursor: pointer;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.table tbody tr.selected {
+  background: color-mix(in srgb, var(--primary-weak) 40%, transparent);
+}
+
 /* ===== Form ===== */
 form .form-row {
   display: grid;

@@ -14,6 +14,10 @@ const btnUpload = $('#btn-upload');
 const viewDevices = $('#view-devices');
 const viewManifests = $('#view-manifests');
 const viewUpload = $('#view-upload');
+const deviceDetailPanel = $('#device-detail-panel');
+const deviceDetailTitle = $('#device-detail-title');
+const deviceDetailBody = $('#device-detail-body');
+let selectedDeviceKID = null;
 
 function setActive(btn, view) {
   $all('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -32,26 +36,74 @@ loadDevices();
 async function loadDevices() {
   const tbody = document.getElementById('devices-body');
   tbody.innerHTML = '';
+  selectedDeviceKID = null;
+  if (deviceDetailPanel) deviceDetailPanel.classList.remove('visible');
+  if (deviceDetailTitle) deviceDetailTitle.textContent = 'Device Details';
+  if (deviceDetailBody) deviceDetailBody.innerHTML = '';
   try {
     const res = await fetch('/api/devices');
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(d => {
-        const tr = document.createElement('tr');
         const kid = d.kid || d.KID || '-';
+        const lastUpdate = d.last_update || d.lastUpdate || d.updated_at || d.updatedAt || '-';
         const wappList = d.wapp_list || d.WappList || [];
-        let name = '-';
-        let ver = '-';
-        if (Array.isArray(wappList) && wappList.length > 0) {
-          const w = wappList[0];
-          name = w.name || w.Name || '-';
-          ver = (w.ver !== undefined && w.ver !== null) ? String(w.ver) : '-';
-        }
-        const td1 = document.createElement('td'); td1.textContent = kid;
-        const td2 = document.createElement('td'); td2.textContent = name;
-        const td3 = document.createElement('td'); td3.textContent = ver;
-        tr.append(td1, td2, td3);
+
+        const tr = document.createElement('tr');
+        const tdDevice = document.createElement('td');
+        const tdLastUpdate = document.createElement('td');
+
+        tdDevice.textContent = kid;
+        tdDevice.className = 'device-clickable';
+        tdLastUpdate.textContent = lastUpdate;
+
+        tr.append(tdDevice, tdLastUpdate);
         tbody.appendChild(tr);
+
+        tdDevice.addEventListener('click', () => {
+          // Toggle off when clicking the same selected device.
+          if (selectedDeviceKID === kid && tr.classList.contains('selected')) {
+            selectedDeviceKID = null;
+            tr.classList.remove('selected');
+            if (deviceDetailPanel) deviceDetailPanel.classList.remove('visible');
+            if (deviceDetailTitle) deviceDetailTitle.textContent = 'Device Details';
+            if (deviceDetailBody) deviceDetailBody.innerHTML = '';
+            return;
+          }
+
+          selectedDeviceKID = kid;
+          $all('#devices-body tr').forEach(row => row.classList.remove('selected'));
+          tr.classList.add('selected');
+
+          if (deviceDetailTitle) {
+            deviceDetailTitle.textContent = `Device: ${kid}`;
+          }
+          if (deviceDetailBody) {
+            deviceDetailBody.innerHTML = '';
+            if (Array.isArray(wappList) && wappList.length > 0) {
+              wappList.forEach(w => {
+                const detailTr = document.createElement('tr');
+                const nameTd = document.createElement('td');
+                const verTd = document.createElement('td');
+                nameTd.textContent = w.name || w.Name || '-';
+                verTd.textContent = (w.ver !== undefined && w.ver !== null) ? String(w.ver) : '-';
+                detailTr.append(nameTd, verTd);
+                deviceDetailBody.appendChild(detailTr);
+              });
+            } else {
+              const detailTr = document.createElement('tr');
+              const nameTd = document.createElement('td');
+              const verTd = document.createElement('td');
+              nameTd.textContent = '-';
+              verTd.textContent = '-';
+              detailTr.append(nameTd, verTd);
+              deviceDetailBody.appendChild(detailTr);
+            }
+          }
+          if (deviceDetailPanel) {
+            deviceDetailPanel.classList.add('visible');
+          }
+        });
       });
     }
   } catch (e) {
@@ -93,7 +145,6 @@ form.addEventListener('submit', async (e) => {
     statusEl.textContent = 'Upload complete.';
     form.reset();
     loadManifests();
-    setActive(btnManifests, viewManifests);
   } catch (err) {
     statusEl.textContent = 'Upload failed: ' + err.message;
   }
