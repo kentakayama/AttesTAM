@@ -30,7 +30,7 @@ const (
 
 func main() {
 	var (
-		addr                 = flag.String("addr", ":8080", "listen address in host:port form")
+		addr                 = flag.String("addr", "localhost:8080", "listen address in host:port form. If you want to listen on all interfaces, use :8080.")
 		challengeServer      = flag.String("challenge-server", "https://localhost:8443", "base URL for verifier challenge-response server")
 		challengeContentType = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")

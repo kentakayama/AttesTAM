@@ -46,12 +46,12 @@ flowchart LR
 
 This TAM implementation enforces the following requirements for incoming `POST /tam` messages:
 
-1. HTTP-level requirements
+1. HTTP-level requirements <!--これはTEEP over HTTP-->
    - Method must be `POST`.
    - `Content-Type` must be `application/teep+cbor`.
-   - Body size must be within the server limit (`maxRequestBodyBytes`).
+   - Body size must be within the server limit (`maxRequestBodyBytes`). <!--これは-->
 
-2. Message format and signature requirements
+2. Message format and signature requirements <!-- COSE security wrapper -->
    - Non-empty messages are expected to be COSE Sign1-encoded TEEP messages.
    - For normal authenticated flow, the COSE unprotected header `kid` (label `4`) is required.
    - `kid` is treated as an RFC 9679 SHA-256 COSE_Key thumbprint and expected to be 32 bytes.
@@ -103,7 +103,7 @@ sequenceDiagram
     participant Agent as TEEP Agent
     participant TAM as TAM
     participant V as VERAISON
-    participant DB as SQLite
+    participant DB as SQLite <!--これは除く-->
 
     Agent->>TAM: QueryResponse(attestation-payload, token/challenge)
     TAM->>V: Process(attestation-payload)

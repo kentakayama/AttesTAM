@@ -7,9 +7,9 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 1. Start TAM (`go run ./cmd/tam-over-http`).
 2. Check admin endpoints:
-   - `GET /admin/getAgents`
-   - `GET /admin/getManifests`
-3. Register SUIT envelope when needed via `POST /tc-developer/addManifest`.
+   - `POST /AgentService/GetAgentStatus`
+   - `GET /SUITManifestService/ListManifests`
+3. Register SUIT envelope when needed via `POST /SUITManifestService/RegisterManifest`.
 4. Integrate a TEEP Agent that communicates with `POST /tam`.
 
 ## Start the Server
@@ -27,12 +27,15 @@ make run
 ### Docker
 ```bash
 docker build -t tam-over-http .
-docker run --rm -p 8080:8080 tam-over-http
+docker run --rm -p 8080:8080 \
+  -e TAM4WASM_ADDR=":8080" \
+  tam-over-http
 ```
 
 With verifier settings:
 ```bash
 docker run --rm -p 8080:8080 \
+  -e TAM4WASM_ADDR=":8080" \
   -e TAM4WASM_CHALLENGE_SERVER="https://verifier.example.com" \
   -e TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
   tam-over-http
@@ -44,7 +47,7 @@ docker run --rm -p 8080:8080 \
 
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
-| `-addr` | `TAM4WASM_ADDR` | `:8080` | Listen address for the HTTP server. |
+| `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
 | `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
@@ -58,16 +61,21 @@ go run ./cmd/tam-over-http -h
 ## Prerequisites
 
 - `curl` for API calls (or any other HTTP client)
-- [`cbor2diag.rb`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
+- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
 
 ## API Summary
+
+<!--
+ＴＥＥＰ　Ａｇｅｎｔ用、管理者用で違うことを明記、
+仕様とサンプルを分ける
+-->
 
 Method | Endpoint | Notes
 --|--|--
 `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
-`GET` | `/admin/getAgents` | Returns agent status in CBOR.
-`GET` | `/admin/getManifests` | Returns SUIT manifest overviews in CBOR.
-`POST` | `/tc-developer/addManifest` | Registers a signed SUIT envelope.
+`POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+`GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
+`POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
 
 For protocol details, see:
 - [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
@@ -80,22 +88,30 @@ For protocol details, see:
 
 ## Get Agent Status (CBOR)
 
+Prepare a CBOR request body that contains an array of KIDs:
+
 ```bash
-curl -X GET http://localhost:8080/admin/getAgents \
-  -H "Accept: application/cbor" -s | cbor2diag.rb
+echo "['dummy-teep-agent-kid-for-dev-123']" | diag2cbor.rb > /tmp/agent-kids.cbor
 ```
 
-Example output:
+```bash
+curl -X POST http://localhost:8080/AgentService/GetAgentStatus \
+  -H "Accept: application/cbor" \
+  -H "Content-Type: application/cbor" \
+  --data-binary "@/tmp/agent-kids.cbor" -s | cbor2diag.rb
+```
+
+The output is equivalent to:
 ```cbor-diag
 [
   [
     'dummy-teep-agent-kid-for-dev-123',
     {
-      "wapp_list": [
+      / attributes / 1: {256: h'016275696C64696E672D6465762D313233'},
+      / installed-tc / 2: [
         [<< ['app1.wasm'] >>, 3],
         [<< ['app2.wasm'] >>, 2]
       ],
-      "attributes": {256: h'016275696C64696E672D6465762D313233'}
     }
   ]
 ]
@@ -104,7 +120,7 @@ Example output:
 ## Post SUIT Manifest
 
 ```bash
-curl -X POST http://localhost:8080/tc-developer/addManifest \
+curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
   --data-binary "@./examples/text.0.envelope.cbor"
 ```
@@ -119,7 +135,7 @@ If you want to see the SUIT manifest content, see [text.0.envelope.diag](./examp
 ## Get Manifest Overviews (CBOR)
 
 ```bash
-curl -X GET http://localhost:8080/admin/getManifests \
+curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
   -H "Accept: application/cbor" -s | cbor2diag.rb
 ```
 
@@ -162,8 +178,8 @@ make test-integrated
 ## Troubleshooting
 
 - `415 Unsupported Media Type`:
-  - check request headers (`Content-Type` for `POST`, `Accept` for `GET`).
-- `400 Bad Request` on `/tc-developer/addManifest`:
+  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
+- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
   - verify SUIT envelope encoding and signature.
   - verify signer key is pre-registered in TAM.
 - Unexpected `204 No Content`:

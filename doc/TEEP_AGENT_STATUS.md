@@ -1,5 +1,20 @@
 # TEEP Agent Status Handling in TAM
 
+This document describes how TAM's TEEP Agent Status are updated and obtained from the TAM.
+
+```mermaid
+---
+title: API Endpoints relating to TEEP Agent Status
+---
+
+flowchart TB
+
+TAM -- 1. Agent Status<br/>2. SUIT Manifest Overviews --> TAMAdmin([TAM Admin])
+TAM -- 1. Agent Status --> DeviceManager([Device Admin])
+TEEPAgent([TEEP Agent]) -- 3. TEEP Message (Update) --> TAM
+TAM[TAM]
+```
+
 For internal implementation details, see [TAM Status TEEP Agent Status (Internal Design)](./TAM_STATUS_TEEP_AGENT_STATUS.md).
 
 ## Why Is This Required?
@@ -9,22 +24,20 @@ This TAM manages the following status for each TEEP Agent:
 - **which Trusted Components a TEEP Agent has**
 - what kind of errors occurred in a TEEP Agent, and how they were resolved (or not)
 
-## Specification of /getAgents Web API
-
-This TAM currently exposes one implemented status API and one planned API.
-
-### Implemented
+## 1. Specification of AgentService Web API
 
 URL | Method | Authorized Requester | Input | Output
 --|--|--|--|--
-`/admin/getAgents` | `GET` | TAM Admin | no query | Status of all TEEP Agents, see the CDDL below
+`/AgentService/ListAgents` | `GET` | TAM Admin/<br/>Device Admin | no query | 200 OK: `[ + kid ]`<br/>204 No Content<br/>400 Bad Request
+`/AgentService/GetAgentStatus` | `POST` | TAM Admin/<br/>Device Admin | `[ + kid]` | 200 OK: `[ + agent-status-record ]`<br/> 204 No Content<br/>400 Bad Request
 
-### Planned (not implemented yet)
+### A) ListAgents Web API
 
-URL | Method | Authorized Requester | Input | Output
---|--|--|--|--
-`/device-admin/getAgents` | `GET` | Device Manager Admin | no query | TEEP Agents bound to its device, see the CDDL below
+This endpoint
 
+
+
+### B) GetAgentStatus Web API
 ### Output Format
 
 ```cddl
@@ -40,19 +53,21 @@ agent-status-record = [
 ]
 
 agent-status = {
-  "attributes": agent-attributes,
-  "wapp_list": [ * component-list ],
+  attributes-label => agent-attributes,
+  installed-tc-label => [ * suit-manifest-overview ],
 }
+
+attributes-label = 1
+installed-tc-label = 2
 
 agent-attributes = {
   eat.ueid-label => eat.ueid-type,
 }
-
-component-list = [
-  component: bstr .cbor SUIT_Component_Identifier,
-  manifest-sequence-number: uint,
-]
 ```
+
+You can find the CDDL definitions of dependings:
+- [RFC 9711](https://datatracker.ietf.org/doc/html/rfc9711#name-payload-cddl) for `eat.ueid-*`
+- [SUIT Manifest Store](./SUIT_MANIFEST_STORE.md#specification-of-suitmanifestserviceregistermanifest-web-api)
 
 Example output:
 ```cbor-diag
@@ -60,7 +75,10 @@ Example output:
   [
     'dummy-teep-agent-kid-for-dev-123',
     {
-      "wapp_list": [
+      / attributes / 1: {
+        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+      },
+      / installed-tc / 2: [
         [
           / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
           / manifest-sequence-number: / 3
@@ -69,16 +87,17 @@ Example output:
           / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
           / manifest-sequence-number: / 2
         ]
-      ],
-      "attributes": {
-        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
-      }
+      ]
     }
   ]
 ]
 ```
 
 ## Public Key of TEEP Agent
+
+<!--
+鍵がどうやって登録されるのか、
+-->
 
 This TAM authenticates the TEEP Agent public key using remote attestation.
 For now, [VERAISON](https://github.com/veraison) is used as a Verifier with Background-Check Model.
@@ -111,8 +130,18 @@ After successful remote attestation, TAM receives the challenge and the TEEP Age
 
 ## Trusted Components Held by the TEEP Agent
 
-This TAM also records Trusted Components (and their SUIT manifests) stored in TEEP Agents.
+This TAM records Trusted Components (and their SUIT manifests) stored in TEEP Agents.
 These records are useful for Device Owners (or Device Manager Admins) who want to keep Trusted Components up to date.
+getAgentsでは・・・・Ｔｒｕｓｔｅｄ　Ｃｏｍｐｏｎｅｎｔの一覧。
+
+
+## Limitations
+
+<!--
+tc-listは一番信頼する、SUIT Reportで明示的なもの、
+
+complete: リアルタイムで一致している　unmatch
+-->
 
 However, this is **NOT always complete** for several reasons.
 - some TEEP Agents may not report SUIT manifest processing results

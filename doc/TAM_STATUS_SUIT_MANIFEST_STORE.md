@@ -36,7 +36,7 @@ sequenceDiagram
     participant T as tam.TAM
     participant DB as sqlite repos
 
-    Dev->>H: POST /tc-developer/addManifest
+    Dev->>H: POST /SUITManifestService/RegisterManifest
     H->>H: Parse envelope and extract KID/component/sequence
     H->>T: GetEntityKey(kid) + signature verify
     H->>T: SetEnvelope(envelope,digest,kid,component,sequence)
@@ -56,7 +56,7 @@ Validation rules in `SetEnvelope`:
 This prevents downgrade and key-switch attacks within one component stream.
 
 ## Read Flow
-### A) Admin view (`GET /admin/getManifests`)
+### A) Admin view (`GET /SUITManifestService/ListManifests`)
 Current implementation uses fixed demo component IDs in handler, then fetches the latest manifest for each component.
 
 ```mermaid
@@ -66,7 +66,7 @@ sequenceDiagram
     participant T as tam.TAM
     participant DB as suit_manifest_repo
 
-    Admin->>H: GET /admin/getManifests (Accept: application/cbor)
+    Admin->>H: GET /SUITManifestService/ListManifests (Accept: application/cbor)
     H->>T: GetManifest(componentID_1)
     T->>DB: FindLatestByTrustedComponentID(componentID_1)
     DB-->>T: latest manifest or nil

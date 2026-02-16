@@ -2,11 +2,11 @@
 
 ## Purpose
 This document describes the internal implementation of TEEP Agent status handling in TAM.
-It focuses on persistence model, update paths (mainly TEEP Success), and read paths for `/*/getAgents`.
+It focuses on persistence model, update paths (mainly TEEP Success), and read paths for `/*/AgentService/GetAgentStatus`.
 
 ## Components
 - `internal/server/handler.go`
-  - Handles `GET /admin/getAgents` and encodes status response as CBOR
+  - Handles `GET /AgentService/GetAgentStatus` and encodes status response as CBOR
 - `internal/tam/agent_status.go`
   - `GetAgentStatus(...)` / `GetAgentStatuses(...)`
   - `updateAgentStatusOnManifestSuccess(...)`
@@ -59,9 +59,9 @@ Notes:
 - `ReflectManifestSuccess` is transactional (delete old active rows + insert new holding + insert report).
 - Failure-report path exists via `RecordManifestProcessingFailure(...)` and inserts unresolved records into `suit_reports`.
 
-## Read Flow (`/*/getAgents`)
+## Read Flow (`/*/AgentService/GetAgentStatus`)
 
-### A) Implemented: `GET /admin/getAgents`
+### A) Implemented: `GET /AgentService/GetAgentStatus`
 
 ```mermaid
 sequenceDiagram
@@ -71,7 +71,7 @@ sequenceDiagram
     participant R as AgentStatusRepository
     participant DB as sqlite
 
-    Admin->>H: GET /admin/getAgents (Accept: application/cbor)
+    Admin->>H: GET /AgentService/GetAgentStatus (Accept: application/cbor)
     H->>T: FindEntity(\"admin@example.com\")
     H->>T: GetAgentStatus(entity, fixedAgentKID)
     T->>R: GetAgentStatus(agentKID)
@@ -85,7 +85,7 @@ sequenceDiagram
 Current implementation note:
 - Handler currently returns status for one fixed demo agent KID.
 
-### B) Planned: `GET /device-admin/getAgents`
+### B) Planned: `GET /device-admin/AgentService/GetAgentStatus`
 
 Planned behavior:
 1. Authenticate/authorize device admin entity.
@@ -96,6 +96,6 @@ Planned behavior:
 Returned status is mapped to `AgentStatusRecord`:
 - `[agent-kid, status]`
 - `status.attributes.256` (UEID) when available
-- `status.wapp_list`: list of `[trusted-component-id, sequence-number]`
+- `status.installed-tc`: list of `[trusted-component-id, sequence-number]`
 
 See [TEEP_AGENT_STATUS.md](./TEEP_AGENT_STATUS.md) for CDDL and API-level output semantics.

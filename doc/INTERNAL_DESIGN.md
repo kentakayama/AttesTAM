@@ -106,11 +106,13 @@ Key points:
   - For QueryResponse without `token` but with `attestation-payload`, `challenge` can be used after affirming remote attestation results.
 
 ### 2) Admin and TC Developer endpoints
-- `GET /admin/getAgents`: handler resolves admin entity, calls `tam.GetAgentStatus`, returns CBOR.
-- `GET /admin/getManifests`: handler reads manifests via `tam.GetManifest` for target component IDs.
-- `POST /tc-developer/addManifest`: handler verifies SUIT envelope signature with `tam.GetEntityKey`, then persists via `tam.SetEnvelope`.
+- `GET /AgentService/GetAgentStatus`: handler resolves admin entity, calls `tam.GetAgentStatus`, returns CBOR.
+- `GET /SUITManifestService/ListManifests`: handler reads manifests via `tam.GetManifest` for target component IDs.
+- `POST /SUITManifestService/RegisterManifest`: handler verifies SUIT envelope signature with `tam.GetEntityKey`, then persists via `tam.SetEnvelope`.
 
 ## Model to DB Relationship
+
+<!---->
 Core mappings:
 - `model.Agent` <-> `agents`
 - `model.Entity` <-> `entities`

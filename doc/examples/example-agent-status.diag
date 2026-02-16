@@ -2,7 +2,10 @@
   [
     'dummy-teep-agent-kid-for-dev-123',
     {
-      "wapp_list": [
+      / attributes / 1: {
+        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+      },
+      / installed-tc / 2: [
         [
           / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
           / manifest-sequence-number: / 3
@@ -11,10 +14,7 @@
           / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
           / manifest-sequence-number: / 2
         ]
-      ],
-      "attributes": {
-        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
-      }
+      ]
     }
   ]
 ]

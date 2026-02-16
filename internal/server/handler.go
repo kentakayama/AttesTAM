@@ -46,19 +46,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/tam":
 		h.tamOverHttp(w, r)
-		return
-	case "/admin/getManifests":
+	case "/SUITManifestService/ListManifests":
 		h.getManifests(w, r)
-		return
-	case "/tc-developer/addManifest":
+	case "/SUITManifestService/RegisterManifest":
 		h.addTCManifest(w, r)
-		return
-	case "/admin/getAgents":
-		h.getAgentStatusesByTAMAdmin(w, r)
-		return
+	case "/AgentService/ListAgents":
+		h.getAgentList(w, r)
+	case "/AgentService/GetAgentStatus":
+		h.getAgentStatus(w, r)
 	default:
 		http.NotFound(w, r)
-		return
 	}
 }
 
@@ -271,15 +268,69 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, resp)
 }
 
-func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Request) {
-	// TODO: authenticate and authorize TAM Admin to get TEEP Agent status
-
+func (h *handler) getAgentList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
 
-	// TODO: check the content?
+	// check the content
+	if r.Header.Get("Accept") != "application/cbor" {
+		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	// TODO: authenticate and authorize the caller to get TEEP Agent status:
+	// all TEEP Agent status for TAM Admin, while ones administragted by Device Admin itself.
+
+	// TODO: get the caller's role and ID from the authentication result,
+	// and find the corresponding entity in the TAM.
+	// For now, we assume the caller is a TAM Admin and use a hardcoded admin name to find the entity.
+	adminName := "admin@example.com"
+	entity, err := h.tam.FindEntity(adminName)
+	if err != nil {
+		h.logger.Printf("failed to find Device Admin entity: %v", err)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var agentList []*tam.AgentStatusKey
+	switch {
+	case entity.IsTAMAdmin:
+		agentList, err = h.tam.GetAgentStatuses(entity)
+	case entity.IsDeviceAdmin && entity.ID > 0:
+		agentList, err = h.tam.GetAgentStatuses(entity)
+	default:
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err != nil {
+		h.logger.Printf("failed to get TEEP Agent list: %v", err)
+		http.Error(w, "failed to get TEEP Agent list", http.StatusInternalServerError)
+		return
+	}
+
+	encoded, err := cbor.Marshal(agentList)
+	if err != nil {
+		h.logger.Printf("failed to encode TEEP Agent list: %v", err)
+		http.Error(w, "failed to encode TEEP Agent list", http.StatusInternalServerError)
+		return
+	}
+
+	resp := responseSpec{
+		status:      http.StatusOK,
+		body:        encoded,
+		contentType: "application/cbor",
+	}
+	h.writeResponse(w, resp)
+}
+
+func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
 
 	// check the accept header
 	if r.Header.Get("Accept") != "application/cbor" {
@@ -287,7 +338,33 @@ func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
 		return
 	}
+	if r.Header.Get("Content-Type") != "application/cbor" {
+		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Content-Type"))
+		http.Error(w, "This endpoint only accepts Content-Type: application/cbor", http.StatusUnsupportedMediaType)
+		return
+	}
 
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes))
+	if err != nil {
+		h.logger.Printf("failed to read request body: %v", err)
+		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
+		return
+	}
+	if err := r.Body.Close(); err != nil {
+		h.logger.Printf("failed to close request body: %v", err)
+		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
+		return
+	}
+	var kids [][]byte
+	if err := cbor.Unmarshal(body, &kids); err != nil {
+		h.logger.Printf("failed to parse request body as list of KIDs: %v", err)
+		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: get the caller's role and ID from the authentication result,
+	// and find the corresponding entity in the TAM.
+	// For now, we assume the caller is a TAM Admin and use a hardcoded admin name to find the entity.
 	adminName := "admin@example.com"
 	entity, err := h.tam.FindEntity(adminName)
 	if err != nil {
@@ -295,15 +372,23 @@ func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "failed to find Device Admin entity", http.StatusBadRequest)
 		return
 	}
-	agentStatus, err := h.tam.GetAgentStatus(entity, []byte("dummy-teep-agent-kid-for-dev-123"))
-	if err != nil {
-		h.logger.Printf("failed to get TEEP Agent status: %v", err)
-		http.Error(w, "failed to get TEEP Agent status", http.StatusInternalServerError)
-		return
-	}
-	h.logger.Printf("got TEEP Agent status: %+v", agentStatus)
 
-	if agentStatus == nil {
+	var statusList []*tam.AgentStatusRecord
+	for _, kid := range kids {
+		agentStatus, err := h.tam.GetAgentStatus(entity, kid)
+		if err != nil {
+			h.logger.Printf("failed to get TEEP Agent status: %v", err)
+			http.Error(w, "failed to get TEEP Agent status", http.StatusInternalServerError)
+			return
+		}
+		if agentStatus == nil {
+			continue
+		}
+		h.logger.Printf("got TEEP Agent status: %+v", agentStatus)
+		statusList = append(statusList, agentStatus)
+	}
+
+	if len(statusList) == 0 {
 		resp := responseSpec{
 			status:      http.StatusNoContent,
 			contentType: "application/cbor",
@@ -311,7 +396,7 @@ func (h *handler) getAgentStatusesByTAMAdmin(w http.ResponseWriter, r *http.Requ
 		h.writeResponse(w, resp)
 		return
 	}
-	encoded, err := cbor.Marshal([]*tam.AgentStatusRecord{agentStatus})
+	encoded, err := cbor.Marshal(statusList)
 	if err != nil {
 		h.logger.Printf("failed to encode TEEP Agent status: %v", err)
 		http.Error(w, "failed to encode TEEP Agent status", http.StatusInternalServerError)
