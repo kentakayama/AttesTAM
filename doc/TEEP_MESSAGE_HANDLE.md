@@ -49,11 +49,11 @@ This TAM implementation enforces the following requirements for incoming `POST /
 1. HTTP-level requirements based on [TEEP over HTTP](https://datatracker.ietf.org/doc/draft-ietf-teep-otrp-over-http):
    - Method must be `POST`.
    - `Content-Type` must be `application/teep+cbor`.
-   - For the implimentation limitation, body size must be within the server limit (`maxRequestBodyBytes = 1MiB`).
+   - For the implementation limitation, body size must be within the server limit (`maxRequestBodyBytes = 1MiB`).
 
 2. COSE security wrapper requirements based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
    - Non-empty messages should be wrapped with *COSE security wrapper*, especially COSE Sign1-encoded TEEP messages.
-   - For the implimentation optimization, this TAM requires the COSE unprotected header `kid` (label `4`) for looking up the corresponding agent public key from TEEP Agent Store.
+   - For the implementation optimization, this TAM requires the COSE unprotected header `kid` (label `4`) for looking up the corresponding agent public key from TEEP Agent Store.
    - `kid` value should be encoded with SHA-256 [RFC 9679 COSE_Key thumbprint](https://datatracker.ietf.org/doc/html/rfc9679), and expected to be 32 bytes.
 
 3. Correlation and replay-protection requirements of TEEP Protocol messages and Attestation Payload based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
@@ -65,7 +65,7 @@ This TAM implementation enforces the following requirements for incoming `POST /
 4. Remote attestation fallback path (our TAM original requirement, see next section for details)
    - If QueryResponse cannot be authenticated with stored agent keys, attestation payload is required.
    - The TEEP Agent must reply on QueryRequest with attestation request and challenge, sending back QueryResponse with Evidence using `challenge`
-   - The TAM ask Attestation Result to Verifier, and it must be `affirming`.
+   - The TAM asks the Verifier for an attestation result, and it must be `affirming`.
    - QueryResponse signature is re-verified using the key extracted from Attestation Result.
    - Confirmed key is stored for future message authentication.
 
@@ -157,9 +157,9 @@ Expected EAT/attestation inputs:
 
 Validation layers:
 1. Attestation Result appraisal layer
-   - posts the Evidence in `attastation-payload` field in QueryResponse message to VERAISON challenge-response endpoint.
+   - posts the Evidence in the `attestation-payload` field in the QueryResponse message to the VERAISON challenge-response endpoint.
    - confirms the Attestation Result is `affirming`.
-2. Evidense appraisal layer
+2. Evidence appraisal layer
    - validates `eat.Nonce` field in EAT contains TAM's `challenge` value.
    - extracts `cwt.cnf.key` and verifies QueryResponse COSE signature using that key.
 3. Persistence/update layer

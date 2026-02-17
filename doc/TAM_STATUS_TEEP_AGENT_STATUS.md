@@ -6,7 +6,7 @@ It focuses on persistence model, update paths (mainly TEEP Success), and read pa
 
 ## Components
 - `internal/server/handler.go`
-  - Handles `GET /AgentService/GetAgentStatus` and encodes status response as CBOR
+  - Handles `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus`, and encodes status responses as CBOR
 - `internal/tam/agent_status.go`
   - `GetAgentStatus(...)` / `GetAgentStatuses(...)`
   - `updateAgentStatusOnManifestSuccess(...)`
@@ -59,10 +59,27 @@ Notes:
 - `ReflectManifestSuccess` is transactional (delete old active rows + insert new holding + insert report).
 - Failure-report path exists via `RecordManifestProcessingFailure(...)` and inserts unresolved records into `suit_reports`.
 
-## Read Flow (`/*/AgentService/GetAgentStatus`)
+## Read Flow (`/AgentService/*`)
 
-### A) Implemented: `GET /AgentService/GetAgentStatus`
+### 1) `GET /AgentService/ListAgents`
 
+```mermaid
+sequenceDiagram
+    participant Admin as TAM Admin
+    participant H as server.handler
+    participant T as tam.TAM
+
+    Admin->>H: GET /AgentService/ListAgents (Accept: application/cbor)
+    H->>T: Authorize entity (TODO)
+    H->>T: GetAgentStatuses(entity)
+    T-->>H: AgentStatusKey list
+    H-->>Admin: 200 + [+[kid, last updated] ] (or 204 if not found)
+```
+
+> [!NOTE]
+> Handler currently returns status for one fixed demo agent KID.
+
+### 2) `POST /AgentService/GetAgentStatus`
 ```mermaid
 sequenceDiagram
     participant Admin as TAM Admin
@@ -71,26 +88,18 @@ sequenceDiagram
     participant R as AgentStatusRepository
     participant DB as sqlite
 
-    Admin->>H: GET /AgentService/GetAgentStatus (Accept: application/cbor)
-    H->>T: FindEntity(\"admin@example.com\")
-    H->>T: GetAgentStatus(entity, fixedAgentKID)
-    T->>R: GetAgentStatus(agentKID)
-    R->>DB: query agent + latest active holdings + device ueid
-    DB-->>R: status rows
-    R-->>T: model.AgentStatus
-    T-->>H: AgentStatusRecord
+    Admin->>H: POST /AgentService/GetAgentStatus [+kid] (Accept: application/cbor)
+    H->>H: Authorize entity and parse input KIDs (TODO)
+    loop each kid in input
+      H->>T: GetAgentStatus(entity, kid)
+      T->>R: GetAgentStatus(kid)
+      R->>DB: query agent + latest active holdings + device ueid
+      DB-->>R: status rows
+      R-->>T: AgentStatusRecord
+      T-->>H: AgentStatusRecord
+    end
     H-->>Admin: 200 + CBOR (or 204 if not found)
 ```
-
-Current implementation note:
-- Handler currently returns status for one fixed demo agent KID.
-
-### B) Planned: `GET /device-admin/AgentService/GetAgentStatus`
-
-Planned behavior:
-1. Authenticate/authorize device admin entity.
-2. Filter returned agents by device ownership (`devices.admin_id`).
-3. Reuse the same status assembly logic (`GetAgentStatus`/`GetAgentStatuses`) with role-based filtering.
 
 ## Output Record Shape
 Returned status is mapped to `AgentStatusRecord`:

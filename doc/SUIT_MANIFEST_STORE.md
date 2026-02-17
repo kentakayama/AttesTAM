@@ -1,4 +1,4 @@
-# SUIT Manifest Store Design <!--addManifest-->
+# SUIT Manifest Store Design
 
 ## Purpose
 This document explains how SUIT manifests are validated, stored, and retrieved in TAM.
@@ -21,15 +21,26 @@ TAM -- 3. TEEP Message --> TEEPAgent([TEEP Agent])
 TAM[TAM]
 ```
 
-- Register SUIT manifests from TC Developers (`POST /SUITManifestService/RegisterManifest`)
-- Read latest manifest metadata (`GET /SUITManifestService/ListManifests`)
-- Resolve manifests for Update generation during QueryResponse handling (`POST /tam`) (see [TEEP_MESSAGE_HANDLE.md](./TEEP_MESSAGE_HANDLE.md) for detail)
+1. Register SUIT manifests from TC Developers (`POST /SUITManifestService/RegisterManifest`)
+2. Read latest manifest metadata (`GET /SUITManifestService/ListManifests`)
+3. Resolve manifests for Update generation during QueryResponse handling (`POST /tam`) (see [TEEP_MESSAGE_HANDLE.md](./TEEP_MESSAGE_HANDLE.md) for detail)
+
+## 0) TC Developer's Key Store (TODO)
+
+Since this TAM authenticates SUIT manifests with TC Developer keys, those keys must be provisioned before posting SUIT manifests.
+Only for demo purpose (with `-insecure-demo-mode`), this TAM registers the TC Developer's key corresponding to the following PEM private key (same as [SUIT Manifest draft](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest#name-examples)).
+
+```pem
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgApZYjZCUGLM50VBC
+CjYStX+09jGmnyJPrpDLTz/hiXOhRANCAASEloEarguqq9JhVxie7NomvqqL8Rtv
+P+bitWWchdvArTsfKktsCYExwKNtrNHXi9OB3N+wnAUtszmR23M4tKiW
+-----END PRIVATE KEY-----
+```
 
 ## 1) Specification of /SUITManifestService/RegisterManifest Web API
 
-  -  The TC Developer signing public key must be registered in TAM in advanced. <!--Prerequirements?-->
-
-This API registers a SUIT manifest to TAM's manifest store.
+This API registers a SUIT manifest in TAM's manifest store.
 
 URL | Method | Authorized Requester | Request Headers | Request Body | Response
 --|--|--|--|--|--
@@ -43,7 +54,7 @@ Validation overview:
 
 > [!NOTE]
 > Requirements for accepting `/SUITManifestService/RegisterManifest`:
-> 2. The SUIT `authentication-wrapper` must include `kid` for that signing key, encoded as an [RFC 9679 COSE Key Thumbprint](https://datatracker.ietf.org/doc/html/rfc9679).
+> the SUIT `authentication-wrapper` must include `kid` for that signing key, encoded as an [RFC 9679 COSE Key Thumbprint](https://datatracker.ietf.org/doc/html/rfc9679).
 
 ## 2) Specification of /SUITManifestService/ListManifests Web API
 

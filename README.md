@@ -30,7 +30,7 @@ flowchart LR
 
 To support the architecture shown above, the TAM provides three primary communication channels:
 1. SUIT Manifest Service API: Receives Trusted Applications from the TC Developer. (see [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md))
-2. TAM's teep-over-http API: Delivers Trusted Applications to the TEE. (see [TEEP_MESSAGE_HANDLE.md](./doc/TEEP_MESSAGE_HANDLE.md))
+2. TAM's TEEP-over-HTTP API: Delivers Trusted Applications to the TEE. (see [TEEP_MESSAGE_HANDLE.md](./doc/TEEP_MESSAGE_HANDLE.md))
 3. TEEP Agent Service API: Provides the Device Admin with a list of Trusted Applications installed in the device's TEE. (see [TEEP_AGENT_STATUS.md](./doc/TEEP_AGENT_STATUS.md))
 
 ## Quick Start
@@ -40,7 +40,7 @@ See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 ### A) Native
 
 ```bash
-go run ./cmd/tam-over-http
+go run ./cmd/tam-over-http -insecure-demo-mode
 ```
 
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
@@ -53,7 +53,7 @@ Detailed references for flags and environment variables are documented in [`doc/
 
 ```bash
 docker build -t tam-over-http .
-docker run --rm -p 8080:8080 tam-over-http
+docker run --rm -p 8080:8080 -e TAM4WASM_INSECURE_DEMO_MODE=true tam-over-http
 ```
 
 ## Documentation

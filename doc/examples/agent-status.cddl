@@ -1,7 +1,7 @@
 ;# import rfc9711 as eat
 
 get-agent-status-output = [
-  * agent-status-record,
+  + agent-status-record,
 ]
 
 agent-status-record = [

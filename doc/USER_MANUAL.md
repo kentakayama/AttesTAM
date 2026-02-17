@@ -5,7 +5,7 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 ## Quick Flow
 
-1. Start TAM (`go run ./cmd/tam-over-http`).
+1. Start TAM (`go run ./cmd/tam-over-http -insecure-demo-mode`).
 2. Check admin endpoints:
    - `POST /AgentService/GetAgentStatus`
    - `GET /SUITManifestService/ListManifests`
@@ -49,6 +49,8 @@ docker run --rm -p 8080:8080 \
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
 | `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
+| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | `` (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-insecure-demo-mode` | `TAM4WASM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
 | `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
@@ -90,11 +92,11 @@ SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component bi
 For the TC Developer, the TAM provides `/SUITManifestService/RegisterManifest` endpoint, accepting signed SUIT Manifest.
 
 There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
-You can post it with following command:
+You can post it with following command from top of this repository:
 ```bash
 curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./examples/text.1.envelope.cbor"
+  --data-binary "@./doc/examples/text.1.envelope.cbor"
 ```
 
 Example output:
@@ -105,7 +107,7 @@ OK
 For protocol details, see [`SUIT_MANIFEST_STORE.md`](./SUIT_MANIFEST_STORE.md).
 
 > [!NOTE]
-> If you want to register your SUIT Manifest, the manifest signing key should be registed 
+> If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.
 
 - [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
 
@@ -171,7 +173,7 @@ Example output:
 
 ## Planned Management APIs
 
-TODO: add API endpoints to manage entities, keys, ...
+Planned: add API endpoints to manage entities, keys, and related resources.
 
 ## Run Tests
 
