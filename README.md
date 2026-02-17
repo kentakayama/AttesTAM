@@ -9,7 +9,7 @@ Although the TEEP Architecture requires that a Device Administrator be able to l
 ```mermaid
 flowchart LR
     DeviceAdmin ~~~ AgentStore
-    AgentStore -- Trusted App list --> DeviceAdmin([Device Admin])
+    AgentStore -- Installed Trusted App list --> DeviceAdmin([Device Admin])
     AgentStore ~~~ DeviceAdmin
     TCDeveloper([TC Developer]) -- Trusted App--> ManifestStore
     subgraph TAM Server

@@ -14,12 +14,12 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 ## Start the Server
 
-### Local
+### Native
 ```bash
 go run ./cmd/tam-over-http
 ```
 
-### With Make
+or with make command
 ```bash
 make run
 ```
@@ -65,28 +65,55 @@ go run ./cmd/tam-over-http -h
 
 ## API Summary
 
-<!--
-ＴＥＥＰ　Ａｇｅｎｔ用、管理者用で違うことを明記、
-仕様とサンプルを分ける
--->
+There are mainly three API endpoints for TC Developer, TEEP Agent and Device Admin described below:
 
-Method | Endpoint | Notes
---|--|--
-`POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
-`POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
-`GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
-`POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
+```mermaid
+flowchart LR
+    TCDeveloper([TC Developer]) -- 1. Trusted App--> TAM
+    TAM -- 2. Trusted App --> TEEPAgent([TEEP Agent])
+    TAM -- 3. Installed Trusted App list --> DeviceAdmin([Device Admin])
+```
 
-For protocol details, see:
+Section | Method | Endpoint | Notes
+--|--|--|--
+[1](#1-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
+2 | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+3 | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+4 | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
+
+### 1) Register SUIT Manifests Delivering Trusted Components
+
+For the TAM to securely deliver Trusted Components to TEEP Agent, [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol) uses [SUIT Manifest](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest), a concise data format for installing software/firmwares.
+SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component binary content, who created the SUIT Manifest (and Trusted Component in many cases), and which is depending Trusted Component.
+
+For the TC Developer, the TAM provides `/SUITManifestService/RegisterManifest` endpoint, accepting signed SUIT Manifest.
+
+There is an example SUIT Manifest [text.0.envelope.diag](./examples/text.0.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
+You can post it with following command:
+```bash
+curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
+  -H "Content-Type: application/suit-envelope+cose" \
+  --data-binary "@./examples/text.0.envelope.cbor"
+```
+
+Example output:
+```
+OK
+```
+
+For protocol details, see [`SUIT_MANIFEST_STORE.md`](./SUIT_MANIFEST_STORE.md).
+
+> [!NOTE]
+> If you want to register your SUIT Manifest, the manifest signing key should be registed 
+
 - [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
-- [`SUIT_MANIFEST_STORE.md`](./SUIT_MANIFEST_STORE.md)
 
 > [!NOTE]
 > Communicating with `/tam` requires a TEEP Agent implementation over HTTP.
 > See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
 > For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
-## Get Agent Status (CBOR)
+### 3) Get Agent Status
 
 Prepare a CBOR request body that contains an array of KIDs:
 
@@ -119,18 +146,6 @@ The output is equivalent to:
 
 ## Post SUIT Manifest
 
-```bash
-curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
-  -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./examples/text.0.envelope.cbor"
-```
-
-Example output:
-```
-OK
-```
-
-If you want to see the SUIT manifest content, see [text.0.envelope.diag](./examples/text.0.envelope.diag).
 
 ## Get Manifest Overviews (CBOR)
 
