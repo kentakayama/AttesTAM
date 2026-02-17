@@ -509,6 +509,11 @@ func (t *TAM) searchSentMessageWithChallenge(challenge []byte) *TEEPMessage {
 	if challenge == nil {
 		return nil
 	}
+	challengeRepo := sqlite.NewChallengeRepository(t.db)
+	if err := challengeRepo.MarkConsumed(t.ctx, challenge); err != nil {
+		t.logger.Printf("failed to consume challenge %s: %v", hex.EncodeToString(challenge), err)
+		return nil
+	}
 
 	sentQueryRequestRepo := sqlite.NewSentQueryRequestMessageRepository(t.db)
 	if sentQueryRequestRepo == nil {
