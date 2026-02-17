@@ -253,8 +253,20 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.tam.SetEnvelope(untaggedEnvelopeBytes, envelope.AuthenticationWrapper.Value.DigestBstr, envelope.AuthenticationWrapper.Value.AuthenticationBlocks[0].KID, encodedComponentID, manifest.Value.ManifestSequenceNumber); err != nil {
 		h.logger.Printf("failed to SetEnvelope: %v", err)
-		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
-		return
+		switch err {
+		case tam.ErrNotAuthenticated:
+			http.Error(w, "the manifest signing key is not trusted by the TAM", http.StatusBadRequest)
+			return
+		case suit.ErrSUITManifestSmallerSequenceNumber:
+			http.Error(w, "the manifest sequence number should be bigger than the existing one", http.StatusBadRequest)
+			return
+		case suit.ErrSUITManifestSigningKeyMismatch:
+			http.Error(w, "the manifest signing key should be the same as the existing one", http.StatusBadRequest)
+			return
+		default:
+			http.Error(w, "failed to add SUIT Manifest", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	kid, _ := key.Thumbprint(crypto.SHA256)
@@ -262,7 +274,7 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 
 	resp := responseSpec{
 		status:      http.StatusOK,
-		body:        []byte("OK"),
+		body:        []byte("OK\n"),
 		contentType: "text/plain",
 	}
 	h.writeResponse(w, resp)

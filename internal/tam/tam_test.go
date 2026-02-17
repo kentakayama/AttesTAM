@@ -104,7 +104,7 @@ func (e *MockEATVerifier) Process(data []byte) (*rats.ProcessedAttestation, erro
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(&verifier, logger)
+	tam, err := NewTAM("", &verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(&verifier, logger)
+	tam, err := NewTAM("", &verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -343,7 +343,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 		encodedComponentID, err := cbor.Marshal(tcID)
 		require.Nil(t, err)
 		require.Equal(t, encodedComponentID, agentStatus.Status.SuitManifests[0].TrustedComponentID)
-		require.Equal(t, uint64(1), agentStatus.Status.SuitManifests[0].SequenceNumber)
+		require.Equal(t, uint64(0), agentStatus.Status.SuitManifests[0].SequenceNumber)
 	} else {
 		// TEST#4a: generate TEEP Agent's Error with Token
 		require.NotNil(t, outgoingUpdate.Options.Token)
@@ -397,7 +397,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(&verifier, logger)
+	tam, err := NewTAM("", &verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
@@ -462,7 +462,7 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM(&verifier, logger)
+	tam, err := NewTAM("", &verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}

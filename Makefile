@@ -1,6 +1,6 @@
-.PHONY: run
-run:
-	go run ./cmd/tam-over-http
+.PHONY: run-demo
+run-demo:
+	go run ./cmd/tam-over-http -insecure-demo-mode
 
 .PHONY: test
 test:
@@ -12,4 +12,5 @@ test-integrated:
 
 .PHONY: clean
 clean:
-	rm -f app.wasm manifest.app.wasm.0.suit
+	@echo "[WARNING] Are you sure to clear the TAM's Status?"
+	@$(RM) -i tam_state.db*

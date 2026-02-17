@@ -70,12 +70,12 @@ docker run --rm -p 8080:8080 tam-over-http
 ## Development Workflow
 
 ```bash
-make run              # Start server locally
+make run-demo         # Start server locally with Demo purpose initialization (not for production use)
 make test             # Run unit tests (go test ./...)
 make test-integrated  # Run integration-tagged tests (requires provisioned VERAISON server)
 
 # Equivalent direct Go commands:
-go run ./cmd/tam-over-http
+go run ./cmd/tam-over-http -insecure-demo-mode
 go test ./...
 go test -tags=integration ./...
 ```

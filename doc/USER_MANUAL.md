@@ -16,18 +16,19 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 ### Native
 ```bash
-go run ./cmd/tam-over-http
+go run ./cmd/tam-over-http -insecure-demo-mode
 ```
 
 or with make command
 ```bash
-make run
+make run-demo
 ```
 
 ### Docker
 ```bash
 docker build -t tam-over-http .
 docker run --rm -p 8080:8080 \
+  -e TAM4WASM_INSECURE_DEMO_MODE=true \
   -e TAM4WASM_ADDR=":8080" \
   tam-over-http
 ```
@@ -88,12 +89,12 @@ SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component bi
 
 For the TC Developer, the TAM provides `/SUITManifestService/RegisterManifest` endpoint, accepting signed SUIT Manifest.
 
-There is an example SUIT Manifest [text.0.envelope.diag](./examples/text.0.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
+There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
 You can post it with following command:
 ```bash
 curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./examples/text.0.envelope.cbor"
+  --data-binary "@./examples/text.1.envelope.cbor"
 ```
 
 Example output:
