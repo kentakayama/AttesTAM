@@ -4,7 +4,7 @@
 // To run (manual test pattern #3):
 //   1) Start mock API:  go run ./cmd/mockapi
 //   2) Start app:      go run ./cmd/admin-console --port=8080 --tam-api-base=http://localhost:8080
-//   3) Open: http://localhost:8080 and click "Show Devices"
+//   3) Open: http://localhost:8080 and click "Managed Devices"
 
 package main
 

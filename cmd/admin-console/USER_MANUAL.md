@@ -9,9 +9,9 @@ This document explains how to run `admin-console` and use its UI/API during loca
 2. Start Admin Console (`go run ./cmd/admin-console`).
 3. Open `http://localhost:<port>` in a browser.
 4. Use these views:
-  - `Show Devices`: list devices and inspect per-device installed TC versions.
-   - `Show TCs`: list uploaded/fetched manifests.
-   - `Upload Manifests`: upload a manifest file to the console API.
+   - `Managed Devices`: list agents and inspect per-agent installed TC versions.
+   - `Managed TCs`: list uploaded/fetched manifests.
+   - `Register TC`: upload a manifest file to the console API.
 
 ## Start the Admin Console
 
@@ -68,25 +68,25 @@ When `--tam-api-base` is not set:
 
 ## UI Operation Guide
 
-## 1. Show Devices
+## 1. Managed Devices
 
-- Click `Show Devices` in the sidebar.
-- Device table is loaded from `GET /api/agents`.
-- Click a `Device Name` row to open the detail panel.
-- Detail panel shows installed TC list (`name`, `ver`) for the selected device.
-- Clicking the selected device again closes the detail panel.
+- Click `Managed Devices` in the sidebar.
+- Agent table is loaded from `GET /api/agents`.
+- Click an `Agent KID` row to open the detail panel.
+- Detail panel shows installed TC list (`name`, `ver`) for the selected agent.
+- Clicking the selected agent again closes the detail panel.
 
-## 2. Show TCs
+## 2. Managed TCs
 
-- Click `Show TCs`.
+- Click `Managed TCs`.
 - Manifest table is loaded from `GET /api/manifests/service`.
 - Columns:
   - `TC Name`
   - `Version`
 
-## 3. Upload Manifests
+## 3. Register TC
 
-- Click `Upload Manifests`.
+- Click `Register TC`.
 - Select a file and click `Upload`.
 - Browser sends `multipart/form-data` to `POST /api/manifests/register`.
 - On success, UI displays `Upload complete.` and refreshes manifest list.

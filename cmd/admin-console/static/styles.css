@@ -181,7 +181,7 @@ body {
   gap: var(--space-4);
 }
 
-.device-detail-panel {
+.agent-detail-panel {
   display: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -189,16 +189,16 @@ body {
   background: color-mix(in srgb, var(--panel) 92%, transparent);
 }
 
-.device-detail-panel.visible {
+.agent-detail-panel.visible {
   display: block;
 }
 
-.device-detail-panel h3 {
+.agent-detail-panel h3 {
   margin: 0 0 var(--space-3);
   font-size: .95rem;
 }
 
-.device-clickable {
+.agent-clickable {
   cursor: pointer;
   color: var(--primary);
   text-decoration: underline;

@@ -1,23 +1,23 @@
 /* Simple SPA-like behavior with vanilla JS.
  * - Tabs switch between views
- * - Fetch devices and manifests from the Go API
+ * - Fetch agents and manifests from the Go API
  * - Upload manifests via multipart/form-data
  */
 
 function $(sel) { return document.querySelector(sel); }
 function $all(sel) { return document.querySelectorAll(sel); }
 
-const btnDevices = $('#btn-devices');
+const btnAgents = $('#btn-agents');
 const btnManifests = $('#btn-manifests');
 const btnUpload = $('#btn-upload');
 
-const viewDevices = $('#view-devices');
+const viewAgents = $('#view-agents');
 const viewManifests = $('#view-manifests');
 const viewUpload = $('#view-upload');
-const deviceDetailPanel = $('#device-detail-panel');
-const deviceDetailTitle = $('#device-detail-title');
-const deviceDetailBody = $('#device-detail-body');
-let selectedDeviceKID = null;
+const agentDetailPanel = $('#agent-detail-panel');
+const agentDetailTitle = $('#agent-detail-title');
+const agentDetailBody = $('#agent-detail-body');
+let selectedAgentKID = null;
 
 function setActive(btn, view) {
   $all('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -26,69 +26,75 @@ function setActive(btn, view) {
   view.classList.add('visible');
 }
 
-btnDevices.addEventListener('click', () => { setActive(btnDevices, viewDevices); loadDevices(); });
+btnAgents.addEventListener('click', () => { setActive(btnAgents, viewAgents); loadAgents(); });
 btnManifests.addEventListener('click', () => { setActive(btnManifests, viewManifests); loadManifests(); });
 btnUpload.addEventListener('click', () => { setActive(btnUpload, viewUpload); });
 
 // Initial load
-loadDevices();
+loadAgents();
 
-async function loadDevices() {
-  const tbody = document.getElementById('devices-body');
+async function loadAgents() {
+  const tbody = document.getElementById('agents-body');
   tbody.innerHTML = '';
-  selectedDeviceKID = null;
-  if (deviceDetailPanel) deviceDetailPanel.classList.remove('visible');
-  if (deviceDetailTitle) deviceDetailTitle.textContent = 'Device Details';
-  if (deviceDetailBody) deviceDetailBody.innerHTML = '';
+  selectedAgentKID = null;
+  if (agentDetailPanel) {
+    agentDetailPanel.classList.remove('visible');
+    agentDetailPanel.hidden = true;
+  }
+  if (agentDetailTitle) agentDetailTitle.textContent = 'Agent Details';
+  if (agentDetailBody) agentDetailBody.innerHTML = '';
   try {
     const res = await fetch('/api/agents');
     const data = await res.json();
     if (Array.isArray(data)) {
-      data.forEach(d => {
-        const kid = d.kid || d.KID || '-';
-        const lastUpdate = d.last_update || d.lastUpdate || d.updated_at || d.updatedAt || '-';
-        const installedTCList = d["installed-tc"] || d.InstalledTCList || [];
+      data.forEach(agent => {
+        const kid = agent.kid || agent.KID || '-';
+        const lastUpdate = agent.last_update || agent.lastUpdate || agent.updated_at || agent.updatedAt || '-';
+        const installedTCList = agent["installed-tc"] || agent.InstalledTCList || [];
 
         const tr = document.createElement('tr');
-        const tdDevice = document.createElement('td');
+        const tdAgent = document.createElement('td');
         const tdLastUpdate = document.createElement('td');
 
-        tdDevice.textContent = kid;
-        tdDevice.className = 'device-clickable';
+        tdAgent.textContent = kid;
+        tdAgent.className = 'agent-clickable';
         tdLastUpdate.textContent = lastUpdate;
 
-        tr.append(tdDevice, tdLastUpdate);
+        tr.append(tdAgent, tdLastUpdate);
         tbody.appendChild(tr);
 
-        tdDevice.addEventListener('click', () => {
-          // Toggle off when clicking the same selected device.
-          if (selectedDeviceKID === kid && tr.classList.contains('selected')) {
-            selectedDeviceKID = null;
+        tdAgent.addEventListener('click', () => {
+          // Toggle off when clicking the same selected agent.
+          if (selectedAgentKID === kid && tr.classList.contains('selected')) {
+            selectedAgentKID = null;
             tr.classList.remove('selected');
-            if (deviceDetailPanel) deviceDetailPanel.classList.remove('visible');
-            if (deviceDetailTitle) deviceDetailTitle.textContent = 'Device Details';
-            if (deviceDetailBody) deviceDetailBody.innerHTML = '';
+            if (agentDetailPanel) {
+              agentDetailPanel.classList.remove('visible');
+              agentDetailPanel.hidden = true;
+            }
+            if (agentDetailTitle) agentDetailTitle.textContent = 'Agent Details';
+            if (agentDetailBody) agentDetailBody.innerHTML = '';
             return;
           }
 
-          selectedDeviceKID = kid;
-          $all('#devices-body tr').forEach(row => row.classList.remove('selected'));
+          selectedAgentKID = kid;
+          $all('#agents-body tr').forEach(row => row.classList.remove('selected'));
           tr.classList.add('selected');
 
-          if (deviceDetailTitle) {
-            deviceDetailTitle.textContent = `Device: ${kid}`;
+          if (agentDetailTitle) {
+            agentDetailTitle.textContent = `Agent: ${kid}`;
           }
-          if (deviceDetailBody) {
-            deviceDetailBody.innerHTML = '';
+          if (agentDetailBody) {
+            agentDetailBody.innerHTML = '';
             if (Array.isArray(installedTCList) && installedTCList.length > 0) {
-              installedTCList.forEach(w => {
+              installedTCList.forEach(installedTC => {
                 const detailTr = document.createElement('tr');
                 const nameTd = document.createElement('td');
                 const verTd = document.createElement('td');
-                nameTd.textContent = w.name || w.Name || '-';
-                verTd.textContent = (w.ver !== undefined && w.ver !== null) ? String(w.ver) : '-';
+                nameTd.textContent = installedTC.name || installedTC.Name || '-';
+                verTd.textContent = (installedTC.ver !== undefined && installedTC.ver !== null) ? String(installedTC.ver) : '-';
                 detailTr.append(nameTd, verTd);
-                deviceDetailBody.appendChild(detailTr);
+                agentDetailBody.appendChild(detailTr);
               });
             } else {
               const detailTr = document.createElement('tr');
@@ -97,17 +103,18 @@ async function loadDevices() {
               nameTd.textContent = '-';
               verTd.textContent = '-';
               detailTr.append(nameTd, verTd);
-              deviceDetailBody.appendChild(detailTr);
+              agentDetailBody.appendChild(detailTr);
             }
           }
-          if (deviceDetailPanel) {
-            deviceDetailPanel.classList.add('visible');
+          if (agentDetailPanel) {
+            agentDetailPanel.hidden = false;
+            agentDetailPanel.classList.add('visible');
           }
         });
       });
     }
   } catch (e) {
-    console.error('devices fetch failed', e);
+    console.error('agents fetch failed', e);
   }
 }
 
