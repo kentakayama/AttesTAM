@@ -9,7 +9,7 @@ import (
 )
 
 // ConvertCBORToJSON converts the specific CBOR structure to the target JSON format.
-// Input CBOR structure: [kid(string), { "attributes": { 256: bytes }, "wapp_list": [ [name, ver], ... ] }]
+// Input CBOR structure: [kid(string), { "attributes": { 256: bytes }, "installed-tc": [ [name, ver], ... ] }]
 func ConvertCBORToJSON(data []byte) ([]byte, error) {
 	// 1. Unmarshal CBOR into a generic slice since the root is an array
 	var raw []interface{}
@@ -58,10 +58,11 @@ func ConvertCBORToJSON(data []byte) ([]byte, error) {
 		}
 	}
 
-	// Process Wapp List
-	if wappsRaw, ok := details["wapp_list"]; ok {
-		if wapps, ok := wappsRaw.([]interface{}); ok {
-			for _, item := range wapps {
+	// Process Installed TC List
+	tcsRaw := details["installed-tc"]
+	if tcsRaw != nil {
+		if tcs, ok := tcsRaw.([]interface{}); ok {
+			for _, item := range tcs {
 				if pair, ok := item.([]interface{}); ok && len(pair) >= 2 {
 					name := toComponentID(pair[0])
 					var ver int
@@ -76,7 +77,7 @@ func ConvertCBORToJSON(data []byte) ([]byte, error) {
 						ver = int(v)
 					}
 					if len(name) > 0 {
-						target.WappList = append(target.WappList, WappItem{Name: name, Ver: ver})
+						target.InstalledTCList = append(target.InstalledTCList, InstalledTCItem{Name: name, Ver: ver})
 					}
 				}
 			}

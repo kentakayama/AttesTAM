@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -13,7 +14,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func devicesHandler(w http.ResponseWriter, r *http.Request) {
+func handleListAgents(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -31,52 +32,64 @@ func devicesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	devices, err := loadTestVectorDevices()
+	devices, err := loadTestVectorAgents()
 	if err != nil {
-		log.Printf("testvector devices load failed: %v", err)
-		http.Error(w, fmt.Sprintf("testvector devices load failed: %v", err), http.StatusInternalServerError)
+		log.Printf("testvector agents load failed: %v", err)
+		http.Error(w, fmt.Sprintf("testvector agents load failed: %v", err), http.StatusInternalServerError)
 		return
 	}
 	respondJSON(w, devices)
 }
 
-func manifestsHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		base := conf.TAMAPIBase
-		if base != "" {
-			manifests, err := fetchTAMManifests(base)
-			if err != nil {
-				log.Printf("TAM API fetch manifests failed: %v", err)
-				http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
-				return
-			}
-			respondJSON(w, manifests)
-			return
-		}
+func handleListManifestsService(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-		manifests, err := loadTestVectorManifests()
+	base := conf.TAMAPIBase
+	if base != "" {
+		manifests, err := fetchTAMManifests(base)
 		if err != nil {
-			log.Printf("testvector manifests load failed: %v", err)
-			http.Error(w, fmt.Sprintf("testvector manifests load failed: %v", err), http.StatusInternalServerError)
+			log.Printf("TAM API fetch manifests failed: %v", err)
+			http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
 			return
 		}
 		respondJSON(w, manifests)
-	case http.MethodPost:
-		base := conf.TAMAPIBase
-		if base != "" {
-			if err := postTAMManifest(w, r, base); err != nil {
-				log.Printf("TAM API post manifest failed: %v", err)
-				http.Error(w, fmt.Sprintf("TAM API post failed: %v", err), http.StatusBadGateway)
-			}
-			return
-		}
+		return
+	}
 
+	manifests, err := loadTestVectorManifests()
+	if err != nil {
+		log.Printf("testvector manifests load failed: %v", err)
+		http.Error(w, fmt.Sprintf("testvector manifests load failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, manifests)
+}
+
+func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	base := conf.TAMAPIBase
+	if base != "" {
+		if err := postTAMManifest(w, r, base); err != nil {
+			log.Printf("TAM API post manifest failed: %v", err)
+			http.Error(w, fmt.Sprintf("TAM API post failed: %v", err), http.StatusBadGateway)
+		}
+		return
+	}
+
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		if err := echoUploadedFileAsDownload(w, r); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+
+	http.Error(w, "multipart/form-data is required", http.StatusBadRequest)
 }

@@ -9,21 +9,22 @@ import (
 )
 
 type Agent struct {
-	KID        string     `json:"kid"`
-	Attributes Attribute  `json:"attribute"`
-	WappList   []WappItem `json:"wapp_list"`
+	KID             string            `json:"kid"`
+	LastUpdate      string            `json:"last_update,omitempty"`
+	Attributes      Attribute         `json:"attribute"`
+	InstalledTCList []InstalledTCItem `json:"installed-tc"`
 }
 
 type Attribute struct {
 	Ueid string `json:"ueid"`
 }
 
-type WappItem struct {
+type InstalledTCItem struct {
 	Name suit.ComponentID `json:"name"`
 	Ver  int              `json:"ver"`
 }
 
-func (w WappItem) MarshalJSON() ([]byte, error) {
+func (w InstalledTCItem) MarshalJSON() ([]byte, error) {
 	type alias struct {
 		Name string `json:"name"`
 		Ver  int    `json:"ver"`
@@ -34,7 +35,7 @@ func (w WappItem) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (w *WappItem) UnmarshalJSON(data []byte) error {
+func (w *InstalledTCItem) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Name json.RawMessage `json:"name"`
 		Ver  int             `json:"ver"`
@@ -65,7 +66,7 @@ func (w *WappItem) UnmarshalJSON(data []byte) error {
 		w.Name = toComponentID(list)
 		return nil
 	}
-	return fmt.Errorf("invalid wapp item name")
+	return fmt.Errorf("invalid installed tc item name")
 }
 
 func componentIDDisplayName(id suit.ComponentID) string {

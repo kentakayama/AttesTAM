@@ -41,13 +41,13 @@ async function loadDevices() {
   if (deviceDetailTitle) deviceDetailTitle.textContent = 'Device Details';
   if (deviceDetailBody) deviceDetailBody.innerHTML = '';
   try {
-    const res = await fetch('/api/devices');
+    const res = await fetch('/api/agents');
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(d => {
         const kid = d.kid || d.KID || '-';
         const lastUpdate = d.last_update || d.lastUpdate || d.updated_at || d.updatedAt || '-';
-        const wappList = d.wapp_list || d.WappList || [];
+        const installedTCList = d["installed-tc"] || d.InstalledTCList || [];
 
         const tr = document.createElement('tr');
         const tdDevice = document.createElement('td');
@@ -80,8 +80,8 @@ async function loadDevices() {
           }
           if (deviceDetailBody) {
             deviceDetailBody.innerHTML = '';
-            if (Array.isArray(wappList) && wappList.length > 0) {
-              wappList.forEach(w => {
+            if (Array.isArray(installedTCList) && installedTCList.length > 0) {
+              installedTCList.forEach(w => {
                 const detailTr = document.createElement('tr');
                 const nameTd = document.createElement('td');
                 const verTd = document.createElement('td');
@@ -115,7 +115,7 @@ async function loadManifests() {
   const tbody = document.getElementById('manifests-body');
   tbody.innerHTML = '';
   try {
-    const res = await fetch('/api/manifests');
+    const res = await fetch('/api/manifests/service');
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(m => {
@@ -139,7 +139,7 @@ form.addEventListener('submit', async (e) => {
   const fd = new FormData(form);
   statusEl.textContent = 'Uploading...';
   try {
-    const res = await fetch('/api/manifests', { method: 'POST', body: fd });
+    const res = await fetch('/api/manifests/register', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
     const disposition = res.headers.get('Content-Disposition') || '';
     if (disposition.includes('attachment')) {

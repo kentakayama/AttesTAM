@@ -15,7 +15,7 @@ func TestDecodeAgentsFromCBOR(t *testing.T) {
 				"attributes": map[any]any{
 					256: []byte{0x01, 0x02, 0x03},
 				},
-				"wapp_list": []any{
+				"installed-tc": []any{
 					[]any{"app-a", uint64(2)},
 				},
 			},
@@ -39,19 +39,19 @@ func TestDecodeAgentsFromCBOR(t *testing.T) {
 	if agents[0].Attributes.Ueid != "010203" {
 		t.Fatalf("unexpected ueid: %q", agents[0].Attributes.Ueid)
 	}
-	if len(agents[0].WappList) != 1 || agents[0].WappList[0].Ver != 2 {
-		t.Fatalf("unexpected wapp list: %+v", agents[0].WappList)
+	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Ver != 2 {
+		t.Fatalf("unexpected installed tc list: %+v", agents[0].InstalledTCList)
 	}
-	if len(agents[0].WappList[0].Name) != 1 || string(agents[0].WappList[0].Name[0]) != "app-a" {
-		t.Fatalf("unexpected wapp list: %+v", agents[0].WappList)
+	if len(agents[0].InstalledTCList[0].Name) != 1 || string(agents[0].InstalledTCList[0].Name[0]) != "app-a" {
+		t.Fatalf("unexpected installed tc list: %+v", agents[0].InstalledTCList)
 	}
 }
 
 func TestParseAgentsSingleObject(t *testing.T) {
 	payload := map[string]any{
-		"kid":       "dev-1",
-		"attribute": map[string]any{"ueid": "ueid-1"},
-		"wapp_list": []any{map[string]any{"name": []string{"YXBw"}, "ver": 1}},
+		"kid":               "dev-1",
+		"attribute":         map[string]any{"ueid": "ueid-1"},
+		"installed-tc": []any{map[string]any{"name": []string{"YXBw"}, "ver": 1}},
 	}
 	agents, err := parseAgents(payload)
 	if err != nil {
@@ -70,8 +70,8 @@ func TestParseAgentsPairFormat(t *testing.T) {
 				"attributes": map[string]any{
 					"ueid": "urn:example:building-alpha",
 				},
-				"wapp_list": []any{
-					[]any{"wapp-1", float64(3.2)},
+				"installed-tc": []any{
+					[]any{"tc-1", float64(3.2)},
 				},
 			},
 		},
@@ -86,8 +86,8 @@ func TestParseAgentsPairFormat(t *testing.T) {
 	if agents[0].KID != "building-alpha" {
 		t.Fatalf("unexpected extracted kid: %q", agents[0].KID)
 	}
-	if len(agents[0].WappList) != 1 || agents[0].WappList[0].Ver != 3 {
-		t.Fatalf("unexpected wapp list: %+v", agents[0].WappList)
+	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Ver != 3 {
+		t.Fatalf("unexpected installed tc list: %+v", agents[0].InstalledTCList)
 	}
 }
 
@@ -105,8 +105,8 @@ func TestConvertCBORToJSON(t *testing.T) {
 			"attributes": map[any]any{
 				int64(256): []byte{0xaa, 0xbb},
 			},
-			"wapp_list": []any{
-				[]any{"wapp-x", int64(5)},
+			"installed-tc": []any{
+				[]any{"tc-x", int64(5)},
 			},
 		},
 	}
@@ -131,12 +131,12 @@ func TestConvertCBORToJSON(t *testing.T) {
 	if err := json.Unmarshal(j, &m); err != nil {
 		t.Fatalf("unmarshal json map: %v", err)
 	}
-	wlist, _ := m["wapp_list"].([]any)
+	wlist, _ := m["installed-tc"].([]any)
 	if len(wlist) != 1 {
-		t.Fatalf("unexpected wapp list in json: %#v", m["wapp_list"])
+		t.Fatalf("unexpected installed tc list in json: %#v", m["installed-tc"])
 	}
 	w0, _ := wlist[0].(map[string]any)
-	if gotName, _ := w0["name"].(string); gotName != "wapp-x" {
-		t.Fatalf("unexpected wapp name in json: %#v", w0["name"])
+	if gotName, _ := w0["name"].(string); gotName != "tc-x" {
+		t.Fatalf("unexpected installed tc name in json: %#v", w0["name"])
 	}
 }

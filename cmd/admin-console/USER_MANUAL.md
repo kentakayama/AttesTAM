@@ -9,7 +9,7 @@ This document explains how to run `admin-console` and use its UI/API during loca
 2. Start Admin Console (`go run ./cmd/admin-console`).
 3. Open `http://localhost:<port>` in a browser.
 4. Use these views:
-   - `Show Devices`: list devices and inspect per-device WAPP versions.
+  - `Show Devices`: list devices and inspect per-device installed TC versions.
    - `Show TCs`: list uploaded/fetched manifests.
    - `Upload Manifests`: upload a manifest file to the console API.
 
@@ -44,9 +44,10 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://localhost:8080
 
 When `--tam-api-base` is set, the console calls TAM endpoints:
 
-- `GET {base}/admin/getAgents`
-- `GET {base}/admin/getManifests`
-- `POST {base}/tc-developer/addManifest`
+- `POST {base}/AgentService/ListAgents` (empty request body)
+- `POST {base}/AgentService/GetAgentStatus` (request body: list of KIDs from ListAgents)
+- `POST {base}/SUITManifestService/ListManifests` (empty request body)
+- `POST {base}/SUITManifestService/RegisterManifest`
 
 Request header used by console:
 
@@ -59,24 +60,26 @@ Console behavior:
 
 When `--tam-api-base` is not set:
 
-- `GET /api/devices` reads and decodes `cmd/admin-console/testvector/devices.cbor`.
-- `GET /api/manifests` reads and decodes `cmd/admin-console/testvector/manifests.cbor`.
-- `POST /api/manifests` returns the uploaded file as downloadable response (`Content-Disposition: attachment`).
+- `GET /api/agents` reads and combines:
+  - `cmd/admin-console/testvector/agentservice_listagents.cbor`
+  - `cmd/admin-console/testvector/agentservice_getagentstatus.cbor`
+- `GET /api/manifests/service` reads and decodes `cmd/admin-console/testvector/suitmanifestservice_listmanifests.cbor`.
+- `POST /api/manifests/register` returns the uploaded file as downloadable response (`Content-Disposition: attachment`).
 
 ## UI Operation Guide
 
 ## 1. Show Devices
 
 - Click `Show Devices` in the sidebar.
-- Device table is loaded from `GET /api/devices`.
+- Device table is loaded from `GET /api/agents`.
 - Click a `Device Name` row to open the detail panel.
-- Detail panel shows WAPP list (`name`, `ver`) for the selected device.
+- Detail panel shows installed TC list (`name`, `ver`) for the selected device.
 - Clicking the selected device again closes the detail panel.
 
 ## 2. Show TCs
 
 - Click `Show TCs`.
-- Manifest table is loaded from `GET /api/manifests`.
+- Manifest table is loaded from `GET /api/manifests/service`.
 - Columns:
   - `TC Name`
   - `Version`
@@ -85,7 +88,7 @@ When `--tam-api-base` is not set:
 
 - Click `Upload Manifests`.
 - Select a file and click `Upload`.
-- Browser sends `multipart/form-data` to `POST /api/manifests`.
+- Browser sends `multipart/form-data` to `POST /api/manifests/register`.
 - On success, UI displays `Upload complete.` and refreshes manifest list.
 
 ## Run Tests
@@ -100,7 +103,7 @@ go test ./...
 
 - `TAM API fetch failed: status 4xx/5xx from TAM API`:
   - Verify TAM is running and `--tam-api-base` is correct.
-  - Verify TAM endpoints `/admin/getAgents` and `/admin/getManifests` are reachable.
+  - Verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, and `/SUITManifestService/ListManifests` are reachable.
 - `Upload failed: file is required`:
   - Ensure the upload form includes `file` field.
 - Empty tables in UI:

@@ -47,7 +47,7 @@ func decodeAgentsFromCBOR(body []byte) ([]Agent, error) {
 				}
 			}
 		}
-		agent.WappList = buildWappList(detail["wapp_list"])
+		agent.InstalledTCList = buildInstalledTCList(extractInstalledTCListFromCBORDetail(detail))
 		agents = append(agents, agent)
 	}
 	return agents, nil
@@ -83,7 +83,7 @@ func parseAgents(v any) ([]Agent, error) {
 				}
 			}
 		}
-		a.WappList = buildWappList(m["wapp_list"])
+		a.InstalledTCList = buildInstalledTCList(extractInstalledTCListFromJSONDetail(m))
 		return []Agent{a}, nil
 	}
 
@@ -126,8 +126,8 @@ func parseAgents(v any) ([]Agent, error) {
 					}
 				}
 			}
-			wapps := buildWappList(detail["wapp_list"])
-			agents = append(agents, Agent{KID: deviceID, Attributes: Attribute{Ueid: ueid}, WappList: wapps})
+			installedTCs := buildInstalledTCList(extractInstalledTCListFromJSONDetail(detail))
+			agents = append(agents, Agent{KID: deviceID, Attributes: Attribute{Ueid: ueid}, InstalledTCList: installedTCs})
 		}
 		return agents, nil
 	}
@@ -155,26 +155,26 @@ func extractDeviceID(attrs map[string]any, fallback string) string {
 	return fallback
 }
 
-func buildWappList(v any) []WappItem {
+func buildInstalledTCList(v any) []InstalledTCItem {
 	list, ok := v.([]any)
 	if !ok {
 		return nil
 	}
-	out := make([]WappItem, 0, len(list))
+	out := make([]InstalledTCItem, 0, len(list))
 	for _, item := range list {
-		name, ver := parseWappItem(item)
+		name, ver := parseInstalledTCItem(item)
 		if len(name) == 0 {
 			continue
 		}
 		if ver < 0 {
 			ver = 0
 		}
-		out = append(out, WappItem{Name: name, Ver: ver})
+		out = append(out, InstalledTCItem{Name: name, Ver: ver})
 	}
 	return out
 }
 
-func parseWappItem(item any) (name suit.ComponentID, ver int) {
+func parseInstalledTCItem(item any) (name suit.ComponentID, ver int) {
 	ver = -1
 	if m, ok := item.(map[string]any); ok {
 		if v, ok := m["SUIT_Component_Identifier"]; ok {
@@ -209,6 +209,20 @@ func parseWappItem(item any) (name suit.ComponentID, ver int) {
 	}
 	name = toComponentID(item)
 	return
+}
+
+func extractInstalledTCListFromCBORDetail(detail map[interface{}]interface{}) any {
+	if v, ok := detail["installed-tc"]; ok {
+		return v
+	}
+	return nil
+}
+
+func extractInstalledTCListFromJSONDetail(detail map[string]any) any {
+	if v, ok := detail["installed-tc"]; ok {
+		return v
+	}
+	return nil
 }
 
 func toComponentID(v any) suit.ComponentID {

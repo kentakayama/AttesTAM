@@ -34,8 +34,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", indexHandler)
-	mux.HandleFunc("/api/devices", devicesHandler)
-	mux.HandleFunc("/api/manifests", manifestsHandler)
+	mux.HandleFunc("/api/agents", handleListAgents)
+	mux.HandleFunc("/api/manifests/service", handleListManifestsService)
+	mux.HandleFunc("/api/manifests/register", handleRegisterManifest)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(resolvePath("static")))))
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
