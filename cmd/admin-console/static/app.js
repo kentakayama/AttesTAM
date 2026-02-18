@@ -141,8 +141,29 @@ form.addEventListener('submit', async (e) => {
   try {
     const res = await fetch('/api/manifests', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
-    await res.json();
-    statusEl.textContent = 'Upload complete.';
+    const disposition = res.headers.get('Content-Disposition') || '';
+    if (disposition.includes('attachment')) {
+      const blob = await res.blob();
+      const filenameMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+      const filename = filenameMatch ? filenameMatch[1] : 'download.bin';
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      statusEl.textContent = 'Upload complete. Download started.';
+    } else {
+      const ct = res.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        await res.json();
+      } else {
+        await res.text();
+      }
+      statusEl.textContent = 'Upload complete.';
+    }
     form.reset();
     loadManifests();
   } catch (err) {

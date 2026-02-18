@@ -13,6 +13,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -21,21 +22,15 @@ import (
 	"io"
 	"log"
 	"math"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
-
-type AppState struct {
-	mu        sync.RWMutex
-	agents    []Agent
-	manifests []Manifest
-}
 
 // AppConfig holds runtime settings.
 type AppConfig struct {
@@ -47,7 +42,6 @@ type AppConfig struct {
 
 var (
 	tmpl      *template.Template
-	state     = &AppState{}
 	buildTime = time.Now()
 	conf      AppConfig
 )
@@ -141,9 +135,13 @@ func devicesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state.mu.RLock()
-	defer state.mu.RUnlock()
-	respondJSON(w, state.agents)
+	devices, err := loadTestVectorDevices()
+	if err != nil {
+		log.Printf("testvector devices load failed: %v", err)
+		http.Error(w, fmt.Sprintf("testvector devices load failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, devices)
 }
 
 func manifestsHandler(w http.ResponseWriter, r *http.Request) {
@@ -160,39 +158,28 @@ func manifestsHandler(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, manifests)
 			return
 		}
-		state.mu.RLock()
-		defer state.mu.RUnlock()
-		respondJSON(w, state.manifests)
-	case http.MethodPost:
-		ct := r.Header.Get("Content-Type")
-		var m Manifest
-		if strings.HasPrefix(ct, "multipart/form-data") {
-			if err := r.ParseMultipartForm(10 << 20); err != nil {
-				http.Error(w, "failed to parse form", http.StatusBadRequest)
-				return
-			}
-			file, header, err := r.FormFile("file")
-			if err != nil {
-				http.Error(w, "file is required", http.StatusBadRequest)
-				return
-			}
-			defer file.Close()
-			ver, _ := strconv.Atoi(r.FormValue("version"))
-			m = Manifest{Name: header.Filename, Ver: ver}
-		} else {
-			if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-				http.Error(w, "invalid JSON", http.StatusBadRequest)
-				return
-			}
-		}
-		if m.Name == "" {
-			http.Error(w, "name is required", http.StatusBadRequest)
+
+		manifests, err := loadTestVectorManifests()
+		if err != nil {
+			log.Printf("testvector manifests load failed: %v", err)
+			http.Error(w, fmt.Sprintf("testvector manifests load failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		state.mu.Lock()
-		state.manifests = append(state.manifests, m)
-		state.mu.Unlock()
-		respondJSON(w, map[string]any{"ok": true, "manifest": m})
+		respondJSON(w, manifests)
+	case http.MethodPost:
+		base := conf.ExternalAPIBase
+		if base != "" {
+			if err := postExternalManifest(w, r, base); err != nil {
+				log.Printf("external post manifest failed: %v", err)
+				http.Error(w, fmt.Sprintf("external post failed: %v", err), http.StatusBadGateway)
+			}
+			return
+		}
+
+		if err := echoUploadedFileAsDownload(w, r); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -236,53 +223,12 @@ func fetchExternalDevices(base string) ([]Agent, error) {
 		return nil, fmt.Errorf("status %d from external", resp.StatusCode)
 	}
 
-	if resp.Header.Get("Content-Type") == "application/cbor" {
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read body: %w", err)
 		}
-
-		// The API is expected to return a list of agents, e.g., [ [kid1, details1], ... ]
-		var rawList []interface{}
-		if err := cbor.Unmarshal(body, &rawList); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal CBOR device list: %w", err)
-		}
-
-		var agents []Agent
-		for _, itemRaw := range rawList {
-			item, ok := itemRaw.([]interface{})
-			if !ok || len(item) < 2 {
-				continue // Skip malformed items
-			}
-
-			var kid string
-			switch v := item[0].(type) {
-			case string:
-				kid = v
-			case []byte:
-				kid = string(v)
-			}
-			detail, _ := item[1].(map[interface{}]interface{})
-
-			agent := Agent{KID: kid}
-
-			if attrsRaw, ok := detail["attributes"]; ok {
-				if attrs, ok := attrsRaw.(map[interface{}]interface{}); ok {
-					keys := []interface{}{256, int64(256), uint64(256)}
-					for _, k := range keys {
-						if v, found := attrs[k]; found {
-							if b, ok := v.([]byte); ok {
-								agent.Attributes.Ueid = hex.EncodeToString(b)
-								break
-							}
-						}
-					}
-				}
-			}
-			agent.WappList = buildWappList(detail["wapp_list"])
-			agents = append(agents, agent)
-		}
-		return agents, nil
+		return decodeAgentsFromCBOR(body)
 	}
 
 	// Fallback to JSON decoding for non-CBOR responses
@@ -311,17 +257,14 @@ func fetchExternalManifests(base string) ([]Manifest, error) {
 	}
 
 	var manifests []Manifest
-	if resp.Header.Get("Content-Type") == "application/cbor" {
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read body: %w", err)
 		}
-		jsonBytes, err := ConvertManifestsCBORToJSON(body)
+		manifests, err = decodeManifestsFromCBOR(body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert CBOR: %w", err)
-		}
-		if err := json.Unmarshal(jsonBytes, &manifests); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal converted JSON: %w", err)
+			return nil, err
 		}
 	} else {
 		if err := json.NewDecoder(resp.Body).Decode(&manifests); err != nil {
@@ -329,6 +272,162 @@ func fetchExternalManifests(base string) ([]Manifest, error) {
 		}
 	}
 	return manifests, nil
+}
+
+func loadTestVectorDevices() ([]Agent, error) {
+	body, err := os.ReadFile(resolvePath(filepath.Join("testvector", "devices.cbor")))
+	if err != nil {
+		return nil, err
+	}
+	return decodeAgentsFromCBOR(body)
+}
+
+func loadTestVectorManifests() ([]Manifest, error) {
+	body, err := os.ReadFile(resolvePath(filepath.Join("testvector", "manifests.cbor")))
+	if err != nil {
+		return nil, err
+	}
+	return decodeManifestsFromCBOR(body)
+}
+
+func decodeAgentsFromCBOR(body []byte) ([]Agent, error) {
+	var rawList []interface{}
+	if err := cbor.Unmarshal(body, &rawList); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBOR device list: %w", err)
+	}
+
+	var agents []Agent
+	for _, itemRaw := range rawList {
+		item, ok := itemRaw.([]interface{})
+		if !ok || len(item) < 2 {
+			continue
+		}
+
+		var kid string
+		switch v := item[0].(type) {
+		case string:
+			kid = v
+		case []byte:
+			kid = string(v)
+		}
+		detail, _ := item[1].(map[interface{}]interface{})
+
+		agent := Agent{KID: kid}
+		if attrsRaw, ok := detail["attributes"]; ok {
+			if attrs, ok := attrsRaw.(map[interface{}]interface{}); ok {
+				keys := []interface{}{256, int64(256), uint64(256)}
+				for _, k := range keys {
+					if v, found := attrs[k]; found {
+						if b, ok := v.([]byte); ok {
+							agent.Attributes.Ueid = hex.EncodeToString(b)
+							break
+						}
+					}
+				}
+			}
+		}
+		agent.WappList = buildWappList(detail["wapp_list"])
+		agents = append(agents, agent)
+	}
+	return agents, nil
+}
+
+func decodeManifestsFromCBOR(body []byte) ([]Manifest, error) {
+	jsonBytes, err := ConvertManifestsCBORToJSON(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert CBOR: %w", err)
+	}
+	var manifests []Manifest
+	if err := json.Unmarshal(jsonBytes, &manifests); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal converted JSON: %w", err)
+	}
+	return manifests, nil
+}
+
+func postExternalManifest(w http.ResponseWriter, r *http.Request, base string) error {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return fmt.Errorf("failed to parse form: %w", err)
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return fmt.Errorf("file is required")
+	}
+	defer file.Close()
+
+	body, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read upload file: %w", err)
+	}
+
+	url := strings.TrimRight(base, "/") + "/tc-developer/addManifest"
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/suit-envelope+cose"
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	client := &http.Client{Timeout: 12 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read external response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("status %d from external: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	ver, _ := strconv.Atoi(r.FormValue("version"))
+	respondJSON(w, map[string]any{
+		"ok":             true,
+		"manifest":       Manifest{Name: header.Filename, Ver: ver},
+		"externalStatus": resp.StatusCode,
+		"externalBody":   strings.TrimSpace(string(respBody)),
+	})
+	return nil
+}
+
+func echoUploadedFileAsDownload(w http.ResponseWriter, r *http.Request) error {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return fmt.Errorf("failed to parse form")
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return fmt.Errorf("file is required")
+	}
+	defer file.Close()
+
+	body, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read upload file")
+	}
+
+	filename := header.Filename
+	if filename == "" {
+		filename = "uploaded.bin"
+	}
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = mime.TypeByExtension(filepath.Ext(filename))
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	_, _ = w.Write(body)
+	return nil
 }
 
 func parseAgents(v any) ([]Agent, error) {

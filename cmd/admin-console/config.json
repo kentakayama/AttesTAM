@@ -2,5 +2,5 @@
   "server": {
     "port": 9090
   },
-  "externalApiBase": "http://localhost:8080"
+  "externalApiBase": ""
 }
