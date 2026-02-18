@@ -79,7 +79,7 @@ Internal links:
 - Inbound from [Area 1](#area-1-identity-and-authorization) via `signing_key_id`.
 - Outbound to [Area 3](#area-3-agent-manifest-state) via `suit_manifest_id`.
 - Outbound to [Area 4](#area-4-message-tracking) via `sent_manifests_in_update_messages`.
-- Outbound to [Area 5](#area-5-feedback-and-triage) via `suit_manifest_id` or `manifest_digest`.
+- Outbound to [Area 5](#area-5-feedback-and-triage) via `suit_manifest_id`.
 
 ### Area 3: Agent Manifest State
 Per-agent installation/holding state:
@@ -105,13 +105,13 @@ Internal links:
 
 ### Area 5: Feedback and Triage
 Inbound status/evidence store:
-- `suit_reports` stores raw SUIT report payloads with optional `agent_id`, `suit_manifest_id`, and `manifest_digest`.
+- `suit_reports` stores raw SUIT report payloads with optional `agent_id` and `suit_manifest_id`.
 - `resolved` supports operational triage and backlog handling.
 - `ON DELETE SET NULL` keeps reports even if upstream identity/artifact rows are removed.
 
 Internal links:
 - Inbound from [Area 1](#area-1-identity-and-authorization) via optional `agent_id`.
-- Inbound from [Area 2](#area-2-suit-artifact-store) via optional `suit_manifest_id` and `manifest_digest`.
+- Inbound from [Area 2](#area-2-suit-artifact-store) via optional `suit_manifest_id`.
 
 ## Table Design
 
@@ -321,7 +321,6 @@ Columns:
 - `id` INTEGER PK AUTOINCREMENT
 - `agent_id` INTEGER NULL
 - `suit_manifest_id` INTEGER NULL
-- `manifest_digest` BLOB NULL
 - `suit_report` BLOB NOT NULL
 - `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 - `resolved` INTEGER NOT NULL DEFAULT 0
@@ -329,7 +328,6 @@ Columns:
 Indexes:
 - `idx_suit_reports_agent_id(agent_id)`
 - `idx_suit_reports_suit_manifest_id(suit_manifest_id)`
-- `idx_suit_reports_manifest_digest(manifest_digest)`
 - `idx_suit_reports_resolved_created_at(resolved, created_at)`
 
 Relationships:
@@ -452,7 +450,6 @@ erDiagram
     INTEGER id PK
     INTEGER agent_id FK
     INTEGER suit_manifest_id FK
-    BLOB manifest_digest
     BLOB suit_report
     INTEGER resolved
     TIMESTAMP created_at

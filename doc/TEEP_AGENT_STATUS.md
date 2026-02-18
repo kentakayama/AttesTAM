@@ -151,7 +151,7 @@ agent-attributes = {
 
 You can find CDDL definitions for dependencies in:
 - [RFC 9711](https://datatracker.ietf.org/doc/html/rfc9711#name-payload-cddl) for `eat.ueid-*`
-- [SUIT Manifest Store](./SUIT_MANIFEST_STORE.md#specification-of-suitmanifestserviceregistermanifest-web-api)
+- [SUIT Manifest Repository](./SUIT_MANIFEST_REPOSITORY.md#specification-of-suitmanifestserviceregistermanifest-web-api)
 
 #### Example Output
 ```cbor-diag

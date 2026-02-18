@@ -3,6 +3,15 @@
 ## Purpose
 This document explains the internal relationship between the HTTP server, TAM core logic, domain models, SQLite persistence, and verifier client.
 
+## Related Internal Docs
+- [Database Design](./DATABASE_DESIGN.md)
+- [TAM Status: TEEP Agent Status](./TAM_STATUS_TEEP_AGENT_STATUS.md)
+- [TAM Status: SUIT Manifest Repository](./TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md)
+
+## Terminology
+- **Agent Status**: protocol/API-facing status representation returned by `/AgentService/*`.
+- **Repository**: persistence abstraction/component (code-level storage access).
+
 ## Layered Architecture
 
 ```mermaid

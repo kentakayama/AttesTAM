@@ -1,16 +1,16 @@
-# SUIT Manifest Store Design
+# SUIT Manifest Repository Design
 
 ## Purpose
 This document explains how SUIT manifests are validated, stored, and retrieved in TAM.
 It focuses on the path from HTTP API to TAM logic and SQLite persistence.
 
-For internal storage and runtime flow details, see [TAM Status SUIT Manifest Store (Internal Design)](./TAM_STATUS_SUIT_MANIFEST_STORE.md).
+For internal storage and runtime flow details, see [TAM Status SUIT Manifest Repository (Internal Design)](./TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md).
 
 ## Scope
 
 ```mermaid
 ---
-title: API Endpoints relating to SUIT Manifest Store
+title: API Endpoints relating to SUIT Manifest Repository
 ---
 
 flowchart TB

@@ -4,6 +4,9 @@
 This document describes the internal implementation of TEEP Agent status handling in TAM.
 It focuses on persistence model, update paths (mainly TEEP Success), and read paths for `/*/AgentService/GetAgentStatus`.
 
+Terminology note:
+- **Agent Status** is used consistently for the API representation and its persisted source.
+
 ## Components
 - `internal/server/handler.go`
   - Handles `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus`, and encodes status responses as CBOR

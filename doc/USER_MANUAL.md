@@ -104,7 +104,7 @@ Example output:
 OK
 ```
 
-For protocol details, see [`SUIT_MANIFEST_STORE.md`](./SUIT_MANIFEST_STORE.md).
+For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSITORY.md).
 
 > [!NOTE]
 > If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.

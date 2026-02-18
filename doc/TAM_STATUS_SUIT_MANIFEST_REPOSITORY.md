@@ -1,4 +1,4 @@
-# TAM Status SUIT Manifest Store (Internal Design)
+# TAM Status SUIT Manifest Repository (Internal Design)
 
 ## Purpose
 This document explains the internal implementation of SUIT manifest storage in TAM.
@@ -8,7 +8,7 @@ It covers code-level components, persistence model, and runtime read/write flows
 - `internal/server/handler.go`
   - Parses `application/suit-envelope+cose`
   - Verifies request method/headers and converts HTTP payload to SUIT structures
-- `internal/tam/manifest_store.go`
+- `internal/tam/manifest_repository_flow.go`
   - `SetEnvelope(...)`: validation + persistence entrypoint
   - `GetManifest(...)`: latest manifest lookup by trusted component ID
 - `internal/infra/sqlite/suit_manifest_repo.go`

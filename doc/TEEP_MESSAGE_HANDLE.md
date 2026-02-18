@@ -53,7 +53,7 @@ This TAM implementation enforces the following requirements for incoming `POST /
 
 2. COSE security wrapper requirements based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
    - Non-empty messages should be wrapped with *COSE security wrapper*, especially COSE Sign1-encoded TEEP messages.
-   - For the implementation optimization, this TAM requires the COSE unprotected header `kid` (label `4`) for looking up the corresponding agent public key from TEEP Agent Store.
+   - For the implementation optimization, this TAM requires the COSE unprotected header `kid` (label `4`) for looking up the corresponding agent public key from Agent Status Repository.
    - `kid` value should be encoded with SHA-256 [RFC 9679 COSE_Key thumbprint](https://datatracker.ietf.org/doc/html/rfc9679), and expected to be 32 bytes.
 
 3. Correlation and replay-protection requirements of TEEP Protocol messages and Attestation Payload based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
