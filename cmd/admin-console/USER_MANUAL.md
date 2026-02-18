@@ -20,7 +20,7 @@ This document explains how to run `admin-console` and use its UI/API during loca
 go run ./cmd/admin-console
 ```
 
-### Listen Port / External API Settings
+### Listen Port / TAM API Settings
 Settings precedence is:
 
 1. environment variables
@@ -30,7 +30,7 @@ Settings precedence is:
 | Setting | Env Var | `config.json` key | Default | Description |
 | ---- | ---- | ---- | ---- | ---- |
 | Listen port | `PORT` | `server.port` | `8080` | HTTP port for Admin Console |
-| External API base URL | `EXTERNAL_API_BASE` | `externalApiBase` | `""` (disabled) | If set, console calls TAM APIs for devices/manifests upload |
+| TAM API base URL | `TAM_API_BASE` | `tamApiBase` | `""` (disabled) | If set, console calls TAM APIs for devices/manifests upload |
 
 Current sample config (`cmd/admin-console/config.json`):
 
@@ -39,7 +39,7 @@ Current sample config (`cmd/admin-console/config.json`):
   "server": {
     "port": 9090
   },
-  "externalApiBase": "http://localhost:8080"
+  "tamApiBase": "http://localhost:8080"
 }
 ```
 
@@ -50,11 +50,11 @@ Current sample config (`cmd/admin-console/config.json`):
 
 - Go toolchain (`go run`)
 - Browser (Chrome/Safari/Firefox, etc.)
-- TAM server (`tam-over-http`) when using external data mode
+- TAM server (`tam-over-http`) when using TAM API mode
 
-## External Integration Behavior
+## TAM API Integration Behavior
 
-When `EXTERNAL_API_BASE` (or `externalApiBase`) is set, the console calls TAM endpoints:
+When `TAM_API_BASE` (or `tamApiBase`) is set, the console calls TAM endpoints:
 
 - `GET {base}/admin/getAgents`
 - `GET {base}/admin/getManifests`
@@ -69,7 +69,7 @@ Console behavior:
 - If response `Content-Type` starts with `application/cbor`, response is parsed as CBOR and converted to JSON for UI.
 - Otherwise, response is treated as JSON.
 
-When `EXTERNAL_API_BASE` is not set:
+When `TAM_API_BASE` is not set:
 
 - `GET /api/devices` reads and decodes `cmd/admin-console/testvector/devices.cbor`.
 - `GET /api/manifests` reads and decodes `cmd/admin-console/testvector/manifests.cbor`.
@@ -110,8 +110,8 @@ go test ./...
 
 ## Troubleshooting
 
-- `external fetch failed: status 4xx/5xx from external`:
-  - Verify TAM is running and `externalApiBase` is correct.
+- `TAM API fetch failed: status 4xx/5xx from TAM API`:
+  - Verify TAM is running and `tamApiBase` is correct.
   - Verify TAM endpoints `/admin/getAgents` and `/admin/getManifests` are reachable.
 - `Upload failed: file is required`:
   - Ensure the upload form includes `file` field.
