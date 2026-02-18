@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 )
@@ -9,18 +9,18 @@ import (
 // AppConfig holds runtime settings.
 type AppConfig struct {
 	Server struct {
-		Port int `json:"port"`
-	} `json:"server"`
-	TAMAPIBase string `json:"tamApiBase"`
+		Port int
+	}
+	TAMAPIBase string
 }
 
-func loadConfig(path string, out *AppConfig) {
-	f, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	_ = json.NewDecoder(f).Decode(out)
+func loadConfigFromFlags() AppConfig {
+	var cfg AppConfig
+	flag.IntVar(&cfg.Server.Port, "port", 9090, "HTTP listen port for admin console")
+	flag.StringVar(&cfg.TAMAPIBase, "tam-api-base", "", "TAM API base URL (e.g. http://localhost:8080)")
+	flag.Parse()
+
+	return cfg
 }
 
 func resolvePath(rel string) string {

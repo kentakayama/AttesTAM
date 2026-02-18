@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"github.com/fxamacker/cbor/v2"
 )
 
@@ -62,7 +63,7 @@ func ConvertCBORToJSON(data []byte) ([]byte, error) {
 		if wapps, ok := wappsRaw.([]interface{}); ok {
 			for _, item := range wapps {
 				if pair, ok := item.([]interface{}); ok && len(pair) >= 2 {
-					name, _ := pair[0].(string)
+					name := toComponentID(pair[0])
 					var ver int
 					switch v := pair[1].(type) {
 					case int:
@@ -74,7 +75,9 @@ func ConvertCBORToJSON(data []byte) ([]byte, error) {
 					case float64:
 						ver = int(v)
 					}
-					target.WappList = append(target.WappList, WappItem{Name: name, Ver: ver})
+					if len(name) > 0 {
+						target.WappList = append(target.WappList, WappItem{Name: name, Ver: ver})
+					}
 				}
 			}
 		}

@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/suit"
 )
 
 func decodeAgentsFromCBOR(body []byte) ([]Agent, error) {
@@ -63,6 +64,27 @@ func parseAgents(v any) ([]Agent, error) {
 				return []Agent{a}, nil
 			}
 		}
+		a := Agent{}
+		if kid, ok := m["kid"].(string); ok {
+			a.KID = kid
+		}
+		if attrs, ok := m["attribute"].(map[string]any); ok {
+			if ueid, ok := attrs["ueid"].(string); ok {
+				a.Attributes.Ueid = ueid
+			}
+		}
+		if a.Attributes.Ueid == "" {
+			if attrs, ok := m["attributes"].(map[string]any); ok {
+				for _, val := range attrs {
+					if s, ok := val.(string); ok {
+						a.Attributes.Ueid = s
+						break
+					}
+				}
+			}
+		}
+		a.WappList = buildWappList(m["wapp_list"])
+		return []Agent{a}, nil
 	}
 
 	if arr, ok := v.([]any); ok {
@@ -141,7 +163,7 @@ func buildWappList(v any) []WappItem {
 	out := make([]WappItem, 0, len(list))
 	for _, item := range list {
 		name, ver := parseWappItem(item)
-		if name == "" {
+		if len(name) == 0 {
 			continue
 		}
 		if ver < 0 {
@@ -152,24 +174,11 @@ func buildWappList(v any) []WappItem {
 	return out
 }
 
-func parseWappItem(item any) (name string, ver int) {
+func parseWappItem(item any) (name suit.ComponentID, ver int) {
 	ver = -1
 	if m, ok := item.(map[string]any); ok {
 		if v, ok := m["SUIT_Component_Identifier"]; ok {
-			switch t := v.(type) {
-			case []any:
-				if len(t) > 0 {
-					if s, ok := t[0].(string); ok {
-						name = s
-					} else {
-						name = fmt.Sprint(t[0])
-					}
-				}
-			case string:
-				name = t
-			default:
-				name = fmt.Sprint(t)
-			}
+			name = toComponentID(v)
 		}
 		if v, ok := m["manifest-sequence-number"]; ok {
 			if f, ok := v.(float64); ok {
@@ -182,11 +191,7 @@ func parseWappItem(item any) (name string, ver int) {
 	}
 	if a, ok := item.([]any); ok {
 		if len(a) > 0 {
-			if s, ok := a[0].(string); ok {
-				name = s
-			} else {
-				name = fmt.Sprint(a[0])
-			}
+			name = toComponentID(a[0])
 		}
 		if len(a) > 1 {
 			switch v := a[1].(type) {
@@ -202,6 +207,61 @@ func parseWappItem(item any) (name string, ver int) {
 		}
 		return
 	}
-	name = fmt.Sprint(item)
+	name = toComponentID(item)
 	return
+}
+
+func toComponentID(v any) suit.ComponentID {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case suit.ComponentID:
+		if len(t) == 0 {
+			return nil
+		}
+		return t
+	case []byte:
+		if id, ok := decodeCBORComponentID(t); ok {
+			return id
+		}
+		return suit.ComponentID{suit.ComponentIDBytes(t)}
+	case string:
+		if t == "" {
+			return nil
+		}
+		return suit.ComponentID{suit.ComponentIDBytes([]byte(t))}
+	case []any:
+		out := make(suit.ComponentID, 0, len(t))
+		for _, p := range t {
+			switch b := p.(type) {
+			case []byte:
+				out = append(out, suit.ComponentIDBytes(b))
+			case string:
+				out = append(out, suit.ComponentIDBytes([]byte(b)))
+			default:
+				s := fmt.Sprint(b)
+				if s != "" {
+					out = append(out, suit.ComponentIDBytes([]byte(s)))
+				}
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	default:
+		s := fmt.Sprint(t)
+		if s == "" {
+			return nil
+		}
+		return suit.ComponentID{suit.ComponentIDBytes([]byte(s))}
+	}
+}
+
+func decodeCBORComponentID(raw []byte) (suit.ComponentID, bool) {
+	var id suit.ComponentID
+	if err := cbor.Unmarshal(raw, &id); err != nil || len(id) == 0 {
+		return nil, false
+	}
+	return id, true
 }

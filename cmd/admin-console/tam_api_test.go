@@ -53,7 +53,7 @@ func TestFetchTAMDevicesJSONFallback(t *testing.T) {
 			{
 				"kid":       "dev-json",
 				"attribute": map[string]any{"ueid": "u-json"},
-				"wapp_list": []map[string]any{{"name": "w", "ver": 2}},
+				"wapp_list": []map[string]any{{"name": []string{"dw=="}, "ver": 2}},
 			},
 		})
 	}))

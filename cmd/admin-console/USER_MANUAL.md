@@ -21,30 +21,18 @@ go run ./cmd/admin-console
 ```
 
 ### Listen Port / TAM API Settings
-Settings precedence is:
+Use command-line flags:
 
-1. environment variables
-2. `config.json`
-3. built-in defaults
+| Setting | Flag | Default | Description |
+| ---- | ---- | ---- | ---- |
+| Listen port | `--port` | `9090` | HTTP port for Admin Console |
+| TAM API base URL | `--tam-api-base` | `""` (disabled) | If set, console calls TAM APIs for devices/manifests upload |
 
-| Setting | Env Var | `config.json` key | Default | Description |
-| ---- | ---- | ---- | ---- | ---- |
-| Listen port | `PORT` | `server.port` | `8080` | HTTP port for Admin Console |
-| TAM API base URL | `TAM_API_BASE` | `tamApiBase` | `""` (disabled) | If set, console calls TAM APIs for devices/manifests upload |
+Example:
 
-Current sample config (`cmd/admin-console/config.json`):
-
-```json
-{
-  "server": {
-    "port": 9090
-  },
-  "tamApiBase": "http://localhost:8080"
-}
+```bash
+go run ./cmd/admin-console --port=9090 --tam-api-base=http://localhost:8080
 ```
-
-> [!NOTE]
-> With this sample config, `go run ./cmd/admin-console` starts on port `9090` unless `PORT` is set.
 
 ## Prerequisites
 
@@ -54,7 +42,7 @@ Current sample config (`cmd/admin-console/config.json`):
 
 ## TAM API Integration Behavior
 
-When `TAM_API_BASE` (or `tamApiBase`) is set, the console calls TAM endpoints:
+When `--tam-api-base` is set, the console calls TAM endpoints:
 
 - `GET {base}/admin/getAgents`
 - `GET {base}/admin/getManifests`
@@ -69,7 +57,7 @@ Console behavior:
 - If response `Content-Type` starts with `application/cbor`, response is parsed as CBOR and converted to JSON for UI.
 - Otherwise, response is treated as JSON.
 
-When `TAM_API_BASE` is not set:
+When `--tam-api-base` is not set:
 
 - `GET /api/devices` reads and decodes `cmd/admin-console/testvector/devices.cbor`.
 - `GET /api/manifests` reads and decodes `cmd/admin-console/testvector/manifests.cbor`.
@@ -111,7 +99,7 @@ go test ./...
 ## Troubleshooting
 
 - `TAM API fetch failed: status 4xx/5xx from TAM API`:
-  - Verify TAM is running and `tamApiBase` is correct.
+  - Verify TAM is running and `--tam-api-base` is correct.
   - Verify TAM endpoints `/admin/getAgents` and `/admin/getManifests` are reachable.
 - `Upload failed: file is required`:
   - Ensure the upload form includes `file` field.
