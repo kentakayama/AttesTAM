@@ -132,7 +132,7 @@ async function loadManifests() {
       data.forEach(m => {
         const tr = document.createElement('tr');
         const td1 = document.createElement('td'); td1.textContent = m.name;
-        const td2 = document.createElement('td'); td2.textContent = m.version || '-';
+        const td2 = document.createElement('td'); td2.textContent = (m.version !== undefined && m.version !== null) ? String(m.version) : '-';
         tr.append(td1, td2);
         tbody.appendChild(tr);
       });
