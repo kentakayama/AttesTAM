@@ -9,41 +9,41 @@ import (
 )
 
 type Agent struct {
-	KID             string            `json:"kid"`
-	LastUpdate      string            `json:"last_update,omitempty"`
-	Attributes      Attribute         `json:"attribute"`
-	InstalledTCList []InstalledTCItem `json:"installed-tc"`
+	KID             string             `json:"kid"`
+	LastUpdate      string             `json:"last_update,omitempty"`
+	Attributes      Attribute          `json:"attribute"`
+	InstalledTCList []TrustedComponent `json:"installed-tc"`
 }
 
 type Attribute struct {
 	Ueid string `json:"ueid"`
 }
 
-type InstalledTCItem struct {
-	Name suit.ComponentID `json:"name"`
-	Ver  int              `json:"ver"`
+type TrustedComponent struct {
+	Name    suit.ComponentID `json:"name"`
+	Version int              `json:"version"`
 }
 
-func (w InstalledTCItem) MarshalJSON() ([]byte, error) {
+func (w TrustedComponent) MarshalJSON() ([]byte, error) {
 	type alias struct {
-		Name string `json:"name"`
-		Ver  int    `json:"ver"`
+		Name    string `json:"name"`
+		Version int    `json:"version"`
 	}
 	return json.Marshal(alias{
-		Name: componentIDDisplayName(w.Name),
-		Ver:  w.Ver,
+		Name:    componentIDDisplayName(w.Name),
+		Version: w.Version,
 	})
 }
 
-func (w *InstalledTCItem) UnmarshalJSON(data []byte) error {
+func (w *TrustedComponent) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Name json.RawMessage `json:"name"`
-		Ver  int             `json:"ver"`
+		Name    json.RawMessage `json:"name"`
+		Version int             `json:"version"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	w.Ver = raw.Ver
+	w.Version = raw.Version
 	if len(raw.Name) == 0 || string(raw.Name) == "null" {
 		w.Name = nil
 		return nil
@@ -81,9 +81,4 @@ func componentIDDisplayName(id suit.ComponentID) string {
 		return diag
 	}
 	return id.CBORDiagString(0)
-}
-
-type Manifest struct {
-	Name string `json:"name"`
-	Ver  int    `json:"version"`
 }

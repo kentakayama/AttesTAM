@@ -79,6 +79,31 @@ body {
   box-shadow: 0 6px 18px rgba(37,99,235,.25);
 }
 
+.connection-banner {
+  margin: calc(var(--space-5) * -1 + var(--space-3)) 0 var(--space-5);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary-weak) 35%, var(--panel));
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.connection-label {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: .82rem;
+  text-transform: uppercase;
+  letter-spacing: .45px;
+}
+
+.connection-value {
+  color: var(--text);
+  font-size: .92rem;
+}
+
 /* ===== Layout (Responsive) ===== */
 .app-body {
   display: grid;

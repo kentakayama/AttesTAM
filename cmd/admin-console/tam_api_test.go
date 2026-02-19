@@ -9,17 +9,25 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/tam-over-http/internal/tam"
 )
 
 func TestFetchTAMDevicesCBOR(t *testing.T) {
-	statusRaw := []any{
-		[]any{
-			"dev-1",
-			map[any]any{
-				"attributes":   map[any]any{256: []byte{0x10}},
-				"installed-tc": []any{[]any{"app-1", int64(1)}},
+	statusRaw := []tam.AgentStatusRecord{
+		{
+			AgentKID: []byte("dev-1"),
+			Status: tam.AgentStatus{
+				Attributes: tam.AgentAttributes{DeviceUEID: []byte{0x10}},
+				SuitManifests: []model.SuitManifestOverview{
+					{
+						TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("app-1")}),
+						SequenceNumber:     1,
+					},
+				},
 			},
 		},
 	}
@@ -27,8 +35,11 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal cbor: %v", err)
 	}
-	listRaw := []any{
-		[]any{"dev-1", "2026-02-18T10:00:00Z"},
+	listRaw := []tam.AgentStatusKey{
+		{
+			AgentKID:  []byte("dev-1"),
+			UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC),
+		},
 	}
 	listBody, err := cbor.Marshal(listRaw)
 	if err != nil {
@@ -38,7 +49,7 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/AgentService/ListAgents":
-			if r.Method != http.MethodPost {
+			if r.Method != http.MethodGet {
 				t.Fatalf("unexpected method: %s", r.Method)
 			}
 			b, err := io.ReadAll(r.Body)
@@ -54,7 +65,7 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 			if r.Method != http.MethodPost {
 				t.Fatalf("unexpected method: %s", r.Method)
 			}
-			var kids []string
+			var kids [][]byte
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Fatalf("read body: %v", err)
@@ -62,7 +73,7 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 			if err := cbor.Unmarshal(b, &kids); err != nil {
 				t.Fatalf("decode request cbor: %v", err)
 			}
-			if len(kids) != 1 || kids[0] != "dev-1" {
+			if len(kids) != 1 || string(kids[0]) != "dev-1" {
 				t.Fatalf("unexpected kids: %+v", kids)
 			}
 			w.Header().Set("Content-Type", "application/cbor")
@@ -91,10 +102,10 @@ func TestFetchTAMDevicesJSONFallback(t *testing.T) {
 				{"dev-json", "2026-02-18T11:00:00Z"},
 			})
 		case "/AgentService/GetAgentStatus":
-			var kids []string
+			var kids [][]byte
 			b, _ := io.ReadAll(r.Body)
 			_ = cbor.Unmarshal(b, &kids)
-			if len(kids) != 1 || kids[0] != "dev-json" {
+			if len(kids) != 1 || string(kids[0]) != "dev-json" {
 				t.Fatalf("unexpected kids: %+v", kids)
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -102,7 +113,7 @@ func TestFetchTAMDevicesJSONFallback(t *testing.T) {
 				{
 					"kid":          "dev-json",
 					"attribute":    map[string]any{"ueid": "u-json"},
-					"installed-tc": []map[string]any{{"name": []string{"dw=="}, "ver": 2}},
+					"installed-tc": []map[string]any{{"name": []string{"dw=="}, "version": 2}},
 				},
 			})
 		default:
@@ -137,7 +148,7 @@ func TestFetchTAMManifestsCBOR(t *testing.T) {
 		if r.URL.Path != "/SUITManifestService/ListManifests" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("unexpected method: %s", r.Method)
 		}
 		b, err := io.ReadAll(r.Body)
@@ -156,7 +167,7 @@ func TestFetchTAMManifestsCBOR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetchTAMManifests: %v", err)
 	}
-	if len(manifests) != 1 || manifests[0].Name != "m-a" || manifests[0].Ver != 9 {
+	if len(manifests) != 1 || componentIDDisplayName(manifests[0].Name) != "m-a" || manifests[0].Version != 9 {
 		t.Fatalf("unexpected manifests: %+v", manifests)
 	}
 }
@@ -249,4 +260,13 @@ func TestPostTAMManifestNon2xx(t *testing.T) {
 	if !strings.Contains(err.Error(), "status 400 from TAM API") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func mustMarshalCBOR(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := cbor.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal cbor: %v", err)
+	}
+	return b
 }

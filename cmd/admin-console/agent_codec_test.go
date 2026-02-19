@@ -5,18 +5,23 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/tam-over-http/internal/tam"
 )
 
 func TestDecodeAgentsFromCBOR(t *testing.T) {
-	raw := []any{
-		[]any{
-			"kid-1",
-			map[any]any{
-				"attributes": map[any]any{
-					256: []byte{0x01, 0x02, 0x03},
+	raw := []tam.AgentStatusRecord{
+		{
+			AgentKID: []byte("kid-1"),
+			Status: tam.AgentStatus{
+				Attributes: tam.AgentAttributes{
+					DeviceUEID: []byte{0x01, 0x02, 0x03},
 				},
-				"installed-tc": []any{
-					[]any{"app-a", uint64(2)},
+				SuitManifests: []model.SuitManifestOverview{
+					{
+						TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("app-a")}),
+						SequenceNumber:     2,
+					},
 				},
 			},
 		},
@@ -39,7 +44,7 @@ func TestDecodeAgentsFromCBOR(t *testing.T) {
 	if agents[0].Attributes.Ueid != "010203" {
 		t.Fatalf("unexpected ueid: %q", agents[0].Attributes.Ueid)
 	}
-	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Ver != 2 {
+	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Version != 2 {
 		t.Fatalf("unexpected installed tc list: %+v", agents[0].InstalledTCList)
 	}
 	if len(agents[0].InstalledTCList[0].Name) != 1 || string(agents[0].InstalledTCList[0].Name[0]) != "app-a" {
@@ -49,9 +54,9 @@ func TestDecodeAgentsFromCBOR(t *testing.T) {
 
 func TestParseAgentsSingleObject(t *testing.T) {
 	payload := map[string]any{
-		"kid":               "dev-1",
-		"attribute":         map[string]any{"ueid": "ueid-1"},
-		"installed-tc": []any{map[string]any{"name": []string{"YXBw"}, "ver": 1}},
+		"kid":          "dev-1",
+		"attribute":    map[string]any{"ueid": "ueid-1"},
+		"installed-tc": []any{map[string]any{"name": []string{"YXBw"}, "version": 1}},
 	}
 	agents, err := parseAgents(payload)
 	if err != nil {
@@ -86,7 +91,7 @@ func TestParseAgentsPairFormat(t *testing.T) {
 	if agents[0].KID != "building-alpha" {
 		t.Fatalf("unexpected extracted kid: %q", agents[0].KID)
 	}
-	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Ver != 3 {
+	if len(agents[0].InstalledTCList) != 1 || agents[0].InstalledTCList[0].Version != 3 {
 		t.Fatalf("unexpected installed tc list: %+v", agents[0].InstalledTCList)
 	}
 }
@@ -99,14 +104,17 @@ func TestParseAgentsUnexpectedPayload(t *testing.T) {
 }
 
 func TestConvertCBORToJSON(t *testing.T) {
-	raw := []any{
-		"kid-x",
-		map[any]any{
-			"attributes": map[any]any{
-				int64(256): []byte{0xaa, 0xbb},
+	raw := tam.AgentStatusRecord{
+		AgentKID: []byte("kid-x"),
+		Status: tam.AgentStatus{
+			Attributes: tam.AgentAttributes{
+				DeviceUEID: []byte{0xaa, 0xbb},
 			},
-			"installed-tc": []any{
-				[]any{"tc-x", int64(5)},
+			SuitManifests: []model.SuitManifestOverview{
+				{
+					TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("tc-x")}),
+					SequenceNumber:     5,
+				},
 			},
 		},
 	}

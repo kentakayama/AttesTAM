@@ -33,7 +33,7 @@ func loadTestVectorAgents() ([]Agent, error) {
 	}
 	lastUpdatedByKID := make(map[string]string, len(entries))
 	for _, e := range entries {
-		lastUpdatedByKID[e.KID] = e.LastUpdated
+		lastUpdatedByKID[string(e.AgentKID)] = formatUpdatedAt(e.UpdatedAt)
 	}
 	for i := range agents {
 		agents[i].LastUpdate = lastUpdatedByKID[agents[i].KID]
@@ -41,7 +41,7 @@ func loadTestVectorAgents() ([]Agent, error) {
 	return agents, nil
 }
 
-func loadTestVectorManifests() ([]Manifest, error) {
+func loadTestVectorManifests() ([]TrustedComponent, error) {
 	body, err := os.ReadFile(resolvePath(filepath.Join("testvector", "suitmanifestservice_listmanifests.cbor")))
 	if err != nil {
 		return nil, err

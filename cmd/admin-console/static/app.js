@@ -92,7 +92,7 @@ async function loadAgents() {
                 const nameTd = document.createElement('td');
                 const verTd = document.createElement('td');
                 nameTd.textContent = installedTC.name || installedTC.Name || '-';
-                verTd.textContent = (installedTC.ver !== undefined && installedTC.ver !== null) ? String(installedTC.ver) : '-';
+                verTd.textContent = (installedTC.version !== undefined && installedTC.version !== null) ? String(installedTC.version) : '-';
                 detailTr.append(nameTd, verTd);
                 agentDetailBody.appendChild(detailTr);
               });

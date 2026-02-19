@@ -11,23 +11,25 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/tam"
 )
 
 func fetchTAMDevices(base string) ([]Agent, error) {
 	client := &http.Client{Timeout: 12 * time.Second}
-	entries, err := fetchTAMListAgents(base, client)
+	keys, err := fetchTAMListAgents(base, client)
 	if err != nil {
 		return nil, err
 	}
 
-	kids := make([]string, 0, len(entries))
-	lastUpdatedByKID := make(map[string]string, len(entries))
-	for _, e := range entries {
-		if e.KID == "" {
+	kids := make([][]byte, 0, len(keys))
+	lastUpdatedByKID := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if len(key.AgentKID) == 0 {
 			continue
 		}
-		kids = append(kids, e.KID)
-		lastUpdatedByKID[e.KID] = e.LastUpdated
+		kid := string(key.AgentKID)
+		kids = append(kids, key.AgentKID)
+		lastUpdatedByKID[kid] = formatUpdatedAt(key.UpdatedAt)
 	}
 	if len(kids) == 0 {
 		return []Agent{}, nil
@@ -45,14 +47,9 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 	return agents, nil
 }
 
-type listAgentsEntry struct {
-	KID         string
-	LastUpdated string
-}
-
-func fetchTAMListAgents(base string, client *http.Client) ([]listAgentsEntry, error) {
+func fetchTAMListAgents(base string, client *http.Client) ([]tam.AgentStatusKey, error) {
 	url := strings.TrimRight(base, "/") + "/AgentService/ListAgents"
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,34 +63,35 @@ func fetchTAMListAgents(base string, client *http.Client) ([]listAgentsEntry, er
 		return nil, fmt.Errorf("status %d from TAM API", resp.StatusCode)
 	}
 
-	var payload any
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read body: %w", err)
 		}
-		if err := cbor.Unmarshal(body, &payload); err != nil {
+		var keys []tam.AgentStatusKey
+		if err := cbor.Unmarshal(body, &keys); err != nil {
 			return nil, fmt.Errorf("failed to decode ListAgents cbor: %w", err)
 		}
-	} else {
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			return nil, err
-		}
+		return keys, nil
 	}
 
-	entries, ok := parseListAgentsPayload(payload)
+	var payload any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, err
+	}
+	keys, ok := parseListAgentsPayload(payload)
 	if !ok {
 		return nil, fmt.Errorf("invalid ListAgents response format")
 	}
-	return entries, nil
+	return keys, nil
 }
 
-func parseListAgentsPayload(payload any) ([]listAgentsEntry, bool) {
+func parseListAgentsPayload(payload any) ([]tam.AgentStatusKey, bool) {
 	arr, ok := payload.([]any)
 	if !ok {
 		return nil, false
 	}
-	out := make([]listAgentsEntry, 0, len(arr))
+	out := make([]tam.AgentStatusKey, 0, len(arr))
 	for _, row := range arr {
 		pair, ok := row.([]any)
 		if !ok || len(pair) < 2 {
@@ -103,15 +101,15 @@ func parseListAgentsPayload(payload any) ([]listAgentsEntry, bool) {
 		if kid == "" {
 			continue
 		}
-		out = append(out, listAgentsEntry{
-			KID:         kid,
-			LastUpdated: toString(pair[1]),
+		out = append(out, tam.AgentStatusKey{
+			AgentKID:  []byte(kid),
+			UpdatedAt: parseUpdatedAt(pair[1]),
 		})
 	}
 	return out, true
 }
 
-func fetchTAMGetAgentStatus(base string, client *http.Client, kids []string) ([]Agent, error) {
+func fetchTAMGetAgentStatus(base string, client *http.Client, kids [][]byte) ([]Agent, error) {
 	url := strings.TrimRight(base, "/") + "/AgentService/GetAgentStatus"
 	body, err := cbor.Marshal(kids)
 	if err != nil {
@@ -159,10 +157,36 @@ func toString(v any) string {
 	}
 }
 
-func fetchTAMManifests(base string) ([]Manifest, error) {
+func parseUpdatedAt(v any) time.Time {
+	switch t := v.(type) {
+	case time.Time:
+		return t
+	case string:
+		tm, err := time.Parse(time.RFC3339, t)
+		if err == nil {
+			return tm
+		}
+	case int64:
+		return time.Unix(t, 0).UTC()
+	case uint64:
+		return time.Unix(int64(t), 0).UTC()
+	case int:
+		return time.Unix(int64(t), 0).UTC()
+	}
+	return time.Time{}
+}
+
+func formatUpdatedAt(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+func fetchTAMManifests(base string) ([]TrustedComponent, error) {
 	url := strings.TrimRight(base, "/") + "/SUITManifestService/ListManifests"
 	client := &http.Client{Timeout: 12 * time.Second}
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +200,7 @@ func fetchTAMManifests(base string) ([]Manifest, error) {
 		return nil, fmt.Errorf("status %d from TAM API", resp.StatusCode)
 	}
 
-	var manifests []Manifest
+	var manifests []TrustedComponent
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -239,7 +263,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	ver, _ := strconv.Atoi(r.FormValue("version"))
 	respondJSON(w, map[string]any{
 		"ok":        true,
-		"manifest":  Manifest{Name: header.Filename, Ver: ver},
+		"manifest":  TrustedComponent{Name: toComponentID(header.Filename), Version: ver},
 		"tamStatus": resp.StatusCode,
 		"tamBody":   strings.TrimSpace(string(respBody)),
 	})

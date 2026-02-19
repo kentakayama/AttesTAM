@@ -5,12 +5,12 @@ import (
 	"fmt"
 )
 
-func decodeManifestsFromCBOR(body []byte) ([]Manifest, error) {
+func decodeManifestsFromCBOR(body []byte) ([]TrustedComponent, error) {
 	jsonBytes, err := ConvertManifestsCBORToJSON(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert CBOR: %w", err)
 	}
-	var manifests []Manifest
+	var manifests []TrustedComponent
 	if err := json.Unmarshal(jsonBytes, &manifests); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal converted JSON: %w", err)
 	}

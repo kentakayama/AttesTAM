@@ -26,7 +26,7 @@ func TestDecodeManifestsFromCBOR(t *testing.T) {
 	if len(manifests) != 1 {
 		t.Fatalf("expected 1 manifest, got %d", len(manifests))
 	}
-	if manifests[0].Name != "manifest-a" || manifests[0].Ver != 7 {
+	if componentIDDisplayName(manifests[0].Name) != "manifest-a" || manifests[0].Version != 7 {
 		t.Fatalf("unexpected manifest: %+v", manifests[0])
 	}
 }

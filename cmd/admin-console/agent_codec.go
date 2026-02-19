@@ -9,45 +9,34 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/tam-over-http/internal/tam"
 )
 
 func decodeAgentsFromCBOR(body []byte) ([]Agent, error) {
-	var rawList []interface{}
-	if err := cbor.Unmarshal(body, &rawList); err != nil {
+	var records []tam.AgentStatusRecord
+	if err := cbor.Unmarshal(body, &records); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal CBOR device list: %w", err)
 	}
 
-	var agents []Agent
-	for _, itemRaw := range rawList {
-		item, ok := itemRaw.([]interface{})
-		if !ok || len(item) < 2 {
-			continue
+	agents := make([]Agent, 0, len(records))
+	for _, record := range records {
+		agent := Agent{KID: string(record.AgentKID)}
+		if len(record.Status.Attributes.DeviceUEID) > 0 {
+			agent.Attributes.Ueid = hex.EncodeToString(record.Status.Attributes.DeviceUEID)
 		}
-
-		var kid string
-		switch v := item[0].(type) {
-		case string:
-			kid = v
-		case []byte:
-			kid = string(v)
-		}
-		detail, _ := item[1].(map[interface{}]interface{})
-
-		agent := Agent{KID: kid}
-		if attrsRaw, ok := detail["attributes"]; ok {
-			if attrs, ok := attrsRaw.(map[interface{}]interface{}); ok {
-				keys := []interface{}{256, int64(256), uint64(256)}
-				for _, k := range keys {
-					if v, found := attrs[k]; found {
-						if b, ok := v.([]byte); ok {
-							agent.Attributes.Ueid = hex.EncodeToString(b)
-							break
-						}
-					}
+		if len(record.Status.SuitManifests) > 0 {
+			agent.InstalledTCList = make([]TrustedComponent, 0, len(record.Status.SuitManifests))
+			for _, m := range record.Status.SuitManifests {
+				name := toComponentID(m.TrustedComponentID)
+				if len(name) == 0 {
+					continue
 				}
+				agent.InstalledTCList = append(agent.InstalledTCList, TrustedComponent{
+					Name:    name,
+					Version: int(m.SequenceNumber),
+				})
 			}
 		}
-		agent.InstalledTCList = buildInstalledTCList(extractInstalledTCListFromCBORDetail(detail))
 		agents = append(agents, agent)
 	}
 	return agents, nil
@@ -155,12 +144,12 @@ func extractDeviceID(attrs map[string]any, fallback string) string {
 	return fallback
 }
 
-func buildInstalledTCList(v any) []InstalledTCItem {
+func buildInstalledTCList(v any) []TrustedComponent {
 	list, ok := v.([]any)
 	if !ok {
 		return nil
 	}
-	out := make([]InstalledTCItem, 0, len(list))
+	out := make([]TrustedComponent, 0, len(list))
 	for _, item := range list {
 		name, ver := parseInstalledTCItem(item)
 		if len(name) == 0 {
@@ -169,7 +158,7 @@ func buildInstalledTCList(v any) []InstalledTCItem {
 		if ver < 0 {
 			ver = 0
 		}
-		out = append(out, InstalledTCItem{Name: name, Ver: ver})
+		out = append(out, TrustedComponent{Name: name, Version: ver})
 	}
 	return out
 }
@@ -209,13 +198,6 @@ func parseInstalledTCItem(item any) (name suit.ComponentID, ver int) {
 	}
 	name = toComponentID(item)
 	return
-}
-
-func extractInstalledTCListFromCBORDetail(detail map[interface{}]interface{}) any {
-	if v, ok := detail["installed-tc"]; ok {
-		return v
-	}
-	return nil
 }
 
 func extractInstalledTCListFromJSONDetail(detail map[string]any) any {

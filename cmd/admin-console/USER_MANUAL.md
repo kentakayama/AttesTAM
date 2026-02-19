@@ -73,7 +73,7 @@ When `--tam-api-base` is not set:
 - Click `Managed Devices` in the sidebar.
 - Agent table is loaded from `GET /api/agents`.
 - Click an `Agent KID` row to open the detail panel.
-- Detail panel shows installed TC list (`name`, `ver`) for the selected agent.
+- Detail panel shows installed TC list (`name`, `version`) for the selected agent.
 - Clicking the selected agent again closes the detail panel.
 
 ## 2. Managed TCs

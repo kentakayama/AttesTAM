@@ -9,6 +9,10 @@
 <body>
   <div class="app-frame">
     <header class="app-header">Sample TAM Admin Console</header>
+    <div class="connection-banner" role="status" aria-live="polite">
+      <span class="connection-label">Connected TAM Server:</span>
+      <code class="connection-value">{{.ConnectedTAM}}</code>
+    </div>
     <div class="app-body">
       <nav class="sidebar">
         <button id="btn-agents" class="nav-btn active">Managed Devices</button>

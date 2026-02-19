@@ -7,9 +7,22 @@ import (
 	"strings"
 )
 
+type indexViewData struct {
+	ConnectedTAM string
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, "index.html", nil); err != nil {
+	connectedTAM := conf.TAMAPIBase
+	if strings.TrimSpace(connectedTAM) == "" {
+		connectedTAM = "testvector mode (TAM API disabled)"
+	}
+
+	data := indexViewData{
+		ConnectedTAM: connectedTAM,
+	}
+
+	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
