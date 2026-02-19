@@ -204,7 +204,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	assert.Len(t, agentStatus, 1)
 	assert.Equal(t, []byte("dummy-teep-agent-kid-for-dev-123"), agentStatus[0].AgentKID)
 	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
-	assert.Len(t, agentStatus[0].Status.SuitManifests, 2)
+	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
 }
 
 func TestGetAgentStatus_NoContent(t *testing.T) {

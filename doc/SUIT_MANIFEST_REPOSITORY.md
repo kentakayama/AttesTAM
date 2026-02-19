@@ -82,12 +82,8 @@ Example output in CBOR Diagnostic Notation:
 ```cbor-diag
 [
   [
-    / component: / << ['app1.wasm'] >>,
-    / manifest-sequence-number: / 3
-  ],
-  [
-    / component: / << ['app2.wasm'] >>,
-    / manifest-sequence-number: / 2
+    / component: / << ['hello.txt'] >>,
+    / manifest-sequence-number: / 0
   ]
 ]
 ```

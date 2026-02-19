@@ -28,8 +28,8 @@ type AgentStatusRecord struct {
 }
 
 type AgentStatus struct {
-	Attributes    AgentAttributes              `cbor:"1,keyasint,omitempty"`
-	SuitManifests []model.SuitManifestOverview `cbor:"2,keyasint,omitempty"`
+	Attributes    AgentAttributes              `cbor:"1,keyasint"`
+	SuitManifests []model.SuitManifestOverview `cbor:"2,keyasint"`
 }
 
 type AgentAttributes struct {
