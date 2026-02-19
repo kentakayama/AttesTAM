@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 SECOM CO., LTD. All Rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 // Sample TAM Admin Console.
 // TAM API integration + command-line flags.
 //

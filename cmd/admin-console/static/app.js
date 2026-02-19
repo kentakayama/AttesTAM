@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 SECOM CO., LTD. All Rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 /* Simple SPA-like behavior with vanilla JS.
  * - Tabs switch between views
  * - Fetch agents and manifests from the Admin Console API
