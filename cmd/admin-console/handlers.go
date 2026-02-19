@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -109,7 +108,7 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to parse form", http.StatusBadRequest)
 			return
 		}
-		file, header, err := r.FormFile("file")
+		file, _, err := r.FormFile("file")
 		if err != nil {
 			http.Error(w, "file is required", http.StatusBadRequest)
 			return
@@ -122,10 +121,8 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		parsed, _ := strconv.ParseUint(r.FormValue("version"), 10, 64)
 		respondJSON(w, map[string]any{
-			"ok":       true,
-			"manifest": TrustedComponent{Name: componentIDFromFilename(header.Filename), Version: parsed},
+			"ok": true,
 		})
 		return
 	}

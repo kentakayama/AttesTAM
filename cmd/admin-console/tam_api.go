@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -243,7 +242,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		return fmt.Errorf("failed to parse form: %w", err)
 	}
-	file, header, err := r.FormFile("file")
+	file, _, err := r.FormFile("file")
 	if err != nil {
 		return fmt.Errorf("file is required")
 	}
@@ -276,12 +275,8 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 		return fmt.Errorf("status %d from TAM API: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
-	parsed, _ := strconv.ParseUint(r.FormValue("version"), 10, 64)
 	respondJSON(w, map[string]any{
-		"ok":        true,
-		"manifest":  TrustedComponent{Name: componentIDFromFilename(header.Filename), Version: parsed},
-		"tamStatus": resp.StatusCode,
-		"tamBody":   strings.TrimSpace(string(respBody)),
+		"ok": true,
 	})
 	return nil
 }
