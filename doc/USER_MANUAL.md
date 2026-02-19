@@ -68,7 +68,7 @@ go run ./cmd/tam-over-http -h
 
 ## API Summary
 
-There are mainly three API endpoints for TC Developer, TEEP Agent and Device Admin described below:
+There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
 
 ```mermaid
 flowchart LR
@@ -103,13 +103,13 @@ Example output (formatted for readability):
 
 ### 2) Register SUIT Manifests Delivering Trusted Components
 
-For the TAM to securely deliver Trusted Components to TEEP Agent, [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol) uses [SUIT Manifest](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest), a concise data format for installing software/firmwares.
-SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component binary content, who created the SUIT Manifest (and Trusted Component in many cases), and which is depending Trusted Component.
+To securely deliver Trusted Components to a TEEP Agent, [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol) uses [SUIT Manifest](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest), a concise format for software update instructions.
+A SUIT Manifest tells the TEEP Agent how to fetch and verify Trusted Component binaries, who created the manifest (and often the Trusted Component), and what dependencies exist.
 
-For the TC Developer, the TAM provides `/SUITManifestService/RegisterManifest` endpoint, accepting signed SUIT Manifest.
+For TC Developers, the TAM provides the `/SUITManifestService/RegisterManifest` endpoint, which accepts signed SUIT Manifests.
 
 There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
-You can post it with following command from top of this repository:
+You can post it with the following command from the repository root:
 ```bash
 curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
@@ -121,7 +121,7 @@ Example output:
 OK
 ```
 
-Now you can see that the SUIT Manifest Store is updated:
+Now the SUIT Manifest Store is updated:
 
 ```bash
 curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
@@ -175,11 +175,11 @@ The output is equivalent to:
 
 ### 4) Update TEEP Agent Status
 
-This requires TEEP Agent implementation communicating with `/tam` endpoint.
+This requires a TEEP Agent implementation that communicates with the `/tam` endpoint.
 See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
 For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
-One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider to try it.
+One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider trying it.
 
 ## Planned Management APIs
 
