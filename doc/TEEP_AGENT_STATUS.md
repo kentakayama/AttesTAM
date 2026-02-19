@@ -164,12 +164,8 @@ You can find CDDL definitions for dependencies in:
       },
       / installed-tc / 2: [
         [
-          / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
-          / manifest-sequence-number: / 3
-        ],
-        [
-          / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
-          / manifest-sequence-number: / 2
+          / SUIT_Component_Identifier: / << ['hello.txt'] >>,
+          / manifest-sequence-number: / 0
         ]
       ]
     }

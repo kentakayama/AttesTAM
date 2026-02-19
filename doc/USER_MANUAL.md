@@ -79,12 +79,29 @@ flowchart LR
 
 Section | Method | Endpoint | Notes
 --|--|--|--
-[1](#1-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
-2 | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
-3 | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
-4 | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
+[1](#1-get-manifest-overviews-cbor) | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
+[2](#2-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
+[3](#3-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+[4](#4-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
 
-### 1) Register SUIT Manifests Delivering Trusted Components
+### 1) Get Manifest Overviews (CBOR)
+
+```bash
+curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
+  -H "Accept: application/cbor" -s | cbor2diag.rb
+```
+
+Example output (formatted for readability):
+```cbor-diag
+[
+  [
+    / component: / << ['hello.txt'] >>,
+    / manifest-sequence-number: / 0
+  ]
+]
+```
+
+### 2) Register SUIT Manifests Delivering Trusted Components
 
 For the TAM to securely deliver Trusted Components to TEEP Agent, [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol) uses [SUIT Manifest](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest), a concise data format for installing software/firmwares.
 SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component binary content, who created the SUIT Manifest (and Trusted Component in many cases), and which is depending Trusted Component.
@@ -104,17 +121,27 @@ Example output:
 OK
 ```
 
+Now you can see that the SUIT Manifest Store is updated:
+
+```bash
+curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
+  -H "Accept: application/cbor" -s | cbor2diag.rb
+```
+
+Example output (formatted for readability):
+```cbor-diag
+[
+  [
+    / component: / << ['hello.txt'] >>,
+    / manifest-sequence-number: / 1
+  ]
+]
+```
+
 For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSITORY.md).
 
 > [!NOTE]
 > If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.
-
-- [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
-
-> [!NOTE]
-> Communicating with `/tam` requires a TEEP Agent implementation over HTTP.
-> See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
-> For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
 ### 3) Get Agent Status
 
@@ -139,37 +166,20 @@ The output is equivalent to:
     {
       / attributes / 1: {256: h'016275696C64696E672D6465762D313233'},
       / installed-tc / 2: [
-        [<< ['app1.wasm'] >>, 3],
-        [<< ['app2.wasm'] >>, 2]
-      ],
+        [<< ['hello.txt'] >>, 0]
+      ]
     }
   ]
 ]
 ```
 
-## Post SUIT Manifest
+### 4) Update TEEP Agent Status
 
+This requires TEEP Agent implementation communicating with `/tam` endpoint.
+See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
+For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
-## Get Manifest Overviews (CBOR)
-
-```bash
-curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
-  -H "Accept: application/cbor" -s | cbor2diag.rb
-```
-
-Example output:
-```cbor-diag
-[
-  [
-    / component: / << ['app1.wasm'] >>,
-    / manifest-sequence-number: / 3
-  ],
-  [
-    / component: / << ['app2.wasm'] >>,
-    / manifest-sequence-number: / 2
-  ]
-]
-```
+One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider to try it.
 
 ## Planned Management APIs
 

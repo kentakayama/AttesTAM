@@ -1131,18 +1131,17 @@ func (t *TAM) EnsureDefaultTEEPAgent(withStatus bool) error {
 		if err != nil || agentStatus == nil {
 			t.logger.Printf("failed to find agent status: %v", err)
 		} else {
-			digestM1 := []byte("digest1")
+			digestM1 := []byte{
+				0x82,       // [
+				0x2f,       // -16 / :SHA256 /
+				0x58, 0x20, // h'
+				0x43, 0x13, 0x16, 0x04, 0x84, 0x18, 0x2f, 0x04, 0x11, 0x97, 0xf6, 0x95, 0xa4, 0x12, 0xb7, 0xc5,
+				0x91, 0xcb, 0x11, 0x2c, 0xca, 0xaa, 0x5d, 0x60, 0xc0, 0x32, 0x85, 0xef, 0x7e, 0x20, 0xfc, 0xb0,
+			}
 			report1 := []byte("report1")
 			err = agentStatusRepo.ReflectManifestSuccess(t.ctx, agentKID, digestM1, report1)
 			if err != nil {
 				t.logger.Printf("create agent status 1 error: %v", err)
-			}
-
-			digestM2 := []byte("digest2")
-			report2 := []byte("report2")
-			err = agentStatusRepo.ReflectManifestSuccess(t.ctx, agentKID, digestM2, report2)
-			if err != nil {
-				t.logger.Printf("create agent status 2 error: %v", err)
 			}
 		}
 	}
