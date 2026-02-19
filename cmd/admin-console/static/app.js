@@ -1,6 +1,6 @@
 /* Simple SPA-like behavior with vanilla JS.
  * - Tabs switch between views
- * - Fetch agents and manifests from the Go API
+ * - Fetch agents and manifests from the Admin Console API
  * - Upload manifests via multipart/form-data
  */
 
@@ -17,6 +17,10 @@ const viewUpload = $('#view-upload');
 const agentDetailPanel = $('#agent-detail-panel');
 const agentDetailTitle = $('#agent-detail-title');
 const agentDetailBody = $('#agent-detail-body');
+const adminAPIBase = '/console';
+const apiViewManagedDevices = `${adminAPIBase}/view-managed-devices`;
+const apiViewManagedTCs = `${adminAPIBase}/view-managed-tcs`;
+const apiRegisterTC = `${adminAPIBase}/register-tc`;
 let selectedAgentKID = null;
 
 function setActive(btn, view) {
@@ -44,7 +48,7 @@ async function loadAgents() {
   if (agentDetailTitle) agentDetailTitle.textContent = 'Agent Details';
   if (agentDetailBody) agentDetailBody.innerHTML = '';
   try {
-    const res = await fetch('/api/agents');
+    const res = await fetch(apiViewManagedDevices);
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(agent => {
@@ -122,7 +126,7 @@ async function loadManifests() {
   const tbody = document.getElementById('manifests-body');
   tbody.innerHTML = '';
   try {
-    const res = await fetch('/api/manifests/service');
+    const res = await fetch(apiViewManagedTCs);
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(m => {
@@ -146,7 +150,7 @@ form.addEventListener('submit', async (e) => {
   const fd = new FormData(form);
   statusEl.textContent = 'Uploading...';
   try {
-    const res = await fetch('/api/manifests/register', { method: 'POST', body: fd });
+    const res = await fetch(apiRegisterTC, { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
     const disposition = res.headers.get('Content-Disposition') || '';
     if (disposition.includes('attachment')) {

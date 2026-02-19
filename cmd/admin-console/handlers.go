@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -97,10 +99,28 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := echoUploadedFileAsDownload(w, r); err != nil {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "failed to parse form", http.StatusBadRequest)
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "file is required", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Consume uploaded body to validate the multipart payload end-to-end.
+		if _, err := io.Copy(io.Discard, file); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		ver, _ := strconv.Atoi(r.FormValue("version"))
+		respondJSON(w, map[string]any{
+			"ok":       true,
+			"manifest": TrustedComponent{Name: toComponentID(header.Filename), Version: ver},
+		})
 		return
 	}
 

@@ -2,17 +2,55 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/tam"
 )
+
+type cachedAgent struct {
+	agent      Agent
+	lastUpdate string
+}
+
+type tamDevicesCache struct {
+	mu    sync.RWMutex
+	byKID map[string]cachedAgent
+}
+
+var tamDeviceCaches = struct {
+	mu     sync.Mutex
+	byBase map[string]*tamDevicesCache
+}{
+	byBase: make(map[string]*tamDevicesCache),
+}
+
+func getTAMDevicesCache(base string) *tamDevicesCache {
+	tamDeviceCaches.mu.Lock()
+	defer tamDeviceCaches.mu.Unlock()
+
+	cache, ok := tamDeviceCaches.byBase[base]
+	if ok {
+		return cache
+	}
+	cache = &tamDevicesCache{
+		byKID: make(map[string]cachedAgent),
+	}
+	tamDeviceCaches.byBase[base] = cache
+	return cache
+}
+
+func resetTAMDeviceCachesForTest() {
+	tamDeviceCaches.mu.Lock()
+	defer tamDeviceCaches.mu.Unlock()
+	tamDeviceCaches.byBase = make(map[string]*tamDevicesCache)
+}
 
 func fetchTAMDevices(base string) ([]Agent, error) {
 	client := &http.Client{Timeout: 12 * time.Second}
@@ -21,27 +59,77 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 		return nil, err
 	}
 
-	kids := make([][]byte, 0, len(keys))
 	lastUpdatedByKID := make(map[string]string, len(keys))
+	orderedKIDs := make([]string, 0, len(keys))
+	cache := getTAMDevicesCache(base)
+
+	cache.mu.RLock()
+	cachedSnapshot := make(map[string]cachedAgent, len(cache.byKID))
+	for kid, entry := range cache.byKID {
+		cachedSnapshot[kid] = entry
+	}
+	cache.mu.RUnlock()
+
+	kidsToFetch := make([][]byte, 0, len(keys))
 	for _, key := range keys {
 		if len(key.AgentKID) == 0 {
 			continue
 		}
 		kid := string(key.AgentKID)
-		kids = append(kids, key.AgentKID)
-		lastUpdatedByKID[kid] = formatUpdatedAt(key.UpdatedAt)
+		orderedKIDs = append(orderedKIDs, kid)
+		lastUpdated := formatUpdatedAt(key.UpdatedAt)
+		lastUpdatedByKID[kid] = lastUpdated
+		cached, ok := cachedSnapshot[kid]
+		if !ok || cached.lastUpdate != lastUpdated {
+			kidsToFetch = append(kidsToFetch, key.AgentKID)
+		}
 	}
-	if len(kids) == 0 {
+	if len(orderedKIDs) == 0 {
+		cache.mu.Lock()
+		cache.byKID = make(map[string]cachedAgent)
+		cache.mu.Unlock()
 		return []Agent{}, nil
 	}
 
-	agents, err := fetchTAMGetAgentStatus(base, client, kids)
-	if err != nil {
-		return nil, err
+	if len(kidsToFetch) > 0 {
+		agents, err := fetchTAMGetAgentStatus(base, client, kidsToFetch)
+		if err != nil {
+			return nil, err
+		}
+		for i := range agents {
+			agents[i].LastUpdate = lastUpdatedByKID[agents[i].KID]
+		}
+
+		cache.mu.Lock()
+		for _, agent := range agents {
+			cache.byKID[agent.KID] = cachedAgent{
+				agent:      agent,
+				lastUpdate: lastUpdatedByKID[agent.KID],
+			}
+		}
+		for kid := range cache.byKID {
+			if _, ok := lastUpdatedByKID[kid]; !ok {
+				delete(cache.byKID, kid)
+			}
+		}
+		cache.mu.Unlock()
+	} else {
+		cache.mu.Lock()
+		for kid := range cache.byKID {
+			if _, ok := lastUpdatedByKID[kid]; !ok {
+				delete(cache.byKID, kid)
+			}
+		}
+		cache.mu.Unlock()
 	}
-	for i := range agents {
-		if lu, ok := lastUpdatedByKID[agents[i].KID]; ok {
-			agents[i].LastUpdate = lu
+
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	agents := make([]Agent, 0, len(orderedKIDs))
+	for _, kid := range orderedKIDs {
+		if entry, ok := cache.byKID[kid]; ok {
+			agents = append(agents, entry.agent)
 		}
 	}
 	return agents, nil
@@ -62,26 +150,16 @@ func fetchTAMListAgents(base string, client *http.Client) ([]tam.AgentStatusKey,
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("status %d from TAM API", resp.StatusCode)
 	}
-
-	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read body: %w", err)
-		}
-		var keys []tam.AgentStatusKey
-		if err := cbor.Unmarshal(body, &keys); err != nil {
-			return nil, fmt.Errorf("failed to decode ListAgents cbor: %w", err)
-		}
-		return keys, nil
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
+		return nil, fmt.Errorf("unsupported response Content-Type %q from TAM API", resp.Header.Get("Content-Type"))
 	}
-
-	var payload any
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, err
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
-	keys, ok := parseListAgentsPayload(payload)
-	if !ok {
-		return nil, fmt.Errorf("invalid ListAgents response format")
+	var keys []tam.AgentStatusKey
+	if err := cbor.Unmarshal(body, &keys); err != nil {
+		return nil, fmt.Errorf("failed to decode ListAgents cbor: %w", err)
 	}
 	return keys, nil
 }
@@ -130,20 +208,14 @@ func fetchTAMGetAgentStatus(base string, client *http.Client, kids [][]byte) ([]
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("status %d from TAM API", resp.StatusCode)
 	}
-
-	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
-		raw, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read body: %w", err)
-		}
-		return decodeAgentsFromCBOR(raw)
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
+		return nil, fmt.Errorf("unsupported response Content-Type %q from TAM API", resp.Header.Get("Content-Type"))
 	}
-
-	var payload any
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, err
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
-	return parseAgents(payload)
+	return decodeAgentsFromCBOR(raw)
 }
 
 func toString(v any) string {
@@ -200,20 +272,16 @@ func fetchTAMManifests(base string) ([]TrustedComponent, error) {
 		return nil, fmt.Errorf("status %d from TAM API", resp.StatusCode)
 	}
 
-	var manifests []TrustedComponent
-	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read body: %w", err)
-		}
-		manifests, err = decodeManifestsFromCBOR(body)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if err := json.NewDecoder(resp.Body).Decode(&manifests); err != nil {
-			return nil, err
-		}
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/cbor") {
+		return nil, fmt.Errorf("unsupported response Content-Type %q from TAM API", resp.Header.Get("Content-Type"))
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read body: %w", err)
+	}
+	manifests, err := decodeManifestsFromCBOR(body)
+	if err != nil {
+		return nil, err
 	}
 	return manifests, nil
 }
@@ -238,12 +306,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err != nil {
 		return err
 	}
-
-	contentType := header.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/suit-envelope+cose"
-	}
-	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Content-Type", "application/suit-envelope+cose")
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	resp, err := client.Do(req)

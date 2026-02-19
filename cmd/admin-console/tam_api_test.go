@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,8 @@ import (
 )
 
 func TestFetchTAMDevicesCBOR(t *testing.T) {
+	resetTAMDeviceCachesForTest()
+
 	statusRaw := []tam.AgentStatusRecord{
 		{
 			AgentKID: []byte("dev-1"),
@@ -93,29 +96,113 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 	}
 }
 
-func TestFetchTAMDevicesJSONFallback(t *testing.T) {
+func TestFetchTAMDevicesNonCBORResponse(t *testing.T) {
+	resetTAMDeviceCachesForTest()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/AgentService/ListAgents" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([][]any{
+			{"dev-json", "2026-02-18T11:00:00Z"},
+		})
+	}))
+	defer srv.Close()
+
+	_, err := fetchTAMDevices(srv.URL)
+	if err == nil {
+		t.Fatal("expected error for non-CBOR response, got nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported response Content-Type") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFetchTAMDevicesDeltaByUpdatedAt(t *testing.T) {
+	resetTAMDeviceCachesForTest()
+
+	type call struct {
+		kids []string
+	}
+	var (
+		listCount   int
+		statusCalls []call
+	)
+
+	statusForKID := map[string]tam.AgentStatusRecord{
+		"dev-1": {
+			AgentKID: []byte("dev-1"),
+			Status: tam.AgentStatus{
+				Attributes: tam.AgentAttributes{DeviceUEID: []byte{0x11}},
+				SuitManifests: []model.SuitManifestOverview{
+					{TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("app-1")}), SequenceNumber: 1},
+				},
+			},
+		},
+		"dev-2": {
+			AgentKID: []byte("dev-2"),
+			Status: tam.AgentStatus{
+				Attributes: tam.AgentAttributes{DeviceUEID: []byte{0x22}},
+				SuitManifests: []model.SuitManifestOverview{
+					{TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("app-2")}), SequenceNumber: 2},
+				},
+			},
+		},
+	}
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/AgentService/ListAgents":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([][]any{
-				{"dev-json", "2026-02-18T11:00:00Z"},
-			})
+			listCount++
+			var listRaw []tam.AgentStatusKey
+			switch listCount {
+			case 1:
+				listRaw = []tam.AgentStatusKey{
+					{AgentKID: []byte("dev-1"), UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)},
+					{AgentKID: []byte("dev-2"), UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)},
+				}
+			case 2:
+				listRaw = []tam.AgentStatusKey{
+					{AgentKID: []byte("dev-1"), UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)},
+					{AgentKID: []byte("dev-2"), UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)},
+				}
+			default:
+				listRaw = []tam.AgentStatusKey{
+					{AgentKID: []byte("dev-1"), UpdatedAt: time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)},
+					{AgentKID: []byte("dev-2"), UpdatedAt: time.Date(2026, 2, 18, 11, 0, 0, 0, time.UTC)},
+				}
+			}
+			listBody, err := cbor.Marshal(listRaw)
+			if err != nil {
+				t.Fatalf("marshal list cbor: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/cbor")
+			_, _ = w.Write(listBody)
 		case "/AgentService/GetAgentStatus":
 			var kids [][]byte
-			b, _ := io.ReadAll(r.Body)
-			_ = cbor.Unmarshal(b, &kids)
-			if len(kids) != 1 || string(kids[0]) != "dev-json" {
-				t.Fatalf("unexpected kids: %+v", kids)
+			b, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{
-					"kid":          "dev-json",
-					"attribute":    map[string]any{"ueid": "u-json"},
-					"installed-tc": []map[string]any{{"name": []string{"dw=="}, "version": 2}},
-				},
-			})
+			if err := cbor.Unmarshal(b, &kids); err != nil {
+				t.Fatalf("decode request cbor: %v", err)
+			}
+			kidStrings := make([]string, 0, len(kids))
+			records := make([]tam.AgentStatusRecord, 0, len(kids))
+			for _, kid := range kids {
+				k := string(kid)
+				kidStrings = append(kidStrings, k)
+				records = append(records, statusForKID[k])
+			}
+			statusCalls = append(statusCalls, call{kids: kidStrings})
+
+			statusBody, err := cbor.Marshal(records)
+			if err != nil {
+				t.Fatalf("marshal status cbor: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/cbor")
+			_, _ = w.Write(statusBody)
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -124,10 +211,36 @@ func TestFetchTAMDevicesJSONFallback(t *testing.T) {
 
 	agents, err := fetchTAMDevices(srv.URL)
 	if err != nil {
-		t.Fatalf("fetchTAMDevices: %v", err)
+		t.Fatalf("fetchTAMDevices first: %v", err)
 	}
-	if len(agents) != 1 || agents[0].KID != "dev-json" {
-		t.Fatalf("unexpected agents: %+v", agents)
+	if len(agents) != 2 {
+		t.Fatalf("unexpected agents length: %d", len(agents))
+	}
+
+	agents, err = fetchTAMDevices(srv.URL)
+	if err != nil {
+		t.Fatalf("fetchTAMDevices second: %v", err)
+	}
+	if len(agents) != 2 {
+		t.Fatalf("unexpected agents length: %d", len(agents))
+	}
+
+	agents, err = fetchTAMDevices(srv.URL)
+	if err != nil {
+		t.Fatalf("fetchTAMDevices third: %v", err)
+	}
+	if len(agents) != 2 {
+		t.Fatalf("unexpected agents length: %d", len(agents))
+	}
+
+	if len(statusCalls) != 2 {
+		t.Fatalf("expected 2 GetAgentStatus calls, got %d", len(statusCalls))
+	}
+	if !slices.Equal(statusCalls[0].kids, []string{"dev-1", "dev-2"}) {
+		t.Fatalf("unexpected first call kids: %+v", statusCalls[0].kids)
+	}
+	if !slices.Equal(statusCalls[1].kids, []string{"dev-2"}) {
+		t.Fatalf("unexpected second call kids: %+v", statusCalls[1].kids)
 	}
 }
 
@@ -182,7 +295,7 @@ func TestPostTAMManifest(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("unexpected method: %s", r.Method)
 		}
-		if ct := r.Header.Get("Content-Type"); ct != "application/octet-stream" {
+		if ct := r.Header.Get("Content-Type"); ct != "application/suit-envelope+cose" {
 			t.Fatalf("unexpected content type: %s", ct)
 		}
 		b, err := io.ReadAll(r.Body)

@@ -4,7 +4,7 @@
 // To run (manual test pattern #3):
 //   1) Start mock API:  go run ./cmd/mockapi
 //   2) Start app:      go run ./cmd/admin-console --port=8080 --tam-api-base=http://localhost:8080
-//   3) Open: http://localhost:8080 and click "Managed Devices"
+//   3) Open: http://localhost:8080 and click "View Managed Devices"
 
 package main
 
@@ -34,9 +34,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", indexHandler)
-	mux.HandleFunc("/api/agents", handleListAgents)
-	mux.HandleFunc("/api/manifests/service", handleListManifestsService)
-	mux.HandleFunc("/api/manifests/register", handleRegisterManifest)
+	// Console API
+	mux.HandleFunc("/console/view-managed-devices", handleListAgents)
+	mux.HandleFunc("/console/view-managed-tcs", handleListManifestsService)
+	mux.HandleFunc("/console/register-tc", handleRegisterManifest)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(resolvePath("static")))))
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
