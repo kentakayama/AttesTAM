@@ -2,11 +2,14 @@
 
 ## Purpose
 This document describes the internal implementation of TEEP Agent status handling in TAM.
-It focuses on persistence model, update paths (mainly TEEP Success), and read paths for `/*/getAgents`.
+It focuses on persistence model, update paths (mainly TEEP Success), and read paths for `/*/AgentService/GetAgentStatus`.
+
+Terminology note:
+- **Agent Status** is used consistently for the API representation and its persisted source.
 
 ## Components
 - `internal/server/handler.go`
-  - Handles `GET /admin/getAgents` and encodes status response as CBOR
+  - Handles `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus`, and encodes status responses as CBOR
 - `internal/tam/agent_status.go`
   - `GetAgentStatus(...)` / `GetAgentStatuses(...)`
   - `updateAgentStatusOnManifestSuccess(...)`
@@ -59,10 +62,27 @@ Notes:
 - `ReflectManifestSuccess` is transactional (delete old active rows + insert new holding + insert report).
 - Failure-report path exists via `RecordManifestProcessingFailure(...)` and inserts unresolved records into `suit_reports`.
 
-## Read Flow (`/*/getAgents`)
+## Read Flow (`/AgentService/*`)
 
-### A) Implemented: `GET /admin/getAgents`
+### 1) `GET /AgentService/ListAgents`
 
+```mermaid
+sequenceDiagram
+    participant Admin as TAM Admin
+    participant H as server.handler
+    participant T as tam.TAM
+
+    Admin->>H: GET /AgentService/ListAgents (Accept: application/cbor)
+    H->>T: Authorize entity (TODO)
+    H->>T: GetAgentStatuses(entity)
+    T-->>H: AgentStatusKey list
+    H-->>Admin: 200 + [+[kid, last updated] ] (or 204 if not found)
+```
+
+> [!NOTE]
+> Handler currently returns status for one fixed demo agent KID.
+
+### 2) `POST /AgentService/GetAgentStatus`
 ```mermaid
 sequenceDiagram
     participant Admin as TAM Admin
@@ -71,31 +91,23 @@ sequenceDiagram
     participant R as AgentStatusRepository
     participant DB as sqlite
 
-    Admin->>H: GET /admin/getAgents (Accept: application/cbor)
-    H->>T: FindEntity(\"admin@example.com\")
-    H->>T: GetAgentStatus(entity, fixedAgentKID)
-    T->>R: GetAgentStatus(agentKID)
-    R->>DB: query agent + latest active holdings + device ueid
-    DB-->>R: status rows
-    R-->>T: model.AgentStatus
-    T-->>H: AgentStatusRecord
+    Admin->>H: POST /AgentService/GetAgentStatus [+kid] (Accept: application/cbor)
+    H->>H: Authorize entity and parse input KIDs (TODO)
+    loop each kid in input
+      H->>T: GetAgentStatus(entity, kid)
+      T->>R: GetAgentStatus(kid)
+      R->>DB: query agent + latest active holdings + device ueid
+      DB-->>R: status rows
+      R-->>T: AgentStatusRecord
+      T-->>H: AgentStatusRecord
+    end
     H-->>Admin: 200 + CBOR (or 204 if not found)
 ```
-
-Current implementation note:
-- Handler currently returns status for one fixed demo agent KID.
-
-### B) Planned: `GET /device-admin/getAgents`
-
-Planned behavior:
-1. Authenticate/authorize device admin entity.
-2. Filter returned agents by device ownership (`devices.admin_id`).
-3. Reuse the same status assembly logic (`GetAgentStatus`/`GetAgentStatuses`) with role-based filtering.
 
 ## Output Record Shape
 Returned status is mapped to `AgentStatusRecord`:
 - `[agent-kid, status]`
 - `status.attributes.256` (UEID) when available
-- `status.wapp_list`: list of `[trusted-component-id, sequence-number]`
+- `status.installed-tc`: list of `[trusted-component-id, sequence-number]`
 
 See [TEEP_AGENT_STATUS.md](./TEEP_AGENT_STATUS.md) for CDDL and API-level output semantics.

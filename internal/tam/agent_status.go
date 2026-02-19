@@ -8,21 +8,28 @@ package tam
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/domain/model"
 	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
 )
 
+type AgentStatusKey struct {
+	_         struct{}  `cbor:",toarray"`
+	AgentKID  []byte    `cbor:"0,keyasint"`
+	UpdatedAt time.Time `cbor:"1,keyasint"`
+}
+
 type AgentStatusRecord struct {
-	AgentKID []byte
-	Status   AgentStatus
+	_        struct{}    `cbor:",toarray"`
+	AgentKID []byte      `cbor:"0,keyasint"`
+	Status   AgentStatus `cbor:"1,keyasint"`
 }
 
 type AgentStatus struct {
-	Attributes    AgentAttributes              `cbor:"attributes"`
-	SuitManifests []model.SuitManifestOverview `cbor:"wapp_list"`
-	// UpdatedAt     time.Time                    `cbor:"updated_at,omitempty"`
+	Attributes    AgentAttributes              `cbor:"1,keyasint,omitempty"`
+	SuitManifests []model.SuitManifestOverview `cbor:"2,keyasint,omitempty"`
 }
 
 type AgentAttributes struct {
@@ -78,28 +85,37 @@ func (t *TAM) GetAgentStatus(entity *model.Entity, agentKID []byte) (*AgentStatu
 	return &record, nil
 }
 
-func (t *TAM) GetAgentStatuses(entity *model.Entity) ([]*AgentStatusRecord, error) {
-	// TODO: switch query based on the entity role
+func (t *TAM) GetAgentStatuses(entity *model.Entity) ([]*AgentStatusKey, error) {
+	// TODO: switch query based on the entity role, and get this info without joining with Agent table, to avoid unnecessary DB access for each agent.
 
-	arepo := sqlite.NewAgentRepository(t.db)
-	agents, err := arepo.GetAll(t.ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list agents: %w", err)
+	// XXX: returns dummy data for testing, and will be removed after implementing the actual DB access logic.
+	agentStatus := &AgentStatusKey{
+		AgentKID:  []byte("dummy-teep-agent-kid-for-dev-123"),
+		UpdatedAt: time.Now(),
 	}
+	agentStatuses := []*AgentStatusKey{agentStatus}
 
-	agentStatuses := make([]*AgentStatusRecord, 0, len(agents))
-	astatusRepo := sqlite.NewAgentStatusRepository(t.db)
-	for _, agent := range agents {
-		agentStatus, err := astatusRepo.GetAgentStatus(t.ctx, agent.KID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get agent status for agent KID %x: %w", agent.KID, err)
-		}
-		var record AgentStatusRecord
-		if err := record.FromModel(agentStatus); err != nil {
-			return nil, fmt.Errorf("failed to convert agent status: %w", err)
-		}
-		agentStatuses = append(agentStatuses, &record)
-	}
+	// arepo := sqlite.NewAgentRepository(t.db)
+	// agents, err := arepo.GetAll(t.ctx)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to list agents: %w", err)
+	// }
+
+	// agentStatuses := make([]*AgentStatusKey, 0, len(agents))
+	// astatusRepo := sqlite.NewAgentStatusRepository(t.db)
+	// for _, agent := range agents {
+	// 	agentStatus, err := astatusRepo.GetAgentStatus(t.ctx, agent.KID)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to get agent status for agent KID %x: %w", agent.KID, err)
+	// 	}
+	// 	if agentStatus == nil {
+	// 		continue
+	// 	}
+	// 	agentStatuses = append(agentStatuses, &AgentStatusKey{
+	// 		AgentKID:  agentStatus.AgentKID,
+	// 		UpdatedAt: agentStatus.UpdatedAt,
+	// 	})
+	// }
 
 	return agentStatuses, nil
 }

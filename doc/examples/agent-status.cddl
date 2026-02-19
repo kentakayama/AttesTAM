@@ -1,8 +1,7 @@
 ;# import rfc9711 as eat
-; requires SUIT Manifest CDDL and SUIT Manifest Overview CDDL
 
 get-agent-status-output = [
-  * agent-status-record,
+  + agent-status-record,
 ]
 
 agent-status-record = [
@@ -11,9 +10,12 @@ agent-status-record = [
 ]
 
 agent-status = {
-  "attributes": agent-attributes,
-  "wapp_list": [ * suit-manifest-overview ],
+  attributes-label => agent-attributes,
+  installed-tc-label => [ * suit-manifest-overview ],
 }
+
+attributes-label = 1
+installed-tc-label = 2
 
 agent-attributes = {
   eat.ueid-label => eat.ueid-type,

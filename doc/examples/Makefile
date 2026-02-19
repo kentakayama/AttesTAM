@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
+AGENT_LIST_CBOR := example-agent-list.cbor
+AGENT_LIST_CDDL := agent-list.cddl
 AGENT_STATUS_CBOR := example-agent-status.cbor
 AGENT_STATUS_CDDL := concatenated-agent-status.cddl
 SUIT_MANIFEST_OVERVIEW_CBOR := example-suit-manifest-overview.cbor
@@ -34,18 +36,23 @@ $(SUIT_MANIFEST_CDDL):
 $(RFC9711_CDDL):
 	curl https://raw.githubusercontent.com/ietf-rats-wg/draft-ietf-rats-ear/refs/heads/main/cddl/rfc9711.cddl > $@
 
+.PHONY: test-agent-list
+test-agent-list: $(AGENT_LIST_CBOR)
+	$(CDDL) $(AGENT_LIST_CDDL) validate $<
+	@echo [PASS] /AgentService/ListAgents example matches to the CDDL
+
 .PHONY: test-agent-status
 test-agent-status: $(AGENT_STATUS_CBOR) $(AGENT_STATUS_CDDL)
 	$(CDDL) $(AGENT_STATUS_CDDL) validate $(AGENT_STATUS_CBOR)
-	@echo [PASS] getAgent example matches to the CDDL
+	@echo [PASS] /AgentService/GetAgentStatus example matches to the CDDL
 
 .PHONY: test-suit-manifest-overview
 test-suit-manifest-overview: $(SUIT_MANIFEST_OVERVIEW_CBOR) $(SUIT_MANIFEST_OVERVIEW_CDDL)
 	$(CDDL) $(SUIT_MANIFEST_OVERVIEW_CDDL) validate $(SUIT_MANIFEST_OVERVIEW_CBOR)
-	@echo [PASS] getManifests example matches to the CDDL
+	@echo [PASS] /SUITManifestService/ListManifests example matches to the CDDL
 
 .PHONY: test
-test: test-agent-status test-suit-manifest-overview
+test: test-agent-list test-agent-status test-suit-manifest-overview
 
 .PHONY: clean
 clean:

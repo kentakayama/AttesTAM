@@ -30,12 +30,11 @@ RUN apk add --no-cache ca-certificates
 
 # Copy the compiled binary and runtime resources.
 COPY --from=build /out/tam-over-http ./tam-over-http
-COPY --from=build /src/resources ./resources
 
-# Default configuration mirrors the CLI flags defined in cmd/tam-over-http/main.go.
+# Default configuration based on the CLI flags defined in cmd/tam-over-http/main.go.
 ENV TAM4WASM_ADDR=":8080" \
     TAM4WASM_CHALLENGE_SERVER="" \
-    TAM4WASM_CHALLENGE_CONTENT_TYPE="application/psa-attestation-token" \
+    TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
     TAM4WASM_CHALLENGE_INSECURE_TLS="true" \
     TAM4WASM_CHALLENGE_TIMEOUT="1m0s"
 

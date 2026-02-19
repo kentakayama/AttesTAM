@@ -75,7 +75,7 @@ func TestChallenge_MarkConsumed(t *testing.T) {
 		t.Fatalf("Create error: %v", err)
 	}
 
-	if err := repo.MarkConsumed(ctx, id); err != nil {
+	if err := repo.MarkConsumed(ctx, challenge.Challenge); err != nil {
 		t.Fatalf("MarkConsumed error: %v", err)
 	}
 
