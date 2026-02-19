@@ -7,18 +7,28 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/tam-over-http/internal/domain/model"
 )
 
 func decodeManifestsFromCBOR(body []byte) ([]TrustedComponent, error) {
-	jsonBytes, err := ConvertManifestsCBORToJSON(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert CBOR: %w", err)
+	var overviews []model.SuitManifestOverview
+	if err := cbor.Unmarshal(body, &overviews); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBOR: %w", err)
 	}
-	var manifests []TrustedComponent
-	if err := json.Unmarshal(jsonBytes, &manifests); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal converted JSON: %w", err)
+
+	manifests := make([]TrustedComponent, 0, len(overviews))
+	for _, overview := range overviews {
+		name, ok := decodeCBORComponentID(overview.TrustedComponentID)
+		if !ok {
+			continue
+		}
+		manifests = append(manifests, TrustedComponent{
+			Name:    name,
+			Version: uint64(overview.SequenceNumber),
+		})
 	}
 	return manifests, nil
 }

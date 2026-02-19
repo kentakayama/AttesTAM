@@ -122,10 +122,10 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ver, _ := strconv.Atoi(r.FormValue("version"))
+		parsed, _ := strconv.ParseUint(r.FormValue("version"), 10, 64)
 		respondJSON(w, map[string]any{
 			"ok":       true,
-			"manifest": TrustedComponent{Name: toComponentID(header.Filename), Version: ver},
+			"manifest": TrustedComponent{Name: componentIDFromFilename(header.Filename), Version: parsed},
 		})
 		return
 	}

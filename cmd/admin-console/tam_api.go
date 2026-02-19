@@ -22,7 +22,7 @@ import (
 
 type cachedAgent struct {
 	agent      Agent
-	lastUpdate string
+	lastUpdate time.Time
 }
 
 type tamDevicesCache struct {
@@ -65,7 +65,7 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 		return nil, err
 	}
 
-	lastUpdatedByKID := make(map[string]string, len(keys))
+	lastUpdatedByKID := make(map[string]time.Time, len(keys))
 	orderedKIDs := make([]string, 0, len(keys))
 	cache := getTAMDevicesCache(base)
 
@@ -83,10 +83,10 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 		}
 		kid := string(key.AgentKID)
 		orderedKIDs = append(orderedKIDs, kid)
-		lastUpdated := formatUpdatedAt(key.UpdatedAt)
+		lastUpdated := key.UpdatedAt
 		lastUpdatedByKID[kid] = lastUpdated
 		cached, ok := cachedSnapshot[kid]
-		if !ok || cached.lastUpdate != lastUpdated {
+		if !ok || !cached.lastUpdate.Equal(lastUpdated) {
 			kidsToFetch = append(kidsToFetch, key.AgentKID)
 		}
 	}
@@ -103,14 +103,14 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 			return nil, err
 		}
 		for i := range agents {
-			agents[i].LastUpdate = lastUpdatedByKID[agents[i].KID]
+			agents[i].LastUpdate = lastUpdatedByKID[string(agents[i].KID)]
 		}
 
 		cache.mu.Lock()
 		for _, agent := range agents {
-			cache.byKID[agent.KID] = cachedAgent{
+			cache.byKID[string(agent.KID)] = cachedAgent{
 				agent:      agent,
-				lastUpdate: lastUpdatedByKID[agent.KID],
+				lastUpdate: lastUpdatedByKID[string(agent.KID)],
 			}
 		}
 		for kid := range cache.byKID {
@@ -170,29 +170,6 @@ func fetchTAMListAgents(base string, client *http.Client) ([]tam.AgentStatusKey,
 	return keys, nil
 }
 
-func parseListAgentsPayload(payload any) ([]tam.AgentStatusKey, bool) {
-	arr, ok := payload.([]any)
-	if !ok {
-		return nil, false
-	}
-	out := make([]tam.AgentStatusKey, 0, len(arr))
-	for _, row := range arr {
-		pair, ok := row.([]any)
-		if !ok || len(pair) < 2 {
-			continue
-		}
-		kid := toString(pair[0])
-		if kid == "" {
-			continue
-		}
-		out = append(out, tam.AgentStatusKey{
-			AgentKID:  []byte(kid),
-			UpdatedAt: parseUpdatedAt(pair[1]),
-		})
-	}
-	return out, true
-}
-
 func fetchTAMGetAgentStatus(base string, client *http.Client, kids [][]byte) ([]Agent, error) {
 	url := strings.TrimRight(base, "/") + "/AgentService/GetAgentStatus"
 	body, err := cbor.Marshal(kids)
@@ -222,36 +199,6 @@ func fetchTAMGetAgentStatus(base string, client *http.Client, kids [][]byte) ([]
 		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
 	return decodeAgentsFromCBOR(raw)
-}
-
-func toString(v any) string {
-	switch t := v.(type) {
-	case string:
-		return t
-	case []byte:
-		return string(t)
-	default:
-		return ""
-	}
-}
-
-func parseUpdatedAt(v any) time.Time {
-	switch t := v.(type) {
-	case time.Time:
-		return t
-	case string:
-		tm, err := time.Parse(time.RFC3339, t)
-		if err == nil {
-			return tm
-		}
-	case int64:
-		return time.Unix(t, 0).UTC()
-	case uint64:
-		return time.Unix(int64(t), 0).UTC()
-	case int:
-		return time.Unix(int64(t), 0).UTC()
-	}
-	return time.Time{}
 }
 
 func formatUpdatedAt(t time.Time) string {
@@ -329,10 +276,10 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 		return fmt.Errorf("status %d from TAM API: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
-	ver, _ := strconv.Atoi(r.FormValue("version"))
+	parsed, _ := strconv.ParseUint(r.FormValue("version"), 10, 64)
 	respondJSON(w, map[string]any{
 		"ok":        true,
-		"manifest":  TrustedComponent{Name: toComponentID(header.Filename), Version: ver},
+		"manifest":  TrustedComponent{Name: componentIDFromFilename(header.Filename), Version: parsed},
 		"tamStatus": resp.StatusCode,
 		"tamBody":   strings.TrimSpace(string(respBody)),
 	})

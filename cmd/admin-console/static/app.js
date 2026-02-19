@@ -58,9 +58,9 @@ async function loadAgents() {
     const data = await res.json();
     if (Array.isArray(data)) {
       data.forEach(agent => {
-        const kid = agent.kid || agent.KID || '-';
-        const lastUpdate = agent.last_update || agent.lastUpdate || agent.updated_at || agent.updatedAt || '-';
-        const installedTCList = agent["installed-tc"] || agent.InstalledTCList || [];
+        const kid = agent.kid || '-';
+        const lastUpdate = agent.last_update || '-';
+        const installedTCList = agent["installed-tc"] || [];
 
         const tr = document.createElement('tr');
         const tdAgent = document.createElement('td');
@@ -101,7 +101,7 @@ async function loadAgents() {
                 const detailTr = document.createElement('tr');
                 const nameTd = document.createElement('td');
                 const verTd = document.createElement('td');
-                nameTd.textContent = installedTC.name || installedTC.Name || '-';
+                nameTd.textContent = installedTC.name || '-';
                 verTd.textContent = (installedTC.version !== undefined && installedTC.version !== null) ? String(installedTC.version) : '-';
                 detailTr.append(nameTd, verTd);
                 agentDetailBody.appendChild(detailTr);

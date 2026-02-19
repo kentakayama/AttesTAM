@@ -97,7 +97,10 @@ func TestFetchTAMDevicesCBOR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetchTAMDevices: %v", err)
 	}
-	if len(agents) != 1 || agents[0].KID != "dev-1" || agents[0].Attributes.Ueid != "10" || agents[0].LastUpdate != "2026-02-18T10:00:00Z" {
+	if len(agents) != 1 ||
+		!bytes.Equal(agents[0].KID, []byte("dev-1")) ||
+		!bytes.Equal([]byte(agents[0].Attributes.Ueid), []byte{0x10}) ||
+		!agents[0].LastUpdate.Equal(time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)) {
 		t.Fatalf("unexpected agents: %+v", agents)
 	}
 }
@@ -286,7 +289,7 @@ func TestFetchTAMManifestsCBOR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetchTAMManifests: %v", err)
 	}
-	if len(manifests) != 1 || componentIDDisplayName(manifests[0].Name) != "m-a" || manifests[0].Version != 9 {
+	if len(manifests) != 1 || componentIDDisplayName(manifests[0].Name) != "['m-a']" || manifests[0].Version != 9 {
 		t.Fatalf("unexpected manifests: %+v", manifests)
 	}
 }

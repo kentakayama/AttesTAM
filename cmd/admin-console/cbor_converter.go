@@ -7,13 +7,13 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/domain/model"
 	"github.com/kentakayama/tam-over-http/internal/tam"
+	"github.com/veraison/eat"
 )
 
 // ConvertCBORToJSON converts a TAM AgentStatusRecord CBOR payload to the target JSON format.
@@ -24,21 +24,21 @@ func ConvertCBORToJSON(data []byte) ([]byte, error) {
 	}
 
 	target := Agent{
-		KID: string(record.AgentKID),
+		KID: record.AgentKID,
 	}
 	if len(record.Status.Attributes.DeviceUEID) > 0 {
-		target.Attributes.Ueid = hex.EncodeToString(record.Status.Attributes.DeviceUEID)
+		target.Attributes.Ueid = eat.UEID(record.Status.Attributes.DeviceUEID)
 	}
 	if len(record.Status.SuitManifests) > 0 {
 		target.InstalledTCList = make([]TrustedComponent, 0, len(record.Status.SuitManifests))
 		for _, m := range record.Status.SuitManifests {
-			name := toComponentID(m.TrustedComponentID)
-			if len(name) == 0 {
+			name, ok := decodeCBORComponentID(m.TrustedComponentID)
+			if !ok {
 				continue
 			}
 			target.InstalledTCList = append(target.InstalledTCList, TrustedComponent{
 				Name:    name,
-				Version: int(m.SequenceNumber),
+				Version: uint64(m.SequenceNumber),
 			})
 		}
 	}
@@ -54,13 +54,13 @@ func ConvertManifestsCBORToJSON(data []byte) ([]byte, error) {
 
 	result := make([]TrustedComponent, 0, len(overviews))
 	for _, overview := range overviews {
-		name := toComponentID(overview.TrustedComponentID)
-		if len(name) == 0 {
+		name, ok := decodeCBORComponentID(overview.TrustedComponentID)
+		if !ok {
 			continue
 		}
 		result = append(result, TrustedComponent{
 			Name:    name,
-			Version: int(overview.SequenceNumber),
+			Version: uint64(overview.SequenceNumber),
 		})
 	}
 	return json.MarshalIndent(result, "", "  ")
