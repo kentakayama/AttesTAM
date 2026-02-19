@@ -3,6 +3,15 @@
 ## Purpose
 This document explains the internal relationship between the HTTP server, TAM core logic, domain models, SQLite persistence, and verifier client.
 
+## Related Internal Docs
+- [Database Design](./DATABASE_DESIGN.md)
+- [TAM Status: TEEP Agent Status](./TAM_STATUS_TEEP_AGENT_STATUS.md)
+- [TAM Status: SUIT Manifest Repository](./TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md)
+
+## Terminology
+- **Agent Status**: protocol/API-facing status representation returned by `/AgentService/*`.
+- **Repository**: persistence abstraction/component (code-level storage access).
+
 ## Layered Architecture
 
 ```mermaid
@@ -10,7 +19,7 @@ flowchart TD
     B([internal/server.server: <br/>HTTP entrypoint])
     B --> C[internal/server.handler: <br/>API handler]
     C --> D[internal/tam: <br/>TEEP orchestration]
-    D --> E[internal/domain/model: <br/>Model for TAM's state]
+    D --> E[internal/domain/model: <br/>Models for TAM state]
     E --> F[internal/infra/sqlite: <br/>DBMS]
     F --> H[(SQLite: <br/>tam_state.db)]
     D --> G[internal/infra/rats: <br/>Verifier client]
@@ -57,8 +66,9 @@ flowchart LR
 2. `server.New` creates verifier client (`rats.NewVerifierClient`).
 3. `server.New` creates `tam.TAM`, then calls:
    - `tam.Init()` -> opens `tam_state.db`, applies schema/PRAGMA.
-   - `tam.EnsureDefaultEntity(true)` -> seeds demo entities/keys/manifests.
-   - `tam.EnsureDefaultTEEPAgent(true)` -> seeds demo agent/device/status.
+   - if `-insecure-demo-mode` is true:
+     - `tam.EnsureDefaultEntity(true)` -> seeds demo entities/keys/manifests.
+     - `tam.EnsureDefaultTEEPAgent(true)` -> seeds demo agent/device/status.
 4. HTTP server starts with a single handler multiplexer implemented in `handler.ServeHTTP`.
 
 ## Request Flow and State Ownership
@@ -106,25 +116,10 @@ Key points:
   - For QueryResponse without `token` but with `attestation-payload`, `challenge` can be used after affirming remote attestation results.
 
 ### 2) Admin and TC Developer endpoints
-- `GET /admin/getAgents`: handler resolves admin entity, calls `tam.GetAgentStatus`, returns CBOR.
-- `GET /admin/getManifests`: handler reads manifests via `tam.GetManifest` for target component IDs.
-- `POST /tc-developer/addManifest`: handler verifies SUIT envelope signature with `tam.GetEntityKey`, then persists via `tam.SetEnvelope`.
-
-## Model to DB Relationship
-Core mappings:
-- `model.Agent` <-> `agents`
-- `model.Entity` <-> `entities`
-- `model.ManifestSigningKey` <-> `manifest_signing_keys`
-- `model.SuitManifest` <-> `suit_manifests`
-- `model.Token` <-> `tokens`
-- `model.Challenge` <-> `challenges`
-- `model.SentQueryRequestMessage` <-> `sent_query_request_messages`
-- `model.SentUpdateMessage` <-> `sent_update_messages`
-
-Status/telemetry tables:
-- `agent_holding_suit_manifests`: active manifest holdings per agent.
-- `sent_manifests_in_update_messages`: manifests attached to each sent update.
-- `suit_reports`: success/failure SUIT report records.
+- `GET /AgentService/ListAgents`: handler resolves admin entity (TODO), calls `tam.GetAgentStatuses` (TODO: implement a low-cost lookup function), returns CBOR.
+- `POST /AgentService/GetAgentStatus`: handler resolves admin entity (TODO), calls `tam.GetAgentStatus`, returns CBOR.
+- `GET /SUITManifestService/ListManifests`: handler reads manifests via `tam.GetManifest` for target component IDs.
+- `POST /SUITManifestService/RegisterManifest`: handler verifies SUIT envelope signature with `tam.GetEntityKey`, then persists via `tam.SetEnvelope`.
 
 ## Design Rules
 - HTTP package depends on TAM, never on SQLite repositories.

@@ -33,6 +33,11 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		logger = log.Default()
 	}
 
+	if !cfg.InsecureDemoMode && cfg.TAMTEEPPrivateKeyPath == "" {
+		logger.Printf("Using default TAM private key is not allowed in production environments. It is recommended to provide your own key for production use. Set -tam-teep-private-key-path.")
+		return nil, errors.New("default TAM private key is not allowed for production use")
+	}
+
 	verifierClient, err := rats.NewVerifierClient(config.RAConfig{
 		BaseURL:     cfg.ChallengeServerURL,
 		ContentType: cfg.ChallengeContentType,
@@ -44,21 +49,24 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, err
 	}
 
-	tam, err := tam.NewTAM(verifierClient, logger)
+	t, err := tam.NewTAM(cfg.TAMTEEPPrivateKeyPath, verifierClient, logger)
 	if err != nil {
 		return nil, err
 	}
-	if err := tam.Init(); err != nil {
+	if err := t.Init(); err != nil {
 		return nil, err
 	}
-	if err := tam.EnsureDefaultEntity(false); err != nil {
-		return nil, err
-	}
-	if err := tam.EnsureDefaultTEEPAgent(true); err != nil {
-		return nil, err
+	if cfg.InsecureDemoMode {
+		logger.Printf("[WARNING] Insecure demo mode is enabled. This should NOT be used in production environments.")
+		if err := t.EnsureDefaultEntity(true); err != nil {
+			return nil, err
+		}
+		if err := t.EnsureDefaultTEEPAgent(true); err != nil {
+			return nil, err
+		}
 	}
 
-	h, err := newHandler(tam, logger)
+	h, err := newHandler(t, logger)
 	if err != nil {
 		return nil, err
 	}

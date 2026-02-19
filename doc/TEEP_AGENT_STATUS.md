@@ -1,5 +1,21 @@
 # TEEP Agent Status Handling in TAM
 
+This document describes how TEEP Agent status is updated and retrieved in TAM.
+
+```mermaid
+---
+title: API Endpoints relating to TEEP Agent Status
+---
+
+flowchart TB
+
+TAM -- 3. Agent Status --> TAMAdmin([TAM Admin])
+TAM -- 3. Agent Status --> DeviceManager([Device Admin])
+TEEPAgent -- 1. Evidence in QueryResponse --> TAM
+TEEPAgent([TEEP Agent]) -- 2. TEEP Success Message --> TAM
+TAM[TAM]
+```
+
 For internal implementation details, see [TAM Status TEEP Agent Status (Internal Design)](./TAM_STATUS_TEEP_AGENT_STATUS.md).
 
 ## Why Is This Required?
@@ -9,29 +25,110 @@ This TAM manages the following status for each TEEP Agent:
 - **which Trusted Components a TEEP Agent has**
 - what kind of errors occurred in a TEEP Agent, and how they were resolved (or not)
 
-## Specification of /getAgents Web API
+## 1. TEEP Agent's Public Key Registration
 
-This TAM currently exposes one implemented status API and one planned API.
+As explained in [TEEP_MESSAGE_HANDLE.md](./TEEP_MESSAGE_HANDLE.md#handling-queryresponse-with-attestation-payload), the TEEP Agent's public key is trusted by the TAM via Remote Attestation.
+Here is a summary of the flow.
 
-### Implemented
+```mermaid
+sequenceDiagram
+    Participant Agent AS TEEP Agent
+    Participant TAM
+    Participant Verifier AS Verifier
+
+    note over Agent: generate (pubAgent, privAgent)
+    Agent ->> TAM: session creation
+    TAM ->> Agent: challenge in QueryRequest
+    note over Agent: generate Evidence(challenge, pubAgent)
+    Agent ->> TAM: Evidence in QueryResponse
+    TAM ->> Verifier: Evidence
+    note over Verifier: appraise the Evidence
+    Verifier ->> TAM: Attestation Result
+    note over TAM: check challenge<br/>store pubAgent
+    TAM ->> Agent: close session
+```
+
+After successful Remote Attestation, an entry for the TEEP Agent is created, and will be served from `/AgentService` endpoints (see [AgentService API](#3-specification-of-agentservice-web-api) below).
+
+## 2. Updating TEEP Agent Status
+
+This TAM records Trusted Components (and their SUIT manifests) stored in TEEP Agents.
+These records are useful for Device Admins who want to keep Trusted Components up to date.
+On TEEP Success messages with SUIT reports, the TAM updates the list of Trusted Components that the TEEP Agent has.
+
+Here is the SUIT Report definition extracted from the document.
+```cddl
+SUIT_Report = {
+  suit-reference              => SUIT_Reference,
+  ? suit-report-nonce         => bstr,
+  suit-report-records         => [
+    * SUIT_Record / system-property-claims ],
+  suit-report-result          => true / {
+    suit-report-result-code   => int,
+    suit-report-result-record => SUIT_Record,
+    suit-report-result-reason => SUIT_Report_Reasons,
+  },
+  ? suit-report-capability-report => SUIT_Capability_Report,
+  $$SUIT_Report_Extensions
+}
+
+SUIT_Reference = [
+    suit-report-manifest-uri : tstr,
+    suit-report-manifest-digest : SUIT_Digest
+]
+```
+
+The TAM extracts the `suit-report-manifest-digest` to identify the SUIT manifest, and `suit-report-result` to know its processing result.
+If the latter value is `true` or `suit-report-result-reason` is `suit-report-reason-ok`, the TAM considers that the Trusted Component(s) in the SUIT manifest are successfully installed.
+
+## 3. Specification of AgentService Web API
 
 URL | Method | Authorized Requester | Input | Output
 --|--|--|--|--
-`/admin/getAgents` | `GET` | TAM Admin | no query | Status of all TEEP Agents, see the CDDL below
+`/AgentService/ListAgents` | `GET` | TAM Admin/<br/>Device Admin | no query | 200 OK: `[+agent-kid-and-last-updated]`<br/>204 No Content<br/>400 Bad Request
+`/AgentService/GetAgentStatus` | `POST` | TAM Admin/<br/>Device Admin | `[+kid]` | 200 OK: `[+agent-status-record]`<br/> 204 No Content<br/>400 Bad Request
 
-### Planned (not implemented yet)
+### A) ListAgents Web API
 
-URL | Method | Authorized Requester | Input | Output
---|--|--|--|--
-`/device-admin/getAgents` | `GET` | Device Manager Admin | no query | TEEP Agents bound to its device, see the CDDL below
+This endpoint serves the `(kid, last_updated)` pairs for TAM Admin and Device Admin lookups.
+They can decide to obtain more detailed information from GetAgentStatus API.
+The TAM Admin can acquire the full TEEP Agent list, while the Device Admin can acquire only the agents running on devices managed by the same admin (TODO).
 
-### Output Format
+#### Output Format
+
+```cddl
+list-agents-output = [
+  + agent-kid-and-last-updated
+]
+
+agent-kid-and-last-updated = [
+  kid: bstr .size 32,
+  last-updated: ~time,
+]
+```
+
+#### Example Output
+
+```cbor-diag
+[
+  [
+    'dummy-teep-agent-kid-for-dev-123',
+    1771338065
+  ]
+]
+```
+
+### B) GetAgentStatus Web API
+
+This endpoint provides detailed TEEP Agent status for the input `[+kid]`.
+
+#### Output Format
 
 ```cddl
 ;# import rfc9711 as eat
 
 get-agent-status-output = [
-  * agent-status-record,
+  + agent-status-record,
 ]
 
 agent-status-record = [
@@ -40,27 +137,32 @@ agent-status-record = [
 ]
 
 agent-status = {
-  "attributes": agent-attributes,
-  "wapp_list": [ * component-list ],
+  attributes-label => agent-attributes,
+  installed-tc-label => [ * suit-manifest-overview ],
 }
+
+attributes-label = 1
+installed-tc-label = 2
 
 agent-attributes = {
   eat.ueid-label => eat.ueid-type,
 }
-
-component-list = [
-  component: bstr .cbor SUIT_Component_Identifier,
-  manifest-sequence-number: uint,
-]
 ```
 
-Example output:
+You can find CDDL definitions for dependencies in:
+- [RFC 9711](https://datatracker.ietf.org/doc/html/rfc9711#name-payload-cddl) for `eat.ueid-*`
+- [SUIT Manifest Repository](./SUIT_MANIFEST_REPOSITORY.md#specification-of-suitmanifestserviceregistermanifest-web-api)
+
+#### Example Output
 ```cbor-diag
 [
   [
     'dummy-teep-agent-kid-for-dev-123',
     {
-      "wapp_list": [
+      / attributes / 1: {
+        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
+      },
+      / installed-tc / 2: [
         [
           / SUIT_Component_Identifier: / << ['app1.wasm'] >>,
           / manifest-sequence-number: / 3
@@ -69,67 +171,28 @@ Example output:
           / SUIT_Component_Identifier: / << ['app2.wasm'] >>,
           / manifest-sequence-number: / 2
         ]
-      ],
-      "attributes": {
-        / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
-      }
+      ]
     }
   ]
 ]
 ```
 
-## Public Key of TEEP Agent
+### Trusted Components Held by the TEEP Agent
 
-This TAM authenticates the TEEP Agent public key using remote attestation.
-For now, [VERAISON](https://github.com/veraison) is used as a Verifier with Background-Check Model.
-Other Verifiers or Passport Model may be used.
+## Limitations
 
-```mermaid
-sequenceDiagram
-    Participant Agent AS TEEP Agent
-    Participant TAM
-    Participant Verifier AS VERAISON
-
-    note over Agent: generate (pubAgent, privAgent)
-    Agent ->> TAM: session creation
-    TAM ->> Agent: challenge
-    note over Agent: generate Evidence(challenge, pubAgent)
-    Agent ->> TAM: Evidence
-    TAM ->> Verifier: Evidence
-    note over Verifier: appraise the Evidence
-    Verifier ->> TAM: Attestation Result(challenge, pubAgent)
-    note over TAM: check challenge<br/>store pubAgent
-    TAM ->> Agent: close session
-```
-
-This TAM requires the TEEP Agent to prove
-- are you running in the TEE with genuine hardware?
-- is your Evidence fresh, i.e. generated after my challenge?
-- which key do you use in the TEEP Protocol messages?
-
-After successful remote attestation, TAM receives the challenge and the TEEP Agent public key from the verifier.
-
-## Trusted Components Held by the TEEP Agent
-
-This TAM also records Trusted Components (and their SUIT manifests) stored in TEEP Agents.
-These records are useful for Device Owners (or Device Manager Admins) who want to keep Trusted Components up to date.
-
-However, this is **NOT always complete** for several reasons.
+The installed TC list in TEEP Agent status **DOES NOT always match the actual TEEP Agent instance in real time** for several reasons.
 - some TEEP Agents may not report SUIT manifest processing results
 - even when an agent sends SUIT reports, intermediaries between the TEEP Agent and TAM (such as an untrusted TEEP Broker) may drop the message
 - a TEEP Agent may lose the Trusted Component and/or SUIT manifest because not all TEEs provide durable storage
 - a TEEP Agent may remove a Trusted Component via `UnrequestTA` without notifying TAM
 
 As a result, the TEEP Agent status in TAM means "expected Trusted Components held by TEEP Agents" or "the Trusted Components a TEEP Agent should have."
-It is constructed from the following information:
-- TAM's Messages
-  - which Trusted Components had the TAM sent to the TEEP Agent
-- Agent's Messages
-  - SUIT reports recording how SUIT manifests were processed in `suit-reports` of TEEP Success or Error messages
-    - with successful SUIT Report, the Trusted Components in the corresponding SUIT manifest should be held by the TEEP Agent
-    - additionally, those in SUIT manifests with lower `suit-manifest-sequence-number` are removed
-    - with failure SUIT Report, existing Trusted Components should be kept
-  - `tc-list` of TEEP QueryResponse message contains current Trusted Components
+
+This TAM implementation prioritizes the trustworthiness of the list:
+1. `tc-list` in TEEP Agent's QueryResponse message
+2. `suit-reports` in TEEP Agent's Success messages
+3. sent manifest data in TAM's Update messages
 
 ```mermaid
 flowchart LR
@@ -138,7 +201,7 @@ flowchart LR
     Agent -- SUIT reports --> TAM
 ```
 
-As a result, TAM may store TEEP Agent status like the following table:
+To manage the installed-tc list from those messages, TAM may store TEEP Agent status like the following table:
 
 TEEP Agent | SUIT Manifest | Trusted Component | Status
 --|--|--|--

@@ -75,7 +75,7 @@ func (r *AgentStatusRepository) ReflectManifestSuccess(ctx context.Context, agen
 		return fmt.Errorf("insert holding: %w", err)
 	}
 
-	// Insert it to the SUIT_Report store
+	// Insert it into the suit_reports table.
 	rep := `
 		INSERT INTO suit_reports (suit_report, agent_id, suit_manifest_id, created_at, resolved)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)`
@@ -112,7 +112,7 @@ func (r *AgentStatusRepository) RecordManifestProcessingFailure(ctx context.Cont
 	// Insert failure report.
 	const ins = `
 		INSERT INTO suit_reports (agent_id, suit_manifest_id, suit_report, created_at, resolved)
-		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 0)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)
 	`
 
 	var aID interface{}
@@ -128,7 +128,7 @@ func (r *AgentStatusRepository) RecordManifestProcessingFailure(ctx context.Cont
 		sID = nil
 	}
 
-	res, err := r.db.ExecContext(ctx, ins, aID, sID, manifestDigest, reportBytes)
+	res, err := r.db.ExecContext(ctx, ins, aID, sID, reportBytes)
 	if err != nil {
 		return fmt.Errorf("insert failure report: %w", err)
 	}

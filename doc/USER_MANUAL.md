@@ -5,34 +5,38 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 ## Quick Flow
 
-1. Start TAM (`go run ./cmd/tam-over-http`).
+1. Start TAM (`go run ./cmd/tam-over-http -insecure-demo-mode`).
 2. Check admin endpoints:
-   - `GET /admin/getAgents`
-   - `GET /admin/getManifests`
-3. Register SUIT envelope when needed via `POST /tc-developer/addManifest`.
+   - `POST /AgentService/GetAgentStatus`
+   - `GET /SUITManifestService/ListManifests`
+3. Register SUIT envelope when needed via `POST /SUITManifestService/RegisterManifest`.
 4. Integrate a TEEP Agent that communicates with `POST /tam`.
 
 ## Start the Server
 
-### Local
+### Native
 ```bash
-go run ./cmd/tam-over-http
+go run ./cmd/tam-over-http -insecure-demo-mode
 ```
 
-### With Make
+or with make command
 ```bash
-make run
+make run-demo
 ```
 
 ### Docker
 ```bash
 docker build -t tam-over-http .
-docker run --rm -p 8080:8080 tam-over-http
+docker run --rm -p 8080:8080 \
+  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e TAM4WASM_ADDR=":8080" \
+  tam-over-http
 ```
 
 With verifier settings:
 ```bash
 docker run --rm -p 8080:8080 \
+  -e TAM4WASM_ADDR=":8080" \
   -e TAM4WASM_CHALLENGE_SERVER="https://verifier.example.com" \
   -e TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
   tam-over-http
@@ -44,7 +48,9 @@ docker run --rm -p 8080:8080 \
 
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
-| `-addr` | `TAM4WASM_ADDR` | `:8080` | Listen address for the HTTP server. |
+| `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
+| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | `` (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-insecure-demo-mode` | `TAM4WASM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
 | `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
@@ -58,55 +64,39 @@ go run ./cmd/tam-over-http -h
 ## Prerequisites
 
 - `curl` for API calls (or any other HTTP client)
-- [`cbor2diag.rb`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
+- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
 
 ## API Summary
 
-Method | Endpoint | Notes
---|--|--
-`POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
-`GET` | `/admin/getAgents` | Returns agent status in CBOR.
-`GET` | `/admin/getManifests` | Returns SUIT manifest overviews in CBOR.
-`POST` | `/tc-developer/addManifest` | Registers a signed SUIT envelope.
+There are mainly three API endpoints for TC Developer, TEEP Agent and Device Admin described below:
 
-For protocol details, see:
-- [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
-- [`SUIT_MANIFEST_STORE.md`](./SUIT_MANIFEST_STORE.md)
-
-> [!NOTE]
-> Communicating with `/tam` requires a TEEP Agent implementation over HTTP.
-> See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
-> For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
-
-## Get Agent Status (CBOR)
-
-```bash
-curl -X GET http://localhost:8080/admin/getAgents \
-  -H "Accept: application/cbor" -s | cbor2diag.rb
+```mermaid
+flowchart LR
+    TCDeveloper([TC Developer]) -- 1. Trusted App--> TAM
+    TAM -- 2. Trusted App --> TEEPAgent([TEEP Agent])
+    TAM -- 3. Installed Trusted App list --> DeviceAdmin([Device Admin])
 ```
 
-Example output:
-```cbor-diag
-[
-  [
-    'dummy-teep-agent-kid-for-dev-123',
-    {
-      "wapp_list": [
-        [<< ['app1.wasm'] >>, 3],
-        [<< ['app2.wasm'] >>, 2]
-      ],
-      "attributes": {256: h'016275696C64696E672D6465762D313233'}
-    }
-  ]
-]
-```
+Section | Method | Endpoint | Notes
+--|--|--|--
+[1](#1-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
+2 | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+3 | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+4 | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
 
-## Post SUIT Manifest
+### 1) Register SUIT Manifests Delivering Trusted Components
 
+For the TAM to securely deliver Trusted Components to TEEP Agent, [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol) uses [SUIT Manifest](https://datatracker.ietf.org/doc/html/draft-ietf-suit-manifest), a concise data format for installing software/firmwares.
+SUIT Manifest tells the TEEP Agent how to get and check the Trusted Component binary content, who created the SUIT Manifest (and Trusted Component in many cases), and which is depending Trusted Component.
+
+For the TC Developer, the TAM provides `/SUITManifestService/RegisterManifest` endpoint, accepting signed SUIT Manifest.
+
+There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
+You can post it with following command from top of this repository:
 ```bash
-curl -X POST http://localhost:8080/tc-developer/addManifest \
+curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./examples/text.0.envelope.cbor"
+  --data-binary "@./doc/examples/text.1.envelope.cbor"
 ```
 
 Example output:
@@ -114,12 +104,56 @@ Example output:
 OK
 ```
 
-If you want to see the SUIT manifest content, see [text.0.envelope.diag](./examples/text.0.envelope.diag).
+For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSITORY.md).
+
+> [!NOTE]
+> If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.
+
+- [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md)
+
+> [!NOTE]
+> Communicating with `/tam` requires a TEEP Agent implementation over HTTP.
+> See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
+> For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
+
+### 3) Get Agent Status
+
+Prepare a CBOR request body that contains an array of KIDs:
+
+```bash
+echo "['dummy-teep-agent-kid-for-dev-123']" | diag2cbor.rb > /tmp/agent-kids.cbor
+```
+
+```bash
+curl -X POST http://localhost:8080/AgentService/GetAgentStatus \
+  -H "Accept: application/cbor" \
+  -H "Content-Type: application/cbor" \
+  --data-binary "@/tmp/agent-kids.cbor" -s | cbor2diag.rb
+```
+
+The output is equivalent to:
+```cbor-diag
+[
+  [
+    'dummy-teep-agent-kid-for-dev-123',
+    {
+      / attributes / 1: {256: h'016275696C64696E672D6465762D313233'},
+      / installed-tc / 2: [
+        [<< ['app1.wasm'] >>, 3],
+        [<< ['app2.wasm'] >>, 2]
+      ],
+    }
+  ]
+]
+```
+
+## Post SUIT Manifest
+
 
 ## Get Manifest Overviews (CBOR)
 
 ```bash
-curl -X GET http://localhost:8080/admin/getManifests \
+curl -X GET http://localhost:8080/SUITManifestService/ListManifests \
   -H "Accept: application/cbor" -s | cbor2diag.rb
 ```
 
@@ -139,7 +173,7 @@ Example output:
 
 ## Planned Management APIs
 
-TODO: add API endpoints to manage entities, keys, ...
+Planned: add API endpoints to manage entities, keys, and related resources.
 
 ## Run Tests
 
@@ -162,8 +196,8 @@ make test-integrated
 ## Troubleshooting
 
 - `415 Unsupported Media Type`:
-  - check request headers (`Content-Type` for `POST`, `Accept` for `GET`).
-- `400 Bad Request` on `/tc-developer/addManifest`:
+  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
+- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
   - verify SUIT envelope encoding and signature.
   - verify signer key is pre-registered in TAM.
 - Unexpected `204 No Content`:

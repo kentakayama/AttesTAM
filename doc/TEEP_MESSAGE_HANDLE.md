@@ -46,29 +46,60 @@ flowchart LR
 
 This TAM implementation enforces the following requirements for incoming `POST /tam` messages:
 
-1. HTTP-level requirements
+1. HTTP-level requirements based on [TEEP over HTTP](https://datatracker.ietf.org/doc/draft-ietf-teep-otrp-over-http):
    - Method must be `POST`.
    - `Content-Type` must be `application/teep+cbor`.
-   - Body size must be within the server limit (`maxRequestBodyBytes`).
+   - For the implementation limitation, body size must be within the server limit (`maxRequestBodyBytes = 1MiB`).
 
-2. Message format and signature requirements
-   - Non-empty messages are expected to be COSE Sign1-encoded TEEP messages.
-   - For normal authenticated flow, the COSE unprotected header `kid` (label `4`) is required.
-   - `kid` is treated as an RFC 9679 SHA-256 COSE_Key thumbprint and expected to be 32 bytes.
-   - TAM looks up the corresponding agent public key from DB and verifies the COSE signature.
+2. COSE security wrapper requirements based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
+   - Non-empty messages should be wrapped with *COSE security wrapper*, especially COSE Sign1-encoded TEEP messages.
+   - For the implementation optimization, this TAM requires the COSE unprotected header `kid` (label `4`) for looking up the corresponding agent public key from Agent Status Repository.
+   - `kid` value should be encoded with SHA-256 [RFC 9679 COSE_Key thumbprint](https://datatracker.ietf.org/doc/html/rfc9679), and expected to be 32 bytes.
 
-3. Correlation and replay-protection requirements
-   - Query/Update correlation relies on one-time `token` and `challenge`.
-   - Received `token` is marked consumed before sent-message lookup.
+3. Correlation and replay-protection requirements of TEEP Protocol messages and Attestation Payload based on [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol)
+   - `(QueryRequest with tc-list request, QueryResponse)` and `(Update, Success/Error)` correlation relies on one-time `token`
+   - `(QueryRequest with attestation request, QueryResponse)` correlation relies on one-time `challenge`.
+   - Received `token` and `challenge` are marked consumed before sent-message lookup respectively.
    - A message must match a previously sent TAM message (by token/challenge); otherwise it is rejected.
 
-4. Remote attestation fallback path
+4. Remote attestation fallback path (our TAM original requirement, see next section for details)
    - If QueryResponse cannot be authenticated with stored agent keys, attestation payload is required.
-   - Attestation result must be `affirming`.
-   - QueryResponse signature is re-verified using the key extracted from attestation result.
+   - The TEEP Agent must reply on QueryRequest with attestation request and challenge, sending back QueryResponse with Evidence using `challenge`
+   - The TAM asks the Verifier for an attestation result, and it must be `affirming`.
+   - QueryResponse signature is re-verified using the key extracted from Attestation Result.
    - Confirmed key is stored for future message authentication.
 
-## TEEP with Remote Attestation
+## Handling QueryResponse with tc-list
+
+When TAM receives an authenticated `QueryResponse`, it generates `Update` from requested Trusted Components.
+
+```mermaid
+sequenceDiagram
+    participant Agent as TEEP Agent
+    participant TAM as TAM
+
+    Agent->>TAM: QueryResponse (token, tc-list/requested-tc-list)
+    TAM->>TAM: validate QueryResponse (signature, token)
+    TAM->>TAM: lookup SUIT Manifests corresponding to tc
+
+    alt at least one manifest found
+        TAM-->>Agent: Update(manifest-list)
+    else none found
+        TAM-->>Agent: empty (session termination)
+    end
+```
+
+Detailed behavior:
+1. `QueryResponse.token` must match the token from TAM's previously sent `QueryRequest`.
+2. TAM builds a unique component set from:
+   - `requested-tc-list[*].component-id`
+   - `tc-list[*].system-component-id`
+3. For each component ID, TAM loads latest manifest (`FindLatestByTrustedComponentID`).
+4. Unknown component IDs are logged and skipped (not fatal).
+5. If resulting manifest list is empty, TAM returns no response body (`204` from HTTP layer).
+6. If manifests exist, TAM signs an `Update`, saves sent-update metadata for later correlation, and returns it.
+
+## Handling QueryResponse with Attestation Payload
 
 For the TAM to securely manage the Trusted Components inside TEEs, our TAM implementation requires Remote Attestation of TEEP Agents.
 The TAM wants to confirm the following points:
@@ -103,14 +134,12 @@ sequenceDiagram
     participant Agent as TEEP Agent
     participant TAM as TAM
     participant V as VERAISON
-    participant DB as SQLite
 
     Agent->>TAM: QueryResponse(attestation-payload, token/challenge)
     TAM->>V: Process(attestation-payload)
     V-->>TAM: ProcessedAttestation (EAR status)
     alt EAR status is affirming
-        note over TAM: Local validation:<br/>decode attestation-payload as COSE Sign1<br/>decode EAT claims from Sign1 payload<br/>validate nonce and match sent challenge<br/>extract cnf.key (agent public key)<br/>verify QueryResponse signature with cnf.key
-        TAM->>DB: store confirmed agent key (and UEID when available)
+        note over TAM: Local validation:<br/>decode attestation-payload as COSE Sign1<br/>decode EAT claims from Sign1 payload<br/>validate nonce and match sent challenge<br/>extract cnf.key (agent public key)<br/>verify QueryResponse signature with cnf.key<br/>store confirmed agent key
         TAM-->>Agent: continue protocol (Update or next response)
     else EAR status is not affirming
         TAM-->>Agent: reject authentication path
@@ -118,7 +147,7 @@ sequenceDiagram
 ```
 
 Expected EAT/attestation inputs:
-1. `eat.eat_nonce`
+1. `eat.Nonce` (or `eat.eat_nonce`, see RFC 9711 and its errata)
    - must be present and valid.
    - must match the challenge previously sent by TAM.
 2. `cwt.cnf.key`
@@ -127,17 +156,20 @@ Expected EAT/attestation inputs:
    - when available, TAM can bind agent key to device identity in persistence.
 
 Validation layers:
-1. Verifier appraisal layer (`IRAVerifier.Process`)
-   - validates evidence and returns attestation result (`affirming` required).
-   - for VERAISON challenge-response endpoint, `verifier_client.go` implements the `Process` routine
-2. TAM local binding layer
-   - validates nonce/challenge correspondence.
+1. Attestation Result appraisal layer
+   - posts the Evidence in the `attestation-payload` field in the QueryResponse message to the VERAISON challenge-response endpoint.
+   - confirms the Attestation Result is `affirming`.
+2. Evidence appraisal layer
+   - validates `eat.Nonce` field in EAT contains TAM's `challenge` value.
    - extracts `cwt.cnf.key` and verifies QueryResponse COSE signature using that key.
 3. Persistence/update layer
    - stores newly confirmed key.
    - continues normal QueryResponse handling (manifest resolution and Update generation).
 
 This two-step model avoids trusting attestation output alone: TAM also proves that the same key in EAT actually signed the live QueryResponse bound to TAM-issued freshness.
+
+> [!NOTE]
+> [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove possession of a key.
 
 ### With Intel SGX DCAP Remote Attestation (TODO)
 
@@ -161,93 +193,29 @@ Due to the limitation of 64-byte `report_data` in SGX Quote, TEEP Agents and TAM
 4. TAM extracts the SGX Quote from `attestation-payload` and requests VERAISON to verify, and
 5. on affirming Attestation Results, the TAM extracts the hash from `report_data` in SGX Quote and compares the one calculated on `raw-report-data`.
 
-> [!NOTE]
-> [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove possession of a key.
+## Handling TEEP Success / Error with SUIT Report
 
-## Handling QueryResponse with tc-list
-
-When TAM receives an authenticated `QueryResponse`, it generates `Update` from requested Trusted Components.
+This TAM manages TEEP Agent Status and provides it to the Device Admin.
+The entry is created when the agent key is validated [here](#handling-queryresponse-with-attestation-payload), and extended with SUIT Report in TEEP Success or Error messages.
+[SUIT Report](https://datatracker.ietf.org/doc/html/draft-ietf-suit-report) is the processing result of SUIT Manifest generated inside TEE, so that the TAM can confirm which Trusted Components are successfully installed.
 
 ```mermaid
 sequenceDiagram
     participant Agent as TEEP Agent
     participant TAM as TAM
-    participant DB as SQLite
 
-    Agent->>TAM: QueryResponse (token, tc-list/requested-tc-list)
-    TAM->>DB: consume token + find sent QueryRequest
-    note over TAM: Build a unique component set<br/>from tc-list and requested-tc-list
-    loop each component
-        TAM->>DB: find latest SUIT manifest
-        DB-->>TAM: manifest or not found
+    TAM-->>Agent: Update(manifest-list)
+    loop
+    Agent->>Agent: process SUIT manifests and<br/>generate SUIT reports
     end
-    alt at least one manifest found
-        TAM->>DB: save sent Update (new token + manifest links)
-        TAM-->>Agent: Update(manifest-list)
-    else none found
-        TAM-->>Agent: empty (session termination)
+    alt success all
+    Agent->>TAM: Success with SUIT reports
+    TAM->>TAM: update installed-tc list
+    else
+    Agent->>TAM: Error with SUIT reports
+    TAM->>TAM: record error log
+    opt
+    TAM-->>Agent: another Update(manifest-list) for error recovery
     end
-```
-
-Detailed behavior:
-1. `QueryResponse.token` must match the token from TAM's previously sent `QueryRequest`.
-2. TAM builds a unique component set from:
-   - `requested-tc-list[*].component-id`
-   - `tc-list[*].system-component-id`
-3. For each component ID, TAM loads latest manifest (`FindLatestByTrustedComponentID`).
-4. Unknown component IDs are logged and skipped (not fatal).
-5. If resulting manifest list is empty, TAM returns no response body (`204` from HTTP layer).
-6. If manifests exist, TAM signs an `Update`, saves sent-update metadata for later correlation, and returns it.
-
-## How This TAM Implementation Acts
-
-Based on these draft RFCs, this TAM over HTTP currently behaves as follows:
-
-```mermaid
----
-title: TAM's TEEP Message handling
----
-
-flowchart TD
-    Start([POST /tam endpoint])
-    IsEmpty{{Is empty?}}
-    SendQueryRequestWithToken(["OK: Return QueryRequest message<br/>(token, request-tc-list)"])
-    SendQueryRequestWithChallenge(["OK: Return QueryRequest message<br/>(challenge, request-attestation)"])
-    Verify{{Verified with stored Agent keys?}}
-    IsResponse{{Is QueryResponse message?}}
-    SwitchMessage{{"Switch {QueryResponse, Success, Error}"}}
-    ProcessSuccess[Process Success message]
-    ProcessError[Process Error message]
-    AttestationExists{{Does attestation-payload exist?}}
-    ProcessAttestation[Query Evidence Verification]
-    AttestationOK{{"Is AttestationResult 'affirming'?"}}
-    VerifyAgain{{Verified QueryResponse with confirmed key?}}
-    StoreKey[Store Agent key]
-    ProcessQueryResponseMessage["Process QueryResponse message"]
-    ReplyUpdate(["OK: Return Update message<br/>(manifests)"])
-    BadMessage([Failure: Return empty])
-    SuccessNoReply([OK: Return empty])
-
-    Start --> IsEmpty
-    IsEmpty -- YES --> SendQueryRequestWithToken
-    IsEmpty -- NO --> Verify
-    Verify -- OK --> SwitchMessage
-    SwitchMessage -- Success --> ProcessSuccess
-    ProcessSuccess --> SuccessNoReply
-    SwitchMessage -- Error --> ProcessError
-    ProcessError --> SuccessNoReply
-    SwitchMessage -- QueryResponse --> ProcessQueryResponseMessage
-    Verify -- NO --> IsResponse
-    IsResponse -- YES --> AttestationExists
-    AttestationExists -- NO --> SendQueryRequestWithChallenge
-    AttestationExists -- YES --> ProcessAttestation
-    ProcessAttestation --> AttestationOK
-    AttestationOK -- YES --> VerifyAgain
-    AttestationOK -- NO --> BadMessage
-    VerifyAgain -- OK --> StoreKey
-    VerifyAgain -- NO --> BadMessage
-    StoreKey --> ProcessQueryResponseMessage
-    ProcessQueryResponseMessage --> ReplyUpdate
-
-    IsResponse -- NO --> BadMessage
+    end
 ```

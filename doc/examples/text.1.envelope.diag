@@ -2,7 +2,7 @@
     / suit-authentication-wrapper / 2: << [
         / digest over suit-manifest including bstr header / << [
             -16 / SHA-256 /,
-            h'4313160484182F041197F695A412B7C591CB112CCAAA5D60C03285EF7E20FCB0'
+            h'B2A00E3E707A117F730A08779A1EBA26413F005DB38D0111BBA9C05D1F4027C0'
         ] >>,
         / authentication block / << 18([
             << {
@@ -12,12 +12,12 @@
                 / kid / 4: h'CA9E35F23B2B525FB4FC83F512B0DCAC4AC29E457E873A5D6A7313F71690B33C' / XXX: RFC 9679 /
             },
             null,
-            h'9F164D573832239848605B3E89C1CD593C55F5BC8C9A5E23DD04E0DE61841185CE6578225EEAD1EE1A3C46B4849EC4AAAA923B96254AC8654AA46B740AEDBB1B'
+            h'D7DA884340159394CEB63147FAC92FD624CAA63901CE39C2027BD9D1C1DB80541A9745768A8CBF177A9167BA5BB87665C7C7F14DB43230BA0C675DA4E62DE0E5'
         ]) >>
     ] >>,
     / suit-manifest / 3: << {
         / suit-manifest-version / 1: 1,
-        / suit-manifest-sequence-number / 2: 0,
+        / suit-manifest-sequence-number / 2: 1,
         / suit-common / 3: << {
             / suit-components / 2: [
                 ['hello.txt']
@@ -28,9 +28,9 @@
                     / suit-parameter-class-identifier / 2: h'1492AF1425695E48BF429B2D51F2AB45',
                     / suit-parameter-image-digest / 3: << [
                         -16 / SHA-256 /,
-                        h'DFFD6021BB2BD5B0AF676290809EC3A53191DD81C7F70A4B28688A362182986F'
+                        h'C2FAE0B45DC6B457ADEBCE2368BB8C2EBAD818FDD7BEB7C8AC77F2295E699481'
                     ] >>,
-                    / suit-parameter-image-size / 14: 13
+                    / suit-parameter-image-size / 14: 21
                 },
                 / suit-condition-vendor-identifier / 1, 15,
                 / suit-condition-class-identifier / 2, 15
@@ -47,5 +47,5 @@
             / suit-condition-image-match / 3, 15
         ] >>
     } >>,
-    "#hello.txt": 'Hello, World!'
+    "#hello.txt": 'Hello, Updated World!'
 }

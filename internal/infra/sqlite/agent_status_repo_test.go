@@ -159,3 +159,69 @@ func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {
 		t.Fatalf("expected suit manifest seq %d got %d", 2, agentStatus3.SuitManifests[1].SequenceNumber)
 	}
 }
+
+func TestAgentStatus_RecordManifestProcessingFailure(t *testing.T) {
+	ctx := context.Background()
+	db, err := InitDB(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("InitDB error: %v", err)
+	}
+	defer CloseDB(db)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	entityRepo := NewEntityRepository(db)
+	dev := &model.Entity{Name: "Test Corp", IsTCDeveloper: true, CreatedAt: now}
+	devID, err := entityRepo.Create(ctx, dev)
+	if err != nil {
+		t.Fatalf("Create developer error: %v", err)
+	}
+
+	keyRepo := NewManifestSigningKeyRepository(db)
+	key := &model.ManifestSigningKey{
+		KID:       []byte("key-1"),
+		EntityID:  devID,
+		PublicKey: []byte("pub-key-1"),
+		CreatedAt: now,
+		ExpiredAt: now.Add(1 * time.Hour),
+	}
+	keyID, err := keyRepo.Create(ctx, key)
+	if err != nil {
+		t.Fatalf("Create key error: %v", err)
+	}
+
+	agentKID := []byte("agent-failure")
+	if _, err := db.ExecContext(ctx, "INSERT INTO agents (kid, public_key, created_at, expired_at) VALUES (?, ?, ?, ?)", agentKID, []byte("pk"), now, now.Add(1*time.Hour)); err != nil {
+		t.Fatalf("insert agent error: %v", err)
+	}
+
+	manifestDigest := []byte("digest-failure")
+	manifestRepo := NewSuitManifestRepository(db)
+	if _, err := manifestRepo.Create(ctx, &model.SuitManifest{
+		Manifest:           []byte("m"),
+		Digest:             manifestDigest,
+		SigningKeyID:       keyID,
+		TrustedComponentID: []byte("tc-failure"),
+		SequenceNumber:     1,
+		CreatedAt:          now,
+	}); err != nil {
+		t.Fatalf("create manifest error: %v", err)
+	}
+
+	reportBytes := []byte("failure-report")
+	repo := NewAgentStatusRepository(db)
+	if err := repo.RecordManifestProcessingFailure(ctx, agentKID, manifestDigest, reportBytes); err != nil {
+		t.Fatalf("RecordManifestProcessingFailure error: %v", err)
+	}
+
+	var gotReport []byte
+	var gotResolved int
+	if err := db.QueryRowContext(ctx, "SELECT suit_report, resolved FROM suit_reports ORDER BY id DESC LIMIT 1").Scan(&gotReport, &gotResolved); err != nil {
+		t.Fatalf("query suit_reports error: %v", err)
+	}
+	if !bytes.Equal(gotReport, reportBytes) {
+		t.Fatalf("suit_report mismatch: expected %x, got %x", reportBytes, gotReport)
+	}
+	if gotResolved != 0 {
+		t.Fatalf("resolved mismatch: expected 0, got %d", gotResolved)
+	}
+}
