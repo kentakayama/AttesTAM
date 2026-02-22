@@ -1,19 +1,30 @@
 # tam-over-http
 
-`tam-over-http` is a lightweight Trusted Application Manager (TAM) server defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
+`tam-over-http` is a lightweight Trusted Application Manager (TAM) server (`cmd/tam-over-http`) defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
 
 A TAM serves as an intermediary that communicates with TEE-equipped devices, specifically the TEEP Agent inside the TEE, when **a Trusted Component (TC) Developer wants to run a Trusted Application in a remote device's TEE while protecting it from tampering or unauthorized access**.
 
-Although the TEEP Architecture requires that a Device Administrator be able to learn which Trusted Applications are installed in the TEE, it does not assign that responsibility to the TAM. In this implementation, however, **the TAM also provides this information as a design choice**.
+Although the TEEP Architecture requires that **a Device Administrator be able to learn which Trusted Applications are installed in the TEE**, it does not assign that responsibility to the TAM. In this implementation, however, **the TAM also provides this information as a design choice**.
+
+This repository also includes a TAM console (`cmd/admin-console`), shown as the `BFF Server` in the diagram below. The console acts as a backend-for-frontend for the Device Administrator: it calls the TAM core server's TEEP Agent Service API, reads the agent/manifest status data returned in CBOR, and converts it into JSON (and HTML UI responses) that are easier for browser-based tools and operators to consume.
 
 ```mermaid
 flowchart LR
-    DeviceAdmin ~~~ AgentStore
-    AgentStore -- Installed Trusted App list --> DeviceAdmin([Device Admin])
-    AgentStore ~~~ DeviceAdmin
     TCDeveloper([TC Developer]) -- Trusted App--> ManifestStore
+
+    DeviceAdmin ~~~ BFF
+    BFF -- TA list (JSON) --> DeviceAdmin([Device Admin])
+    BFF ~~~ DeviceAdmin
+
+    subgraph Admin Console
+        BFF[BFF Server]
+    end
+
     subgraph TAM Server
         TAM
+        BFF ~~~ AgentStore
+        AgentStore -- TA list (CBOR) --> BFF
+        AgentStore ~~~ BFF
         AgentStore[(TEEP Agent Store)] <--> TAM
         ManifestStore[(TC Store)] <--> TAM
     end
@@ -21,11 +32,7 @@ flowchart LR
     TAM e1@== Trusted App ==> TEEPAgent
     e1@{ animate: true }
 
-    subgraph TEE Client Device
-        TEEPAgent["TEE (TEEP Agent)"] ~~~ REE
-        REE -- invoke Trusted App --> TEEPAgent
-        REE ~~~ TEEPAgent
-    end
+    TEEPAgent([TEE Device])
 ```
 
 To support the architecture shown above, the TAM provides three primary communication channels:
@@ -36,6 +43,10 @@ To support the architecture shown above, the TAM provides three primary communic
 ## Quick Start
 
 See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
+
+> [!WARNING]
+> The commands below start the server in insecure demo mode for local testing and evaluation only.
+> Do not use this configuration in production.
 
 ### A) Native
 
@@ -49,28 +60,46 @@ Send TEEP messages (COSE Sign1) as the request body and inspect logs for respons
 Use `go run ./cmd/tam-over-http -h` to see available CLI options.
 Detailed references for flags and environment variables are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
+```bash
+go run ./cmd/admin-console --tam-api-base http://localhost:8080/
+```
+
 ### B) Docker
 
 ```bash
-docker build -t tam-over-http .
-docker run --rm -p 8080:8080 -e TAM4WASM_INSECURE_DEMO_MODE=true tam-over-http
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
+  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
+  tam-over-http
 ```
+
+This container starts both services:
+
+- TAM core server on `http://localhost:8080` (`POST /tam`)
+- TAM admin console on `http://localhost:9090`
+
+Then open `http://localhost:9090` in your Web browser.
 
 ## Documentation
 
 - [User Manual](./doc/USER_MANUAL.md)
 - [External Design](./doc/EXTERNAL_DESIGN.md)
+  - [TAM Admin Console and TAM Server](./doc/ADMIN_CONSOLE_EXTERNAL_DESIGN.md)
   - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
   - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
   - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
 - [Internal Design](./doc/INTERNAL_DESIGN.md)
+  - [TAM Admin Console BFF Server](./doc/ADMIN_CONSOLE_INTERNAL_DESIGN.md)
   - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_STORE.md)
   - [TAM Status TEEP Agent Status](./doc/TAM_STATUS_TEEP_AGENT_STATUS.md)
+  - [Database Disgn](./doc/DATABASE_DESIGN.md)
 
 ## Development Workflow
 
 ```bash
-make run-demo         # Start server locally with Demo purpose initialization (not for production use)
+make run-demo         # Start server locally in insecure demo mode (evaluation only; not for production)
 make test             # Run unit tests (go test ./...)
 make test-integrated  # Run integration-tagged tests (requires provisioned VERAISON server)
 
