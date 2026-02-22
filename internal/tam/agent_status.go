@@ -13,18 +13,19 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/domain/model"
 	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
+	"github.com/kentakayama/tam-over-http/internal/util"
 )
 
 type AgentStatusKey struct {
-	_         struct{}  `cbor:",toarray"`
-	AgentKID  []byte    `cbor:"0,keyasint"`
-	UpdatedAt time.Time `cbor:"1,keyasint"`
+	_         struct{}           `cbor:",toarray"`
+	AgentKID  util.BytesHexMax32 `cbor:"0,keyasint"`
+	UpdatedAt time.Time          `cbor:"1,keyasint"`
 }
 
 type AgentStatusRecord struct {
-	_        struct{}    `cbor:",toarray"`
-	AgentKID []byte      `cbor:"0,keyasint"`
-	Status   AgentStatus `cbor:"1,keyasint"`
+	_        struct{}           `cbor:",toarray"`
+	AgentKID util.BytesHexMax32 `cbor:"0,keyasint"`
+	Status   AgentStatus        `cbor:"1,keyasint"`
 }
 
 type AgentStatus struct {
