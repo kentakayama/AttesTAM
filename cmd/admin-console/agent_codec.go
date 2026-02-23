@@ -45,13 +45,6 @@ func decodeAgentsFromCBOR(body []byte) ([]Agent, error) {
 	return agents, nil
 }
 
-func componentIDFromFilename(filename string) suit.ComponentID {
-	if filename == "" {
-		return nil
-	}
-	return suit.ComponentID{suit.ComponentIDBytes([]byte(filename))}
-}
-
 func decodeCBORComponentID(raw []byte) (suit.ComponentID, bool) {
 	var id suit.ComponentID
 	if err := cbor.Unmarshal(raw, &id); err != nil || len(id) == 0 {

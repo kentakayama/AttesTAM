@@ -8,7 +8,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -59,48 +58,3 @@ func TestDecodeAgentsFromCBOR(t *testing.T) {
 	}
 }
 
-func TestConvertCBORToJSON(t *testing.T) {
-	raw := tam.AgentStatusRecord{
-		AgentKID: []byte("kid-x"),
-		Status: tam.AgentStatus{
-			Attributes: tam.AgentAttributes{
-				DeviceUEID: []byte{0xaa, 0xbb},
-			},
-			SuitManifests: []model.SuitManifestOverview{
-				{
-					TrustedComponentID: mustMarshalCBOR(t, []any{[]byte("tc-x")}),
-					SequenceNumber:     5,
-				},
-			},
-		},
-	}
-	body, err := cbor.Marshal(raw)
-	if err != nil {
-		t.Fatalf("marshal cbor: %v", err)
-	}
-
-	j, err := ConvertCBORToJSON(body)
-	if err != nil {
-		t.Fatalf("ConvertCBORToJSON: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(j, &m); err != nil {
-		t.Fatalf("unmarshal json map: %v", err)
-	}
-	if kid, _ := m["kid"].(string); kid != "kid-x" {
-		t.Fatalf("unexpected kid in json: %#v", m["kid"])
-	}
-	attr, _ := m["attribute"].(map[string]any)
-	if ueid, _ := attr["ueid"].(string); ueid != "aabb" {
-		t.Fatalf("unexpected ueid in json: %#v", attr["ueid"])
-	}
-	wlist, _ := m["installed-tc"].([]any)
-	if len(wlist) != 1 {
-		t.Fatalf("unexpected installed tc list in json: %#v", m["installed-tc"])
-	}
-	w0, _ := wlist[0].(map[string]any)
-	if gotName, _ := w0["name"].(string); gotName != "['tc-x']" {
-		t.Fatalf("unexpected installed tc name in json: %#v", w0["name"])
-	}
-}

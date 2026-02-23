@@ -4,14 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// Sample TAM Admin Console.
-// TAM API integration + command-line flags.
-//
-// To run (manual test pattern #3):
-//   1) Start mock API:  go run ./cmd/mockapi
-//   2) Start app:      go run ./cmd/admin-console --port=8080 --tam-api-base=http://localhost:8080
-//   3) Open: http://localhost:8080 and click "View Managed Devices"
-
 package main
 
 import (
@@ -40,7 +32,6 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", indexHandler)
-	// Console API
 	mux.HandleFunc("/console/view-managed-devices", handleListAgents)
 	mux.HandleFunc("/console/view-managed-tcs", handleListManifestsService)
 	mux.HandleFunc("/console/register-tc", handleRegisterManifest)
