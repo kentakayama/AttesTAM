@@ -735,6 +735,12 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 		}
 	}
 
+	if len(manifests) == 0 {
+		// ok, no matching manifest found
+		// replying empty message means session termination
+		return nil, nil
+	}
+
 	// sign
 	response, err := sendingUpdate.COSESign1Sign(t.tamKey)
 	if err != nil {
