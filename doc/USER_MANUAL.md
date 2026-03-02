@@ -5,12 +5,8 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 
 ## Quick Flow
 
-1. Start TAM (`go run ./cmd/tam-over-http -insecure-demo-mode`).
-2. Check admin endpoints:
-   - `POST /AgentService/GetAgentStatus`
-   - `GET /SUITManifestService/ListManifests`
-3. Register SUIT envelope when needed via `POST /SUITManifestService/RegisterManifest`.
-4. Integrate a TEEP Agent that communicates with `POST /tam`.
+1. Start TAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
+2. Start TAM admin console (`go run ./cmd/admin-console`)
 
 ## Start the Server
 
@@ -19,37 +15,44 @@ This document explains how to run `tam-over-http` and use the currently exposed 
 go run ./cmd/tam-over-http -insecure-demo-mode
 ```
 
-or with make command
-```bash
-make run-demo
-```
+TODO: add TAM Admin Console start up
 
 ### Docker
 ```bash
 docker build -t tam-over-http .
-docker run --rm -p 8080:8080 \
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
   -e TAM4WASM_INSECURE_DEMO_MODE=true \
-  -e TAM4WASM_ADDR=":8080" \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   tam-over-http
 ```
 
 With verifier settings:
 ```bash
-docker run --rm -p 8080:8080 \
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
   -e TAM4WASM_ADDR=":8080" \
   -e TAM4WASM_CHALLENGE_SERVER="https://verifier.example.com" \
   -e TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
+  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   tam-over-http
 ```
 
-### Command Options
+## TAM Admin Console User Manual
+
+TODO: list agents, post manifest, ...
+
+## TAM Server Command Options
 
 `tam-over-http` accepts CLI flags (also configurable by environment variables):
 
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
 | `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
-| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | `` (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-insecure-demo-mode` | `TAM4WASM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
 | `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
@@ -61,12 +64,11 @@ Print live defaults with:
 go run ./cmd/tam-over-http -h
 ```
 
-## Prerequisites
+### TAM Admin Console Command Options
 
-- `curl` for API calls (or any other HTTP client)
-- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
+TODO: move content from ADMIN_CONSOLE_USER_MANUAL.md
 
-## API Summary
+## TAM Server API Summary
 
 There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
 
@@ -83,6 +85,13 @@ Section | Method | Endpoint | Notes
 [2](#2-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
 [3](#3-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
 [4](#4-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+
+### Prerequisites
+
+To test the TAM Server directly, you need these commands below:
+
+- `curl` for API calls (or any other HTTP client)
+- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
 
 ### 1) Get Manifest Overviews (CBOR)
 
