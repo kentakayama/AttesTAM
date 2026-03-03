@@ -9,6 +9,7 @@ package server
 import (
 	"crypto"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -21,7 +22,8 @@ import (
 )
 
 const (
-	maxRequestBodyBytes = 1 << 20 // 1 MiB should cover all test vectors.
+	maxRequestBodyBytes        = 32 << 10 // 32 KiB should cover all test vectors in general.
+	maxRequestBodyBytesForSUIT = 32 << 20 // 32 MiB should cover all test vectors for SUIT.
 )
 
 type handler struct {
@@ -67,15 +69,34 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check the content
+	if r.Header.Get("Accept") != "application/teep+cbor" {
+		h.logger.Printf("content type mismatch: expected application/teep+cbor, actual %v", r.Header.Get("Accept"))
+		http.Error(w, "This endpoint only accepts Accept: application/teep+cbor", http.StatusUnsupportedMediaType)
+		return
+	}
 	if r.Header.Get("Content-Type") != "application/teep+cbor" {
 		h.logger.Printf("content type mismatch: expected application/teep+cbor, actual %v", r.Header.Get("Content-Type"))
 		http.Error(w, "This endpoint only accepts Content-Type: application/teep+cbor", http.StatusUnsupportedMediaType)
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes))
+	// protect against overly large bodies; MaxBytesReader will return http.ErrBodyTooLarge
+	// if the body is bigger than the limit, and also write a 413 if the handler doesn't
+	// consume all of it.
+	// limit size; ReadAll will return either http.ErrBodyTooLarge or *http.MaxBytesError
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.logger.Printf("failed to read request body: %v", err)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.logger.Printf("request body is too large: %v", err)
+			// TODO: should be 413, but currently returns 500 due to the way the handler is structured. --- IGNORE ---
+			// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and --- IGNORE ---
+			// refactoring the handler to return 413 instead of 500 when the body exceeds the limit. --- IGNORE ---
+			http.Error(w, "request body is too large", http.StatusInternalServerError)
+			return
+		}
+		h.logger.Printf("failed reading request body: %v", err)
 		http.Error(w, "failed to parse TEEP Message", http.StatusBadRequest)
 		return
 	}
@@ -194,8 +215,16 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes))
+	// for SUIT envelopes we allow a larger limit
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytesForSUIT)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.logger.Printf("request body is too large: %v", err)
+			http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		h.logger.Printf("failed reading request body: %v", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
@@ -355,9 +384,17 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes))
+	// similar protection for agent status requests
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.logger.Printf("failed to read request body: %v", err)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.logger.Printf("request body is too large: %v", err)
+			http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		h.logger.Printf("failed reading request body: %v", err)
 		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
 		return
 	}
