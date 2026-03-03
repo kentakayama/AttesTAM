@@ -8,10 +8,8 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"strings"
 )
 
 type indexViewData struct {
@@ -20,13 +18,8 @@ type indexViewData struct {
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	connectedTAM := conf.TAMAPIBase
-	if strings.TrimSpace(connectedTAM) == "" {
-		connectedTAM = "testvector mode (TAM API disabled)"
-	}
-
 	data := indexViewData{
-		ConnectedTAM: connectedTAM,
+		ConnectedTAM: conf.TAMAPIBase,
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
@@ -41,21 +34,15 @@ func handleListAgents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := conf.TAMAPIBase
-	if base != "" {
-		devices, err := fetchTAMDevices(base)
-		if err != nil {
-			log.Printf("TAM API fetch failed: %v", err)
-			http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
-			return
-		}
-		respondJSON(w, devices)
+	if base == "" {
+		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
-	devices, err := loadTestVectorAgents()
+	devices, err := fetchTAMDevices(base)
 	if err != nil {
-		log.Printf("testvector agents load failed: %v", err)
-		http.Error(w, fmt.Sprintf("testvector agents load failed: %v", err), http.StatusInternalServerError)
+		log.Printf("TAM API fetch failed: %v", err)
+		http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
 		return
 	}
 	respondJSON(w, devices)
@@ -68,21 +55,15 @@ func handleListManifestsService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := conf.TAMAPIBase
-	if base != "" {
-		manifests, err := fetchTAMManifests(base)
-		if err != nil {
-			log.Printf("TAM API fetch manifests failed: %v", err)
-			http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
-			return
-		}
-		respondJSON(w, manifests)
+	if base == "" {
+		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
-	manifests, err := loadTestVectorManifests()
+	manifests, err := fetchTAMManifests(base)
 	if err != nil {
-		log.Printf("testvector manifests load failed: %v", err)
-		http.Error(w, fmt.Sprintf("testvector manifests load failed: %v", err), http.StatusInternalServerError)
+		log.Printf("TAM API fetch manifests failed: %v", err)
+		http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
 		return
 	}
 	respondJSON(w, manifests)
@@ -95,37 +76,13 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := conf.TAMAPIBase
-	if base != "" {
-		if err := postTAMManifest(w, r, base); err != nil {
-			log.Printf("TAM API post manifest failed: %v", err)
-			http.Error(w, fmt.Sprintf("TAM API post failed: %v", err), http.StatusBadGateway)
-		}
+	if base == "" {
+		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			http.Error(w, "failed to parse form", http.StatusBadRequest)
-			return
-		}
-		file, _, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "file is required", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// Consume uploaded body to validate the multipart payload end-to-end.
-		if _, err := io.Copy(io.Discard, file); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		respondJSON(w, map[string]any{
-			"ok": true,
-		})
-		return
+	if err := postTAMManifest(w, r, base); err != nil {
+		log.Printf("TAM API post manifest failed: %v", err)
+		http.Error(w, fmt.Sprintf("TAM API post failed: %v", err), http.StatusBadGateway)
 	}
-
-	http.Error(w, "multipart/form-data is required", http.StatusBadRequest)
 }

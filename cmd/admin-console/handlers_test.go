@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-func TestHandleRegisterManifestNoTAMReturnsJSON(t *testing.T) {
+func TestHandleRegisterManifestWithoutTAMReturnsServerError(t *testing.T) {
 	prev := conf
 	conf = AppConfig{}
 	t.Cleanup(func() { conf = prev })
@@ -29,9 +29,6 @@ func TestHandleRegisterManifestNoTAMReturnsJSON(t *testing.T) {
 	if _, err := part.Write([]byte("manifest-body")); err != nil {
 		t.Fatalf("part write: %v", err)
 	}
-	if err := mw.WriteField("version", "7"); err != nil {
-		t.Fatalf("WriteField: %v", err)
-	}
 	if err := mw.Close(); err != nil {
 		t.Fatalf("multipart close: %v", err)
 	}
@@ -42,17 +39,14 @@ func TestHandleRegisterManifestNoTAMReturnsJSON(t *testing.T) {
 
 	handleRegisterManifest(rec, req)
 
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("unexpected status: %d, body=%s", rec.Code, rec.Body.String())
 	}
-	if got := rec.Header().Get("Content-Disposition"); got != "" {
-		t.Fatalf("unexpected Content-Disposition: %q", got)
-	}
-	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
 		t.Fatalf("unexpected content type: %q", ct)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "\"ok\": true") {
-		t.Fatalf("expected ok response, got: %s", body)
+	if !strings.Contains(body, "tam-api-base is required") {
+		t.Fatalf("expected configuration error, got: %s", body)
 	}
 }

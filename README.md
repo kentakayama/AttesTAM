@@ -61,8 +61,10 @@ Use `go run ./cmd/tam-over-http -h` to see available CLI options.
 Detailed references for flags and environment variables are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
 ```bash
-go run ./cmd/admin-console --tam-api-base http://localhost:8080/
+go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```
+
+`cmd/admin-console` uses `http://127.0.0.1:8080/` as the default `--tam-api-base` and no longer supports local testvector fallback mode.
 
 ### B) Docker
 
@@ -78,9 +80,9 @@ docker run --rm \
 This container starts both services:
 
 - TAM core server on `http://localhost:8080` (`POST /tam`)
-- TAM admin console on `http://localhost:9090`
+- TAM admin console on `http://127.0.0.1:9090`
 
-Then open `http://localhost:9090` in your Web browser.
+Then open `http://127.0.0.1:9090` in your Web browser.
 
 ## Documentation
 

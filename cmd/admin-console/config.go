@@ -8,6 +8,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -23,10 +24,17 @@ type AppConfig struct {
 func loadConfigFromFlags() AppConfig {
 	var cfg AppConfig
 	flag.IntVar(&cfg.Server.Port, "port", 9090, "HTTP listen port for admin console")
-	flag.StringVar(&cfg.TAMAPIBase, "tam-api-base", "", "TAM API base URL (e.g. http://localhost:8080)")
+	flag.StringVar(&cfg.TAMAPIBase, "tam-api-base", "http://127.0.0.1:8080/", "TAM API base URL")
 	flag.Parse()
 
 	return cfg
+}
+
+func validateConfig(cfg AppConfig) error {
+	if cfg.TAMAPIBase == "" {
+		return fmt.Errorf("tam-api-base is required")
+	}
+	return nil
 }
 
 func resolvePath(rel string) string {

@@ -4,56 +4,83 @@
 
 `cmd/admin-console` provides an operator UI and HTTP endpoints for:
 - Listing managed devices
-- Listing managed trusted components (TCs / manifests)
+- Listing managed trusted components (TC manifests)
 - Registering a TC manifest
 
-This document defines externally visible behavior (HTTP contracts and response shapes).
+This document defines externally visible behavior.
+
+Current limitation:
+- Authentication/authorization for console users is not implemented in the current version. This is planned for a future Admin Console revision.
 
 Covered scope:
 - Public interface of admin-console:
-  - `GET /` (console page)
+  - `GET /`
+    - Admin console page
   - `GET /console/view-managed-devices`
+    - Listing managed devices
   - `GET /console/view-managed-tcs`
+    - Listing managed trusted components
   - `POST /console/register-tc`
-  - `GET /static/*` (UI static assets)
+    - Registering a TC manifest
+  - `GET /static/*`
+    - UI static assets
 
 Not covered:
 - TAM internal business logic and persistence behavior
-- Authentication/authorization design for console users
 
-## 2. Admin Console Base URL And Modes
+## 2. Admin Console Base URL And TAM Dependency
 
 Admin Console Base URL:
-- `http://localhost:<port>`
+- `http://<host>:<port>`
 
 Notes:
-- `host` is fixed to `localhost` for intended access.
+- Current implementation listens on all interfaces (`:<port>`).
+- Operators are expected to access the console via loopback (`127.0.0.1`) or another explicitly controlled host route.
 - `port` is determined by command-line flag `--port` (default: `9090`).
-
-Modes:
-- TAM API mode (`--tam-api-base` set): console proxies/aggregates TAM data.
-- Testvector mode (`--tam-api-base` empty): console returns local sample data.
-
-Mode-dependent behavior overview:
+- `--tam-api-base` defaults to `http://127.0.0.1:8080/`.
 
 ```mermaid
-flowchart TD
-  C[Browser or curl] -->|GET/POST /console/*| AC[Admin Console]
-  AC --> M{--tam-api-base set?}
-  M -->|No| TV[Testvector mode]
-  TV --> TVF[Read local CBOR testvectors]
-  TVF --> R1[Return Admin Console JSON response]
-  M -->|Yes| TAP[TAM API mode]
-  TAP --> TA[TAM API endpoints]
-  TA --> R2[Convert/aggregate and return Admin Console JSON response]
+flowchart LR
+  A([TAM Admin])
+  BC[Browser]
+  AC["Admin Console Web Server<br>http://127.0.0.1:9090/ (default)"]
+  TAM["AttesTAM Server<br>http://127.0.0.1:8080/ (default)"]
+  A --> BC
+  BC --> AC
+  AC --> TAM
 ```
 
-## 3. Admin Console HTTP API Contract
+## 3. Admin Console API
+
+### API call flow
+```mermaid
+flowchart LR
+  BC[Browser]
+  subgraph AC[Admin Console Web Server]
+    C_VMD["/console/view-managed-devices"]
+    C_VMTC["/console/view-managed-tcs"]
+    C_RTC["/console/register-tc"]
+  end
+  subgraph TAM[AttesTAM Server]
+    AS_LA["/AgentService/ListAgents"]
+    AS_GAS["/AgentService/GetAgentStatus"]
+    SMS_LM["/SUITManifestService/ListManifests"]
+    SMS_RM["/SUITManifestService/RegisterManifest"]
+  end
+  BC -->|GET| C_VMD
+  BC -->|GET| C_VMTC
+  BC -->|POST| C_RTC
+  C_VMD -->|GET| AS_LA
+  C_VMD -->|POST| AS_GAS
+  C_VMTC -->|GET| SMS_LM
+  C_RTC -->|POST| SMS_RM
+```
 
 ### 3.1 `GET /console/view-managed-devices`
 
 Purpose:
 - Return managed device list with installed TC info.
+- Admin console calls TAM APIs `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus` to build this response.
 
 Request:
 - Method: `GET`
@@ -67,7 +94,7 @@ Success response:
 
 Agent response schema:
 - `kid`: string
-- `last_update`: RFC3339 string (optional)
+- `last_update`: RFC3339 string
 - `attribute.ueid`: hex string
 - `installed-tc`: array of trusted components
 
@@ -96,13 +123,14 @@ Example:
 
 Errors:
 - `405` when method is not `GET`
-- `502` when TAM API call fails (TAM API mode)
-- `500` when local testvector loading fails (testvector mode)
+- `502` when TAM API call fails
+- `500` when console is misconfigured
 
 ### 3.2 `GET /console/view-managed-tcs`
 
 Purpose:
 - Return managed TC manifest list.
+- Admin console calls TAM API `GET /SUITManifestService/ListManifests` and returns the result in JSON form.
 
 Request:
 - Method: `GET`
@@ -129,20 +157,20 @@ Example:
 
 Errors:
 - `405` when method is not `GET`
-- `502` when TAM API call fails (TAM API mode)
-- `500` when local testvector loading fails (testvector mode)
+- `502` when TAM API call fails
+- `500` when console is misconfigured
 
 ### 3.3 `POST /console/register-tc`
 
 Purpose:
-- Register uploaded manifest to TAM API (or validate upload in testvector mode).
+- Register uploaded manifest to TAM API.
+- Admin console relays the uploaded file to TAM API `POST /SUITManifestService/RegisterManifest`.
 
 Request:
 - Method: `POST`
 - Content-Type: `multipart/form-data`
 - Form field:
   - `file`: required
-  - `version`: optional (currently accepted but not returned)
 
 Success response:
 - Status: `200 OK`
@@ -150,14 +178,14 @@ Success response:
 - Body:
 ```json
 {
-  "ok": true
+  "success": true
 }
 ```
 
 Errors:
 - `405` when method is not `POST`
-- `400` when multipart parse fails or `file` is missing
-- `502` when TAM register call fails (TAM API mode)
+- `502` when multipart parse fails, `file` is missing, or TAM register call fails
+- `500` when console is misconfigured
 
 ## 4. UI Behavior Related To API
 
@@ -175,9 +203,3 @@ Errors:
   - `Access-Control-Allow-Methods: GET, POST, OPTIONS`
   - `Access-Control-Allow-Headers: Content-Type`
 - `OPTIONS` returns `204 No Content`.
-
-## 6. Compatibility Notes
-
-- External JSON field names are stable:
-  - `kid`, `last_update`, `attribute.ueid`, `installed-tc`, `name`, `version`, `ok`
-- Internal typed representations may evolve independently as long as this external contract is preserved.

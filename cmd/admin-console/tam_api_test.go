@@ -328,9 +328,6 @@ func TestPostTAMManifest(t *testing.T) {
 	if _, err := part.Write([]byte(expectedBody)); err != nil {
 		t.Fatalf("part write: %v", err)
 	}
-	if err := mw.WriteField("version", "11"); err != nil {
-		t.Fatalf("WriteField: %v", err)
-	}
 	if err := mw.Close(); err != nil {
 		t.Fatalf("multipart close: %v", err)
 	}
@@ -350,7 +347,7 @@ func TestPostTAMManifest(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response json: %v", err)
 	}
-	if ok, _ := resp["ok"].(bool); !ok {
+	if success, _ := resp["success"].(bool); !success {
 		t.Fatalf("unexpected response: %s", rec.Body.String())
 	}
 }

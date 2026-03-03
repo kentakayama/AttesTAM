@@ -201,9 +201,6 @@ func fetchTAMGetAgentStatus(base string, client *http.Client, kids [][]byte) ([]
 }
 
 func formatUpdatedAt(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
 	return t.UTC().Format(time.RFC3339)
 }
 
@@ -276,7 +273,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	}
 
 	respondJSON(w, map[string]any{
-		"ok": true,
+		"success": true,
 	})
 	return nil
 }

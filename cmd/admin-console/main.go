@@ -23,6 +23,9 @@ var (
 
 func main() {
 	conf = loadConfigFromFlags()
+	if err := validateConfig(conf); err != nil {
+		log.Fatal(err)
+	}
 
 	var err error
 	tmpl, err = template.ParseFiles(resolvePath(filepath.Join("templates", "index.html")))
@@ -39,7 +42,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
 
-	log.Printf("Admin Console listening on http://localhost%v (build: %s) tamApiBase=%q", addr, buildTime.Format(time.RFC3339), conf.TAMAPIBase)
+	log.Printf("Admin Console listening on http://127.0.0.1%v (build: %s) tamApiBase=%q", addr, buildTime.Format(time.RFC3339), conf.TAMAPIBase)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}

@@ -1,21 +1,26 @@
 # User Manual
 
 ## Purpose
-This document explains how to run `tam-over-http` and use the currently exposed APIs during local development.
+This document explains how to start TAM Server (`tam-over-http`) and the TAM Admin Console Server (`admin-console`), and how to use the Admin Console UI.
 
 ## Quick Flow
 
 1. Start TAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
-2. Start TAM admin console (`go run ./cmd/admin-console`)
+2. Start TAM admin console server (`go run ./cmd/admin-console`).
+3. Open `http://127.0.0.1:9090` in a browser.
+4. Use the admin console to inspect managed devices / TCs and register manifests.
 
-## Start the Server
+## Prerequisites
+
+- Go toolchain (`go run`)
+- Browser (Chrome/Safari/Firefox, etc.)
+
+## Start the TAM Server
 
 ### Native
 ```bash
 go run ./cmd/tam-over-http -insecure-demo-mode
 ```
-
-TODO: add TAM Admin Console start up
 
 ### Docker
 ```bash
@@ -41,11 +46,7 @@ docker run --rm \
   tam-over-http
 ```
 
-## TAM Admin Console User Manual
-
-TODO: list agents, post manifest, ...
-
-## TAM Server Command Options
+### TAM Server Command Options
 
 `tam-over-http` accepts CLI flags (also configurable by environment variables):
 
@@ -64,10 +65,100 @@ Print live defaults with:
 go run ./cmd/tam-over-http -h
 ```
 
+## Start the Admin Console
+
+Start the admin console in another terminal:
+```bash
+go run ./cmd/admin-console
+```
+
+If TAM is not running on the default endpoint, set the console's TAM API base URL explicitly:
+```bash
+go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
+```
+
 ### TAM Admin Console Command Options
 
-TODO: move content from ADMIN_CONSOLE_USER_MANUAL.md
+Use command-line flags:
 
+| Setting | Flag | Default | Description |
+| ---- | ---- | ---- | ---- |
+| Listen port | `--port` | `9090` | HTTP port for Admin Console |
+| TAM API base URL | `--tam-api-base` | `http://127.0.0.1:8080/` | Console calls TAM APIs for device/manifest listing and manifest upload |
+
+Example:
+
+```bash
+go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
+```
+
+## UI Operation Guide
+
+### View Managed Devices
+
+- Click `View Managed Devices` in the sidebar.
+- Agent table is loaded from `GET /console/view-managed-devices`.
+- Click an `Agent KID` row to open the detail panel.
+- Detail panel shows installed TC list (`name`, `version`) for the selected agent.
+- Clicking the selected agent again closes the detail panel.
+
+### View Managed TCs
+
+- Click `View Managed TCs`.
+- Manifest table is loaded from `GET /console/view-managed-tcs`.
+- Columns:
+  - `TC Name`
+  - `Version`
+
+### Register TC
+
+- Click `Register TC`.
+- Select a file and click `Upload`.
+- Browser sends `multipart/form-data` to `POST /console/register-tc`.
+- On success, UI displays `Upload complete.` and refreshes manifest list.
+
+## Run Tests
+
+Basic tests:
+```bash
+go test ./...
+```
+
+Integration tests with VERAISON (you need to run VERAISON on localhost):
+```bash
+go test -tags=integration ./...
+```
+
+Equivalent Make targets:
+```bash
+make test
+make test-integrated
+```
+
+## Troubleshooting
+
+- `415 Unsupported Media Type`:
+  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
+- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
+  - verify SUIT envelope encoding and signature.
+  - verify signer key is pre-registered in TAM.
+- Unexpected `204 No Content`:
+  - current admin/manifests behavior is demo-oriented and may return no content when no matching records are found.
+- `TAM API fetch failed: status 4xx/5xx from TAM API`:
+  - verify TAM is running and `--tam-api-base` is correct.
+  - verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, and `/SUITManifestService/ListManifests` are reachable.
+- `tam-api-base is required`:
+  - do not pass an empty `--tam-api-base`.
+  - if TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
+- `Upload failed: file is required`:
+  - ensure the upload form includes `file` field.
+- Empty tables in UI:
+  - validate that TAM has device or manifest data to return.
+
+## 
+```
+The following should be moved to another location:
+```
 ## TAM Server API Summary
 
 There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
@@ -189,35 +280,3 @@ See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https:
 For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
 One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider trying it.
-
-## Planned Management APIs
-
-Planned: add API endpoints to manage entities, keys, and related resources.
-
-## Run Tests
-
-Basic tests:
-```bash
-go test ./...
-```
-
-Integration tests with VERAISON (you need to run VERAISON on localhost):
-```bash
-go test -tags=integration ./...
-```
-
-Equivalent Make targets:
-```bash
-make test
-make test-integrated
-```
-
-## Troubleshooting
-
-- `415 Unsupported Media Type`:
-  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
-- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
-  - verify SUIT envelope encoding and signature.
-  - verify signer key is pre-registered in TAM.
-- Unexpected `204 No Content`:
-  - current admin/manifests behavior is demo-oriented and may return no content when no matching records are found.

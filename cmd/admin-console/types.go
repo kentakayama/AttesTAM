@@ -4,6 +4,19 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+// To keep the CBOR-based backend server free from any CBOR→JSON translation
+// responsibility, this admin console defines its own JSON-specific DTOs
+// (MarshalJSON targets).
+//
+// CBOR decoding MUST use the backend protocol definitions:
+// internal/tam/agent_status.go
+// Therefore, these DTOs should stay aligned with those definitions as much
+// as possible to avoid semantic drift.
+//
+// In short:
+//   - Backend: authoritative for CBOR wire format and protocol semantics.
+//   - Frondend (this code): responsible for JSON representation for the web UI.
+
 package main
 
 import (
@@ -17,7 +30,7 @@ import (
 
 type Agent struct {
 	KID             []byte             `json:"kid"`
-	LastUpdate      time.Time          `json:"last_update,omitempty"`
+	LastUpdate      time.Time          `json:"last_update"`
 	Attributes      Attribute          `json:"attribute"`
 	InstalledTCList []TrustedComponent `json:"installed-tc"`
 }
@@ -25,17 +38,15 @@ type Agent struct {
 func (a Agent) MarshalJSON() ([]byte, error) {
 	type alias struct {
 		KID             string             `json:"kid"`
-		LastUpdate      string             `json:"last_update,omitempty"`
+		LastUpdate      string             `json:"last_update"`
 		Attributes      Attribute          `json:"attribute"`
 		InstalledTCList []TrustedComponent `json:"installed-tc"`
 	}
 	out := alias{
 		KID:             string(a.KID),
+		LastUpdate:      formatUpdatedAt(a.LastUpdate),
 		Attributes:      a.Attributes,
 		InstalledTCList: a.InstalledTCList,
-	}
-	if !a.LastUpdate.IsZero() {
-		out.LastUpdate = formatUpdatedAt(a.LastUpdate)
 	}
 	return json.Marshal(out)
 }
