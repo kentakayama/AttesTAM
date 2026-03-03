@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 SECOM CO., LTD. All Rights reserved.
+ * Copyright (c) 2026 SECOM CO., LTD. All Rights reserved.
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -733,6 +733,12 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 			sendingUpdate.Options.ManifestList = append(sendingUpdate.Options.ManifestList, manifest.Manifest)
 			manifests = append(manifests, model.SuitManifest{ID: manifest.ID})
 		}
+	}
+
+	if len(manifests) == 0 {
+		// ok, no matching manifest found
+		// replying empty message means session termination
+		return nil, nil
 	}
 
 	// sign

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 SECOM CO., LTD. All Rights reserved.
+ * Copyright (c) 2026 SECOM CO., LTD. All Rights reserved.
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -16,6 +16,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/tam-over-http/internal/tam"
+	"github.com/kentakayama/tam-over-http/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -184,7 +185,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	err = cbor.Unmarshal(body, &agentList)
 	require.Nil(t, err)
 	assert.Len(t, agentList, 1)
-	assert.Equal(t, []byte("dummy-teep-agent-kid-for-dev-123"), agentList[0].AgentKID)
+	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentList[0].AgentKID)
 
 	kids, err := cbor.Marshal([][]byte{[]byte("dummy-teep-agent-kid-for-dev-123")})
 	require.Nil(t, err)
@@ -202,7 +203,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	err = cbor.Unmarshal(body, &agentStatus)
 	require.Nil(t, err)
 	assert.Len(t, agentStatus, 1)
-	assert.Equal(t, []byte("dummy-teep-agent-kid-for-dev-123"), agentStatus[0].AgentKID)
+	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentStatus[0].AgentKID)
 	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
 	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
 }

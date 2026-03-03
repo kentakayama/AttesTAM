@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 SECOM CO., LTD. All Rights reserved.
+ * Copyright (c) 2026 SECOM CO., LTD. All Rights reserved.
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -457,4 +457,44 @@ func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 	encoded, err := cbor.Marshal([]AgentStatusRecord{record})
 	require.Nil(t, err)
 	assert.Equal(t, expected, encoded)
+}
+
+func TestTAMNoTCMatch(t *testing.T) {
+	token := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+	sent := TEEPMessage{
+		Type: TEEPTypeQueryRequest,
+		Options: TEEPOptions{
+			Token: token,
+		},
+		DataItemRequested: RequestDataItem(false, true, false, false),
+	}
+	received := TEEPMessage{
+		Type: TEEPTypeQueryResponse,
+		Options: TEEPOptions{
+			Token: token,
+			TCList: util.DiagList[suit.SystemPropertyClaims]{
+				{
+					SystemComponentID: suit.ComponentID([]suit.ComponentIDBytes{[]byte("test")}),
+				},
+			},
+		},
+	}
+	// The handler should return nil without error even if there is no matching TC in the TCList
+	logger := log.Default()
+	verifier := MockEATVerifier{}
+	tam, err := NewTAM("", &verifier, logger)
+	if err != nil {
+		t.Fatalf("NewTAM error: %v", err)
+	}
+	if err = tam.InitWithPath(":memory:"); err != nil {
+		t.Fatalf("TAM Init error: %v", err)
+	}
+	if err = tam.EnsureDefaultTEEPAgent(false); err != nil {
+		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	}
+
+	// TEST#1: process QueryResponse with no matching TC to return empty
+	response, err := tam.processQueryResponse(&received, []byte{0xd0, 0x8d, 0x16, 0x02, 0xca, 0xa2, 0xd0, 0xae, 0x0a, 0xde, 0x02, 0x66, 0x62, 0x92, 0xb1, 0x4c, 0xef, 0xd0, 0xd0, 0x28, 0x2a, 0x15, 0x3f, 0x77, 0x73, 0xac, 0xf6, 0xfd, 0xd0, 0xc0, 0xd3, 0x78}, &sent)
+	assert.Nil(t, response)
+	assert.Nil(t, err)
 }

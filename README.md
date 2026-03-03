@@ -120,3 +120,7 @@ The handler logs every received TEEP message. Verifier responses are decoded and
 3. Add or update tests alongside the code in `*_test.go` files; store golden fixtures under `testdata/`.
 4. Ensure `gofmt`/`goimports`, `go test ./...`, and `go vet ./...` succeed before submitting a PR.
 5. Use imperative commit messages (e.g., `Add QueryResponse attestation logging`) and include motivation plus verification details in the pull request description.
+
+# Acknowledgement
+
+This work was supported by JST K Program Grant Number JPMJKP24U4, Japan.

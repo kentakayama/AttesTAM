@@ -1,3 +1,9 @@
+#
+# Copyright (c) 2026 SECOM CO., LTD. All Rights reserved.
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+
 .PHONY: run-demo
 run-demo:
 	go run ./cmd/tam-over-http -insecure-demo-mode
