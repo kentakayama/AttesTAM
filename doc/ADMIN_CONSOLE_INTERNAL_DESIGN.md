@@ -2,20 +2,20 @@
 
 ## 1. Purpose And Scope
 
-`cmd/admin-console` provides a browser-based operation console for TAM.
-It serves the admin UI, calls TAM APIs, and converts TAM CBOR responses into JSON/HTML that are easier for browsers and operators to consume.
+`cmd/admin-console` provides a browser-based operation console for AttesTAM.
+It serves the admin UI, calls AttesTAM APIs, and converts CBOR responses into JSON/HTML that are easier for browsers and operators to consume.
 
 Current scope:
 - Serve the admin console UI and static assets.
 - Show managed devices and their installed trusted components.
 - Show managed trusted components (manifests).
-- Register a trusted component by relaying uploaded manifests to the TAM API.
-- Operate only with a reachable TAM API backend; no standalone mode is provided.
+- Register a trusted component by relaying uploaded manifests to the AttesTAM API.
+- Operate only with a reachable AttesTAM API backend; no standalone mode is provided.
 
 Out of scope:
 - Authentication/authorization for console users in the current version. This is planned for a future Admin Console revision.
-- TAM server-side business logic, persistence, and policy decisions.
-- Fetching device or manifest state except through TAM APIs.
+- AttesTAM server-side business logic, persistence, and policy decisions.
+- Fetching device or manifest state except through AttesTAM APIs.
 
 Operational assumption:
 - The console is intended for trusted environments or deployments protected by external access control.
@@ -31,10 +31,10 @@ Entry point:
 flowchart LR
   Browser([Browser])
   UI["HTTP/UI layer"]
-  API["TAM API access / aggregation layer"]
+  API["AttesTAM API access / aggregation layer"]
   Codec["CBOR decoding / mapping layer"]
   Model["Data model layer"]
-  TAM[(TAM API server)]
+  TAM[("AttesTAM server")]
 
   Browser --> UI
   UI --> API
@@ -55,9 +55,8 @@ flowchart LR
   - `cmd/admin-console/templates/index.html`
   - `cmd/admin-console/static/app.js`
   - `cmd/admin-console/static/styles.css`
-- TAM API access / aggregation layer:
+- AttesTAM API access / aggregation layer:
   - `cmd/admin-console/tam_api.go`
-  - Calls TAM APIs and maintains per-TAM in-memory cache for device status assembly.
 - CBOR decoding / mapping layer:
   - `cmd/admin-console/agent_codec.go`
   - `cmd/admin-console/manifest_codec.go`
@@ -135,7 +134,7 @@ Handler:
 Flow:
 1. `handleRegisterManifest` validates the HTTP method and checks that `tam-api-base` is configured.
 2. `postTAMManifest` parses multipart input and reads the uploaded file from form field `file`.
-3. `postTAMManifest` relays uploaded bytes to TAM API:
+3. `postTAMManifest` relays uploaded bytes to AttesTAM API:
    - `POST /SUITManifestService/RegisterManifest`
 4. On success, `postTAMManifest` returns JSON success response (`{"success": true}`).
 
@@ -143,9 +142,9 @@ Flow:
 
 - Invalid method returns `405 Method Not Allowed`.
 - Startup validation normally prevents empty `tam-api-base`; if request handling somehow proceeds with invalid runtime configuration, handlers return `500 Internal Server Error`.
-- Non-`2xx` from TAM API is converted to `502 Bad Gateway`.
-- Multipart parsing failures, missing upload file, and TAM upload relay failures in `POST /console/register-tc` are currently surfaced as `502 Bad Gateway`.
-- Unsupported TAM response `Content-Type` (non-CBOR where CBOR is expected) is treated as an upstream error and surfaced as `502 Bad Gateway`.
+- Non-`2xx` from AttesTAM API is converted to `502 Bad Gateway`.
+- Multipart parsing failures, missing upload file, and AttesTAM upload relay failures in `POST /console/register-tc` are currently surfaced as `502 Bad Gateway`.
+- Unsupported AttesTAM response `Content-Type` (non-CBOR where CBOR is expected) is treated as an upstream error and surfaced as `502 Bad Gateway`.
 - CBOR decode failures return explicit wrapped errors for troubleshooting and are surfaced as `502 Bad Gateway`.
 
 ## 6. Configuration
@@ -175,6 +174,3 @@ Key tests:
   - TAM API integration behavior (CBOR contract, error handling, cache/delta behavior).
 - `handlers_test.go`:
   - HTTP handler behavior for register endpoint configuration error path.
-
-Test objective:
-- Keep CBOR decoding, JSON conversion contracts, and TAM API integration behavior stable while refactoring internals.

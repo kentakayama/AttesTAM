@@ -26,9 +26,9 @@ Covered scope:
     - UI static assets
 
 Not covered:
-- TAM internal business logic and persistence behavior
+- AttesTAM internal business logic and persistence behavior
 
-## 2. Admin Console Base URL And TAM Dependency
+## 2. Admin Console Base URL And AttesTAM Dependency
 
 Admin Console Base URL:
 - `http://<host>:<port>`
@@ -41,9 +41,9 @@ Notes:
 
 ```mermaid
 flowchart LR
-  A([TAM Admin])
+  A([AttesTAM Admin])
   BC[Browser]
-  AC["Admin Console Web Server<br>http://127.0.0.1:9090/ (default)"]
+  AC["Admin Console Server<br>http://127.0.0.1:9090/ (default)"]
   TAM["AttesTAM Server<br>http://127.0.0.1:8080/ (default)"]
   A --> BC
   BC --> AC
@@ -56,7 +56,7 @@ flowchart LR
 ```mermaid
 flowchart LR
   BC[Browser]
-  subgraph AC[Admin Console Web Server]
+  subgraph AC[Admin Console Server]
     C_VMD["/console/view-managed-devices"]
     C_VMTC["/console/view-managed-tcs"]
     C_RTC["/console/register-tc"]
@@ -80,7 +80,7 @@ flowchart LR
 
 Purpose:
 - Return managed device list with installed TC info.
-- Admin console calls TAM APIs `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus` to build this response.
+- Admin console calls AttesTAM APIs `GET /AgentService/ListAgents` and `POST /AgentService/GetAgentStatus` to build this response.
 
 Request:
 - Method: `GET`
@@ -123,14 +123,14 @@ Example:
 
 Errors:
 - `405` when method is not `GET`
-- `502` when TAM API call fails
+- `502` when AttesTAM API call fails
 - `500` when console is misconfigured
 
 ### 3.2 `GET /console/view-managed-tcs`
 
 Purpose:
 - Return managed TC manifest list.
-- Admin console calls TAM API `GET /SUITManifestService/ListManifests` and returns the result in JSON form.
+- Admin console calls AttesTAM API `GET /SUITManifestService/ListManifests` and returns the result in JSON form.
 
 Request:
 - Method: `GET`
@@ -157,14 +157,14 @@ Example:
 
 Errors:
 - `405` when method is not `GET`
-- `502` when TAM API call fails
+- `502` when AttesTAM API call fails
 - `500` when console is misconfigured
 
 ### 3.3 `POST /console/register-tc`
 
 Purpose:
-- Register uploaded manifest to TAM API.
-- Admin console relays the uploaded file to TAM API `POST /SUITManifestService/RegisterManifest`.
+- Register uploaded manifest to AttesTAM API.
+- Admin console relays the uploaded file to AttesTAM API `POST /SUITManifestService/RegisterManifest`.
 
 Request:
 - Method: `POST`
@@ -184,7 +184,7 @@ Success response:
 
 Errors:
 - `405` when method is not `POST`
-- `502` when multipart parse fails, `file` is missing, or TAM register call fails
+- `502` when multipart parse fails, `file` is missing, or AttesTAM register call fails
 - `500` when console is misconfigured
 
 ## 4. UI Behavior Related To API

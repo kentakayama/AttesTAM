@@ -5,7 +5,7 @@ This document explains how to start TAM Server (`tam-over-http`) and the TAM Adm
 
 ## Quick Flow
 
-1. Start TAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
+1. Start AttesTAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
 2. Start TAM admin console server (`go run ./cmd/admin-console`).
 3. Open `http://127.0.0.1:9090` in a browser.
 4. Use the admin console to inspect managed devices / TCs and register manifests.
@@ -15,7 +15,7 @@ This document explains how to start TAM Server (`tam-over-http`) and the TAM Adm
 - Go toolchain (`go run`)
 - Browser (Chrome/Safari/Firefox, etc.)
 
-## Start the TAM Server
+## Start the AttesTAM Server
 
 ### Native
 ```bash
@@ -46,7 +46,7 @@ docker run --rm \
   tam-over-http
 ```
 
-### TAM Server Command Options
+### AttesTAM Server Command Options
 
 `tam-over-http` accepts CLI flags (also configurable by environment variables):
 
@@ -65,7 +65,7 @@ Print live defaults with:
 go run ./cmd/tam-over-http -h
 ```
 
-## Start the Admin Console
+## Start the Admin Console Server
 
 Start the admin console in another terminal:
 ```bash
@@ -93,6 +93,8 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 ```
 
 ## UI Operation Guide
+
+
 
 ### View Managed Devices
 
