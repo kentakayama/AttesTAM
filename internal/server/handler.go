@@ -9,6 +9,7 @@ package server
 import (
 	"crypto"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -62,7 +63,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	// NOTE: authentication is done in the TEEP Protocol layer
 	if r.Method != http.MethodPost {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		// TODO: should be 405, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -75,13 +77,22 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes))
 	if err != nil {
-		h.logger.Printf("failed to read request body: %v", err)
-		http.Error(w, "failed to parse TEEP Message", http.StatusBadRequest)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			h.logger.Printf("request body is too large: %v", err)
+			// TODO: should be 413, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
+			http.Error(w, "request body is too large", http.StatusInternalServerError)
+			return
+		}
+		h.logger.Printf("failed reading request body: %v", err)
+		// TODO: should be 400, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
+		http.Error(w, "failed to parse TEEP Message", http.StatusInternalServerError)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
 		h.logger.Printf("failed to close request body: %v", err)
-		http.Error(w, "failed to parse TEEP Message", http.StatusBadRequest)
+		// TODO: should be 400, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
+		http.Error(w, "failed to parse TEEP Message", http.StatusInternalServerError)
 		return
 	}
 
@@ -89,6 +100,7 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	var resp responseSpec
 	if err != nil {
 		resp = responseSpec{
+			// TODO: 4xx might be more appropriate for some errors, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
 			status: http.StatusInternalServerError,
 		}
 		h.logger.Printf("Internal Server Error occurred: %v", err)
