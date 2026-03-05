@@ -139,23 +139,31 @@ make test-integrated
 
 ## Troubleshooting
 
-- `415 Unsupported Media Type`:
-  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
-- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
-  - verify SUIT envelope encoding and signature.
-  - verify signer key is pre-registered in TAM.
-- Unexpected `204 No Content`:
-  - current admin/manifests behavior is demo-oriented and may return no content when no matching records are found.
-- `TAM API fetch failed: status 4xx/5xx from TAM API`:
-  - verify TAM is running and `--tam-api-base` is correct.
-  - verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, and `/SUITManifestService/ListManifests` are reachable.
+### Server startup failure
+
 - `tam-api-base is required`:
-  - do not pass an empty `--tam-api-base`.
-  - if TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
-- `Upload failed: file is required`:
-  - ensure the upload form includes `file` field.
+  - Do not pass an empty `--tam-api-base`.
+  - If TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
+- `parse template: ...`:
+  - Ensure `templates/index.html` is available from the current working directory (or run from repository root).
+- `listen tcp ...: bind: address already in use`:
+  - Another process is already using the port (default `9090`).
+  - Use a different port, for example: `go run ./cmd/admin-console --port=19090`.
+
+### HTTP error
+
+- `500 admin console is misconfigured: tam-api-base is required`:
+  - Start admin-console with a valid `--tam-api-base`.
+- `502 TAM API fetch failed: ...` / `502 TAM API post failed: ...`:
+  - Verify TAM is running and reachable.
+  - Verify `--tam-api-base` is correct.
+  - Verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, `/SUITManifestService/ListManifests`, and `/SUITManifestService/RegisterManifest` are reachable.
+- If upload fails with a message that includes `status 400 from TAM API`:
+  - Verify SUIT envelope encoding and signature.
+  - Verify signer key is pre-registered in TAM.
+  - Verify that you are not uploading a manifest whose sequence number is the same as, or older than, a manifest already registered in TAM.
 - Empty tables in UI:
-  - validate that TAM has device or manifest data to return.
+  - Validate that TAM has device or manifest data to return.
 
 ## 
 ```
