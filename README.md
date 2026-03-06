@@ -1,5 +1,8 @@
 # AttesTAM
 
+Core feature: this TAM trusts a TEEP Agent only after Remote Attestation proves the agent is genuine and running in a genuine TEE.
+For the protocol details, see [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md).
+
 `AttesTAM` is a lightweight Trusted Application Manager (TAM) server (implemented at `cmd/attestam`) defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
 
 A TAM serves as an intermediary that communicates with TEE-equipped devices, specifically the TEEP Agent inside the TEE, when **a Trusted Component (TC) Developer wants to run a Trusted Application in a remote device's TEE while protecting it from tampering or unauthorized access**.
