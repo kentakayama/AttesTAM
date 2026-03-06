@@ -13,9 +13,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/config"
-	"github.com/kentakayama/tam-over-http/internal/infra/rats"
-	"github.com/kentakayama/tam-over-http/internal/tam"
+	"github.com/kentakayama/AttesTAM/internal/config"
+	"github.com/kentakayama/AttesTAM/internal/infra/rats"
+	"github.com/kentakayama/AttesTAM/internal/tam"
 )
 
 // Server wires the HTTP listener and request handling stack.

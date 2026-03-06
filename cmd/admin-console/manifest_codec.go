@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 func decodeManifestsFromCBOR(body []byte) ([]TrustedComponent, error) {

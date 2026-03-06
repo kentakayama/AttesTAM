@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/tam"
+	"github.com/kentakayama/AttesTAM/internal/tam"
 )
 
 type cachedAgent struct {

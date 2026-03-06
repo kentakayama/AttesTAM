@@ -16,18 +16,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/config"
-	"github.com/kentakayama/tam-over-http/internal/server"
+	"github.com/kentakayama/AttesTAM/internal/config"
+	"github.com/kentakayama/AttesTAM/internal/server"
 )
 
 const (
-	envAddr                  = "TAM4WASM_ADDR"
-	envTAMTEEPPrivateKeyPath = "TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH"
-	envInsecureDemoMode      = "TAM4WASM_INSECURE_DEMO_MODE"
-	envChallengeServer       = "TAM4WASM_CHALLENGE_SERVER"
-	envChallengeContentType  = "TAM4WASM_CHALLENGE_CONTENT_TYPE"
-	envChallengeInsecureTLS  = "TAM4WASM_CHALLENGE_INSECURE_TLS"
-	envChallengeTimeout      = "TAM4WASM_CHALLENGE_TIMEOUT"
+	envAddr                  = "ATTESTAM_ADDR"
+	envTAMTEEPPrivateKeyPath = "ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH"
+	envInsecureDemoMode      = "ATTESTAM_INSECURE_DEMO_MODE"
+	envChallengeServer       = "ATTESTAM_CHALLENGE_SERVER"
+	envChallengeContentType  = "ATTESTAM_CHALLENGE_CONTENT_TYPE"
+	envChallengeInsecureTLS  = "ATTESTAM_CHALLENGE_INSECURE_TLS"
+	envChallengeTimeout      = "ATTESTAM_CHALLENGE_TIMEOUT"
 )
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 	)
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "[tam4wasm] ", log.LstdFlags|log.LUTC)
+	logger := log.New(os.Stdout, "[attestam] ", log.LstdFlags|log.LUTC)
 
 	addrVal := stringFromEnv(logger, envAddr, *addr)
 	privateKeyPathVal := stringFromEnv(logger, envTAMTEEPPrivateKeyPath, *privateKeyPath)

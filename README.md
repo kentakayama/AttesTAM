@@ -1,6 +1,6 @@
-# tam-over-http
+# AttesTAM
 
-`tam-over-http` is a lightweight Trusted Application Manager (TAM) server (`cmd/tam-over-http`) defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
+`AttesTAM` is a lightweight Trusted Application Manager (TAM) server (implemented at `cmd/attestam`) defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
 
 A TAM serves as an intermediary that communicates with TEE-equipped devices, specifically the TEEP Agent inside the TEE, when **a Trusted Component (TC) Developer wants to run a Trusted Application in a remote device's TEE while protecting it from tampering or unauthorized access**.
 
@@ -51,13 +51,12 @@ See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 ### A) Native
 
 ```bash
-go run ./cmd/tam-over-http -insecure-demo-mode
+go run ./cmd/attestam -insecure-demo-mode
 ```
 
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
-Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `TAM4WASM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs the decoded verifier responses. No attestation files are written to disk.
-
-Use `go run ./cmd/tam-over-http -h` to see available CLI options.
+Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `ATTESTAM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs the decoded verifier responses. No attestation files are written to disk.
+Use `go run ./cmd/attestam -h` to see available CLI options.
 Detailed references for flags and environment variables are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
 ```bash
@@ -71,10 +70,10 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```bash
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
-  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  tam-over-http
+  attestam
 ```
 
 This container starts both services:
@@ -106,7 +105,7 @@ make test             # Run unit tests (go test ./...)
 make test-integrated  # Run integration-tagged tests (requires provisioned VERAISON server)
 
 # Equivalent direct Go commands:
-go run ./cmd/tam-over-http -insecure-demo-mode
+go run ./cmd/attestam -insecure-demo-mode
 go test ./...
 go test -tags=integration ./...
 ```

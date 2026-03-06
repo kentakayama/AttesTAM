@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/config"
+	"github.com/kentakayama/AttesTAM/internal/config"
 )
 
 const (

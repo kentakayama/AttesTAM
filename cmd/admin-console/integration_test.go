@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/config"
-	tamserver "github.com/kentakayama/tam-over-http/internal/server"
+	"github.com/kentakayama/AttesTAM/internal/config"
+	tamserver "github.com/kentakayama/AttesTAM/internal/server"
 )
 
 type integrationAgent struct {

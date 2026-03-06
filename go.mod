@@ -1,4 +1,4 @@
-module github.com/kentakayama/tam-over-http
+module github.com/kentakayama/AttesTAM
 
 go 1.25.3
 

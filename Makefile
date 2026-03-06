@@ -6,7 +6,7 @@
 
 .PHONY: run-demo
 run-demo:
-	go run ./cmd/tam-over-http -insecure-demo-mode
+	go run ./cmd/attestam -insecure-demo-mode
 
 .PHONY: test
 test:
