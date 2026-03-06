@@ -93,40 +93,40 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 			// TODO: should be 413, but currently returns 500 due to the way the handler is structured. --- IGNORE ---
 			// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and --- IGNORE ---
 			// refactoring the handler to return 413 instead of 500 when the body exceeds the limit. --- IGNORE ---
-			http.Error(w, "request body is too large", http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 		h.logger.Printf("failed reading request body: %v", err)
-		http.Error(w, "failed to parse TEEP Message", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
 		h.logger.Printf("failed to close request body: %v", err)
-		http.Error(w, "failed to parse TEEP Message", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	responseBody, err := h.tam.ResolveTEEPMessage(body)
 	var resp responseSpec
 	if err != nil {
-		resp = responseSpec{
-			status: http.StatusInternalServerError,
-		}
+		// TODO: distinguish different types of errors and return appropriate status codes and messages.
 		h.logger.Printf("Internal Server Error occurred: %v", err)
-	} else {
-		if len(responseBody) == 0 {
-			resp = responseSpec{
-				status: http.StatusNoContent,
-			}
-			h.logger.Printf("Returns NoContent")
-		} else {
-			resp = responseSpec{
-				status:      http.StatusOK,
-				body:        responseBody,
-				contentType: "application/teep+cbor",
-			}
-			h.logger.Printf("Returns %d bytes message", len(responseBody))
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if len(responseBody) == 0 {
+		resp = responseSpec{
+			status: http.StatusNoContent,
 		}
+		h.logger.Printf("Returns NoContent")
+	} else {
+		resp = responseSpec{
+			status:      http.StatusOK,
+			body:        responseBody,
+			contentType: "application/teep+cbor",
+		}
+		h.logger.Printf("Returns %d bytes message", len(responseBody))
 	}
 	h.writeResponse(w, resp)
 }
