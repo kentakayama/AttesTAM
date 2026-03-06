@@ -1,55 +1,59 @@
 # User Manual
 
 ## Purpose
-This document explains how to run `tam-over-http` and use the currently exposed APIs during local development.
+This document explains how to start TAM Server (`tam-over-http`) and the TAM Admin Console Server (`admin-console`), and how to use the Admin Console UI.
 
 ## Quick Flow
 
-1. Start TAM (`go run ./cmd/tam-over-http -insecure-demo-mode`).
-2. Check admin endpoints:
-   - `POST /AgentService/GetAgentStatus`
-   - `GET /SUITManifestService/ListManifests`
-3. Register SUIT envelope when needed via `POST /SUITManifestService/RegisterManifest`.
-4. Integrate a TEEP Agent that communicates with `POST /tam`.
+1. Start AttesTAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
+2. Start TAM admin console server (`go run ./cmd/admin-console`).
+3. Open `http://127.0.0.1:9090` in a browser.
+4. Use the admin console to inspect managed devices / TCs and register manifests.
 
-## Start the Server
+## Prerequisites
+
+- Go toolchain (`go run`)
+- Browser (Chrome/Safari/Firefox, etc.)
+
+## Start the AttesTAM Server
 
 ### Native
 ```bash
 go run ./cmd/tam-over-http -insecure-demo-mode
 ```
 
-or with make command
-```bash
-make run-demo
-```
-
 ### Docker
 ```bash
 docker build -t tam-over-http .
-docker run --rm -p 8080:8080 \
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
   -e TAM4WASM_INSECURE_DEMO_MODE=true \
-  -e TAM4WASM_ADDR=":8080" \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   tam-over-http
 ```
 
 With verifier settings:
 ```bash
-docker run --rm -p 8080:8080 \
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
   -e TAM4WASM_ADDR=":8080" \
   -e TAM4WASM_CHALLENGE_SERVER="https://verifier.example.com" \
   -e TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
+  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   tam-over-http
 ```
 
-### Command Options
+### AttesTAM Server Command Options
 
 `tam-over-http` accepts CLI flags (also configurable by environment variables):
 
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
 | `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
-| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | `` (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-insecure-demo-mode` | `TAM4WASM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
 | `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
@@ -61,12 +65,111 @@ Print live defaults with:
 go run ./cmd/tam-over-http -h
 ```
 
-## Prerequisites
+## Start the Admin Console Server
 
-- `curl` for API calls (or any other HTTP client)
-- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
+Start the admin console in another terminal:
+```bash
+go run ./cmd/admin-console
+```
 
-## API Summary
+If TAM is not running on the default endpoint, set the console's TAM API base URL explicitly:
+```bash
+go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
+```
+
+### TAM Admin Console Command Options
+
+Use command-line flags:
+
+| Setting | Flag | Default | Description |
+| ---- | ---- | ---- | ---- |
+| Listen port | `--port` | `9090` | HTTP port for Admin Console |
+| TAM API base URL | `--tam-api-base` | `http://127.0.0.1:8080/` | Console calls TAM APIs for device/manifest listing and manifest upload |
+
+Example:
+
+```bash
+go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
+```
+
+## UI Operation Guide
+
+
+
+### View Managed Devices
+
+- Click `View Managed Devices` in the sidebar.
+- Agent table is loaded from `GET /console/view-managed-devices`.
+- Click an `Agent KID` row to open the detail panel.
+- Detail panel shows installed TC list (`name`, `version`) for the selected agent.
+- Clicking the selected agent again closes the detail panel.
+
+### View Managed TCs
+
+- Click `View Managed TCs`.
+- Manifest table is loaded from `GET /console/view-managed-tcs`.
+- Columns:
+  - `TC Name`
+  - `Version`
+
+### Register TC
+
+- Click `Register TC`.
+- Select a file and click `Upload`.
+- Browser sends `multipart/form-data` to `POST /console/register-tc`.
+- On success, UI displays `Upload complete.` and refreshes manifest list.
+
+## Run Tests
+
+Basic tests:
+```bash
+go test ./...
+```
+
+Integration tests with VERAISON (you need to run VERAISON on localhost):
+```bash
+go test -tags=integration ./...
+```
+
+Equivalent Make targets:
+```bash
+make test
+make test-integrated
+```
+
+## Troubleshooting
+
+### Server startup failure
+
+- `tam-api-base is required`:
+  - Do not pass an empty `--tam-api-base`.
+  - If TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
+- `parse template: ...`:
+  - Ensure `templates/index.html` is available from the current working directory (or run from repository root).
+- `listen tcp ...: bind: address already in use`:
+  - Another process is already using the port (default `9090`).
+  - Use a different port, for example: `go run ./cmd/admin-console --port=19090`.
+
+### HTTP error
+
+- `500 admin console is misconfigured: tam-api-base is required`:
+  - Start admin-console with a valid `--tam-api-base`.
+- `502 TAM API fetch failed: ...` / `502 TAM API post failed: ...`:
+  - Verify TAM is running and reachable.
+  - Verify `--tam-api-base` is correct.
+  - Verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, `/SUITManifestService/ListManifests`, and `/SUITManifestService/RegisterManifest` are reachable.
+- If upload fails with a message that includes `status 400 from TAM API`:
+  - Verify SUIT envelope encoding and signature.
+  - Verify signer key is pre-registered in TAM.
+  - Verify that you are not uploading a manifest whose sequence number is the same as, or older than, a manifest already registered in TAM.
+- Empty tables in UI:
+  - Validate that TAM has device or manifest data to return.
+
+## 
+```
+The following should be moved to another location:
+```
+## TAM Server API Summary
 
 There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
 
@@ -83,6 +186,13 @@ Section | Method | Endpoint | Notes
 [2](#2-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
 [3](#3-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
 [4](#4-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+
+### Prerequisites
+
+To test the TAM Server directly, you need these commands below:
+
+- `curl` for API calls (or any other HTTP client)
+- [`cbor-diag`](https://rubygems.org/gems/cbor-diag/) (or equivalent CBOR diagnostic tool) for readable output
 
 ### 1) Get Manifest Overviews (CBOR)
 
@@ -180,35 +290,3 @@ See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https:
 For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
 One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider trying it.
-
-## Planned Management APIs
-
-Planned: add API endpoints to manage entities, keys, and related resources.
-
-## Run Tests
-
-Basic tests:
-```bash
-go test ./...
-```
-
-Integration tests with VERAISON (you need to run VERAISON on localhost):
-```bash
-go test -tags=integration ./...
-```
-
-Equivalent Make targets:
-```bash
-make test
-make test-integrated
-```
-
-## Troubleshooting
-
-- `415 Unsupported Media Type`:
-  - check request headers (`Content-Type` for `POST`; `Accept` is required for both `GET` and `POST /AgentService/GetAgentStatus`).
-- `400 Bad Request` on `/SUITManifestService/RegisterManifest`:
-  - verify SUIT envelope encoding and signature.
-  - verify signer key is pre-registered in TAM.
-- Unexpected `204 No Content`:
-  - current admin/manifests behavior is demo-oriented and may return no content when no matching records are found.

@@ -1,0 +1,101 @@
+<!--
+ * Copyright (c) 2026 SECOM CO., LTD. All Rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sample TAM Admin Console</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <header class="app-header">Sample TAM Admin Console</header>
+    <div class="connection-banner" role="status" aria-live="polite">
+      <span class="connection-label">Connected AttesTAM Server:</span>
+      <code class="connection-value">{{.ConnectedTAM}}</code>
+    </div>
+    <div class="app-body">
+      <nav class="sidebar">
+        <button id="btn-agents" class="nav-btn active">View Managed Devices</button>
+        <button id="btn-manifests" class="nav-btn">View Managed TCs</button>
+        <button id="btn-upload" class="nav-btn">Register TC</button>
+      </nav>
+      <main class="content">
+        <section id="view-agents" class="view visible">
+          <div class="card">
+            <p class="kicker">View Managed Devices</p>
+            <h2>View Managed Devices</h2>
+            <div class="devices-layout">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                      <tr>
+                      <th>Agent KID</th>
+                      <th>Last Update</th>
+                      </tr>
+                  </thead>
+                  <tbody id="agents-body"></tbody>
+                </table>
+              </div>
+              <aside id="agent-detail-panel" class="agent-detail-panel" hidden>
+                <h3 id="agent-detail-title">Agent Details</h3>
+                <div class="table-wrap">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Installed TC Name</th>
+                        <th>Version</th>
+                      </tr>
+                    </thead>
+                    <tbody id="agent-detail-body"></tbody>
+                  </table>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-manifests" class="view">
+          <div class="card">
+            <p class="kicker">View Managed TCs</p>
+            <h2>View Managed TCs</h2>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>TC Name</th>
+                    <th>Version</th>
+                  </tr>
+                </thead>
+                <tbody id="manifests-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-upload" class="view">
+          <div class="card">
+            <p class="kicker">Register TC</p>
+            <h2>Register TC</h2>
+            <form id="upload-form">
+              <div class="form-group">
+                <label>File: <input type="file" name="file" required /></label>
+              </div>
+              <br/>
+              <button type="submit">Upload</button>
+              <div id="upload-status"></div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
