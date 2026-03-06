@@ -30,7 +30,7 @@ flowchart LR
     subgraph TAM Core Server
         TAM
         AgentStore[(TEEP Agent Store)] <--> TAM
-        ManifestStore[(TC Store)] <--> TAM
+        ManifestStore[(TC Store)] --> TAM
     end
 
     TAM e1@== Trusted App ==> TEEPAgent
