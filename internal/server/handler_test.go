@@ -232,3 +232,61 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 	h.getAgentStatus(w0, req0)
 	assert.Equal(t, http.StatusNoContent, w0.Result().StatusCode)
 }
+
+func TestHTTPErrorResponse_MethodNotAllowed(t *testing.T) {
+	h, err := newHandler(nil, log.Default())
+	require.Nil(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/AgentService/ListAgents", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Result().StatusCode)
+
+	req = httptest.NewRequest(http.MethodGet, "/AgentService/GetAgentStatus", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Result().StatusCode)
+
+	req = httptest.NewRequest(http.MethodPost, "/SUITManifestService/ListManifests", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Result().StatusCode)
+
+	req = httptest.NewRequest(http.MethodGet, "/SUITManifestService/RegisterManifest", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Result().StatusCode)
+}
+
+func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
+	h, err := newHandler(nil, log.Default())
+	require.Nil(t, err)
+
+	// create a request with a body larger than the configured max size (32 MiB)
+	largeBody := bytes.Repeat([]byte{0x00}, maxRequestBodyBytesForSUIT+1)
+	req := httptest.NewRequest(http.MethodPost, "/SUITManifestService/RegisterManifest", bytes.NewReader(largeBody))
+	req.Header.Set("Content-Type", "application/suit-envelope+cose")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Result().StatusCode)
+
+	// create a request with a body larger than the configured max size (32 KiB) for other endpoints
+	largeBody = bytes.Repeat([]byte{0x00}, maxRequestBodyBytes+1)
+
+	req = httptest.NewRequest(http.MethodPost, "/AgentService/GetAgentStatus", bytes.NewReader(largeBody))
+	req.Header.Set("Content-Type", "application/cbor")
+	req.Header.Set("Accept", "application/cbor")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Result().StatusCode)
+
+	req = httptest.NewRequest(http.MethodPost, "/tam", bytes.NewReader(largeBody))
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	// TODO: should be 413, but currently returns 500 due to the way the handler is structured.
+	// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and
+	// refactoring the handler to return 413 instead of 500 when the body exceeds the limit.
+	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
