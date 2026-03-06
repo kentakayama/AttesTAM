@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/util"
+	"github.com/kentakayama/AttesTAM/internal/util"
 )
 
 var (

@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

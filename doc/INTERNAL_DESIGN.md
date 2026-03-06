@@ -62,7 +62,7 @@ flowchart LR
 - `sqlite` layer (`internal/infra/sqlite`): SQL schema and CRUD/query logic.
 
 ## Startup and Wiring
-1. `cmd/tam-over-http/main.go` builds `config.TAMConfig` from flags/env.
+1. AttesTAM entrypoint `cmd/attestam/main.go` builds `config.TAMConfig` from flags/env.
 2. `server.New` creates verifier client (`rats.NewVerifierClient`).
 3. `server.New` creates `tam.TAM`, then calls:
    - `tam.Init()` -> opens `tam_state.db`, applies schema/PRAGMA.

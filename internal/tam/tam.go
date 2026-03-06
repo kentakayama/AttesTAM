@@ -20,11 +20,11 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
-	"github.com/kentakayama/tam-over-http/internal/infra/rats"
-	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
-	"github.com/kentakayama/tam-over-http/internal/suit"
-	"github.com/kentakayama/tam-over-http/internal/util"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/infra/rats"
+	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
+	"github.com/kentakayama/AttesTAM/internal/suit"
+	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/veraison/eat"
 	"github.com/veraison/go-cose"
 )

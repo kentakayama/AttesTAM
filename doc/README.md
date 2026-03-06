@@ -1,4 +1,4 @@
-# TAM Design Documents
+# AttesTAM Design Documents
 
 ## User Manual
 

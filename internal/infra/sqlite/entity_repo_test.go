@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 func TestEntity_CreateFindByID_OK(t *testing.T) {

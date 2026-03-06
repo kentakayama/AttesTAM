@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/domain"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 func TestSQLite_InitCreateFindClose_OK(t *testing.T) {

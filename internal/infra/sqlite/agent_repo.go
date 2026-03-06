@@ -12,8 +12,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/domain"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 type AgentRepository struct {

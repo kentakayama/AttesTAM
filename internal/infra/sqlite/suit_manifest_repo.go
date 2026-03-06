@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 // SuitManifestRepository handles SUIT manifest persistence.

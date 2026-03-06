@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 // AgentStatusRepository handles agent -> manifest holdings.

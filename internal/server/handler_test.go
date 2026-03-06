@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/tam"
-	"github.com/kentakayama/tam-over-http/internal/util"
+	"github.com/kentakayama/AttesTAM/internal/tam"
+	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

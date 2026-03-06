@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/config"
-	"github.com/kentakayama/tam-over-http/internal/infra/rats"
-	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/AttesTAM/internal/config"
+	"github.com/kentakayama/AttesTAM/internal/infra/rats"
+	"github.com/kentakayama/AttesTAM/internal/suit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/veraison/eat"

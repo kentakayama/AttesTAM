@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 func TestAgenStatus_AddHoldingManifest_GetStatus(t *testing.T) {

@@ -9,7 +9,7 @@ package service
 import (
 	"context"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 // AgentRepository defines the interface for agent persistence.

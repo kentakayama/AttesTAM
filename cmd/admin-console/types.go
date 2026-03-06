@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/AttesTAM/internal/suit"
 	"github.com/veraison/eat"
 )
 

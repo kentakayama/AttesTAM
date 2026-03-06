@@ -1,11 +1,11 @@
 # User Manual
 
 ## Purpose
-This document explains how to start TAM Server (`tam-over-http`) and the TAM Admin Console Server (`admin-console`), and how to use the Admin Console UI.
+This document explains how to start the AttesTAM server (`cmd/attestam`) and the TAM Admin Console server (`admin-console`), and how to use the Admin Console UI.
 
 ## Quick Flow
 
-1. Start AttesTAM server (`go run ./cmd/tam-over-http -insecure-demo-mode`).
+1. Start AttesTAM server (`go run ./cmd/attestam -insecure-demo-mode`).
 2. Start TAM admin console server (`go run ./cmd/admin-console`).
 3. Open `http://127.0.0.1:9090` in a browser.
 4. Use the admin console to inspect managed devices / TCs and register manifests.
@@ -19,50 +19,50 @@ This document explains how to start TAM Server (`tam-over-http`) and the TAM Adm
 
 ### Native
 ```bash
-go run ./cmd/tam-over-http -insecure-demo-mode
+go run ./cmd/attestam -insecure-demo-mode
 ```
 
 ### Docker
 ```bash
-docker build -t tam-over-http .
+docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
-  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  tam-over-http
+  attestam
 ```
 
 With verifier settings:
 ```bash
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
-  -e TAM4WASM_ADDR=":8080" \
-  -e TAM4WASM_CHALLENGE_SERVER="https://verifier.example.com" \
-  -e TAM4WASM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
-  -e TAM4WASM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_ADDR=":8080" \
+  -e ATTESTAM_CHALLENGE_SERVER="https://verifier.example.com" \
+  -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  tam-over-http
+  attestam
 ```
 
 ### AttesTAM Server Command Options
 
-`tam-over-http` accepts CLI flags (also configurable by environment variables):
+The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by environment variables).
 
 | Flag | Env Var | Default | Description |
 | ---- | ------- | ------- | ----------- |
-| `-addr` | `TAM4WASM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
-| `-tam-teep-private-key-path` | `TAM4WASM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
-| `-insecure-demo-mode` | `TAM4WASM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
-| `-challenge-server` | `TAM4WASM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
-| `-challenge-content-type` | `TAM4WASM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
-| `-challenge-insecure-tls` | `TAM4WASM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
-| `-challenge-timeout` | `TAM4WASM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
+| `-addr` | `ATTESTAM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
+| `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
+| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
+| `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
+| `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
+| `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
 
 Print live defaults with:
 ```bash
-go run ./cmd/tam-over-http -h
+go run ./cmd/attestam -h
 ```
 
 ## Start the Admin Console Server

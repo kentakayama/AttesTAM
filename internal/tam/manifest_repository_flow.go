@@ -9,9 +9,9 @@ package tam
 import (
 	"errors"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
-	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
-	"github.com/kentakayama/tam-over-http/internal/suit"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
+	"github.com/kentakayama/AttesTAM/internal/suit"
 )
 
 // Insert SUIT_Envelope to the DB, while checking that:

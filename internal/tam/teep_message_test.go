@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/suit"
-	"github.com/kentakayama/tam-over-http/internal/util"
+	"github.com/kentakayama/AttesTAM/internal/suit"
+	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/veraison/go-cose"

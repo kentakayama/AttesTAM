@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
-	"github.com/kentakayama/tam-over-http/internal/infra/sqlite"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
 	cose "github.com/veraison/go-cose"
 )
 

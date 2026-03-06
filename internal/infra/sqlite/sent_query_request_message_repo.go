@@ -11,7 +11,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/kentakayama/tam-over-http/internal/domain/model"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 )
 
 // SentQueryRequestMessageWithToken represents a sent query request message with its associated token.
