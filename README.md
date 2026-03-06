@@ -20,11 +20,11 @@ flowchart LR
     TCDeveloper([TC Developer]) -- Trusted App--> ManifestStore
 
     DeviceAdmin ~~~ BFF
-    BFF -- TA list (JSON) --> DeviceAdmin([Device Admin])
+    BFF -- Current TEE status --> DeviceAdmin([Device Admin])
     BFF ~~~ DeviceAdmin
 
     BFF[Admin Console] ~~~ AgentStore
-    AgentStore -- TA list (CBOR) --> BFF
+    AgentStore --> BFF
     AgentStore ~~~ BFF
 
     subgraph TAM Core Server
