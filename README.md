@@ -68,6 +68,7 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ### B) Docker
 
 ```bash
+docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
