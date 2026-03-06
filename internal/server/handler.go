@@ -64,7 +64,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	// NOTE: authentication is done in the TEEP Protocol layer
 	if r.Method != http.MethodPost {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		// TODO: should be 405, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -90,9 +91,7 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			h.logger.Printf("request body is too large: %v", err)
-			// TODO: should be 413, but currently returns 500 due to the way the handler is structured. --- IGNORE ---
-			// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and --- IGNORE ---
-			// refactoring the handler to return 413 instead of 500 when the body exceeds the limit. --- IGNORE ---
+			// TODO: should be 413, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -102,6 +101,7 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := r.Body.Close(); err != nil {
 		h.logger.Printf("failed to close request body: %v", err)
+		// TODO: should be 400, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
