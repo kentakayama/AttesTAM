@@ -1,15 +1,19 @@
 # AttesTAM
 
-Core feature: this TAM trusts a TEEP Agent only after Remote Attestation proves the agent is genuine and running in a genuine TEE.
-For the protocol details, see [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md).
+**AttesTAM trusts a TEEP Agent only after Remote Attestation proves the agent is genuine and running in a genuine TEE.**
+AttesTAM is a TAM implementation that acts as a [TEEP-over-HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http-15) server to communicate with TEEP Agents.
+See [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for terminology, [TEEP Protocol v26](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-26) for message format, and [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md) for protocol usage details.
 
-`AttesTAM` is a lightweight Trusted Application Manager (TAM) server (implemented at `cmd/attestam`) defined in [RFC 9397 (TEEP Architecture)](https://datatracker.ietf.org/doc/html/rfc9397) for exercising TEEP (Trusted Execution Environment Provisioning) clients over HTTP.
+**AttesTAM is the intermediary that securely delivers Trusted Components from TC Developers to TEEP Agents in TEEs.**
+In general, a TAM serves as an intermediary that communicates with TEE-equipped devices, specifically the TEEP Agent inside the TEE, when a Trusted Component (TC) Developer wants to run a Trusted Application in a remote device's TEE while protecting it from tampering or unauthorized access.
 
-A TAM serves as an intermediary that communicates with TEE-equipped devices, specifically the TEEP Agent inside the TEE, when **a Trusted Component (TC) Developer wants to run a Trusted Application in a remote device's TEE while protecting it from tampering or unauthorized access**.
+**Remote Attestation flow: challenge from TAM, evidence from agent, verifier decision, then key trust in TAM.**
+The TAM sends a fresh challenge in `QueryRequest`, the TEEP Agent returns attestation evidence in `QueryResponse`, the TAM forwards the evidence to a verifier and accepts only an affirming result, and then the TAM confirms the same attested key signs the live TEEP message before trusting that agent key.
 
-Although the TEEP Architecture requires that **a Device Administrator be able to learn which Trusted Applications are installed in the TEE**, it does not assign that responsibility to the TAM. In this implementation, however, **the TAM also provides this information as a design choice**.
+**This implementation also exposes agent status to administrators as an explicit design choice.**
+Although the TEEP Architecture requires that a Device Administrator be able to learn which Trusted Applications are installed in the TEE, it does not assign that responsibility to the TAM. In this implementation, however, the TAM also provides this information as a design choice.
 
-This repository also includes a TAM console (`cmd/admin-console`), shown as the `BFF Server` in the diagram below. The console acts as a backend-for-frontend for the Device Administrator: it calls the TAM core server's TEEP Agent Service API, reads the agent/manifest status data returned in CBOR, and converts it into JSON (and HTML UI responses) that are easier for browser-based tools and operators to consume.
+This repository also includes a TAM console (`cmd/admin-console`), shown as the `Admin Console` in the diagram below. The console acts as a backend-for-frontend for the TAM Administrator and Device Administrator: it calls the TAM core server's TEEP Agent Service API, reads the agent/manifest status data returned in CBOR, and converts it into JSON (and HTML UI responses) that are easier for browser-based tools and operators to consume.
 
 ```mermaid
 flowchart LR
@@ -19,15 +23,12 @@ flowchart LR
     BFF -- TA list (JSON) --> DeviceAdmin([Device Admin])
     BFF ~~~ DeviceAdmin
 
-    subgraph Admin Console
-        BFF[BFF Server]
-    end
+    BFF[Admin Console] ~~~ AgentStore
+    AgentStore -- TA list (CBOR) --> BFF
+    AgentStore ~~~ BFF
 
-    subgraph TAM Server
+    subgraph TAM Core Server
         TAM
-        BFF ~~~ AgentStore
-        AgentStore -- TA list (CBOR) --> BFF
-        AgentStore ~~~ BFF
         AgentStore[(TEEP Agent Store)] <--> TAM
         ManifestStore[(TC Store)] <--> TAM
     end
@@ -39,7 +40,7 @@ flowchart LR
 ```
 
 To support the architecture shown above, the TAM provides three primary communication channels:
-1. SUIT Manifest Service API: Receives Trusted Applications from the TC Developer. (see [SUIT_MANIFEST_STORE.md](./doc/SUIT_MANIFEST_STORE.md))
+1. SUIT Manifest Service API: Receives Trusted Applications from the TC Developer. (see [SUIT_MANIFEST_REPOSITORY.md](./doc/SUIT_MANIFEST_REPOSITORY.md))
 2. TAM's TEEP-over-HTTP API: Delivers Trusted Applications to the TEE. (see [TEEP_MESSAGE_HANDLE.md](./doc/TEEP_MESSAGE_HANDLE.md))
 3. TEEP Agent Service API: Provides the Device Admin with a list of Trusted Applications installed in the device's TEE. (see [TEEP_AGENT_STATUS.md](./doc/TEEP_AGENT_STATUS.md))
 
@@ -93,13 +94,13 @@ Then open `http://127.0.0.1:9090` in your Web browser.
 - [External Design](./doc/EXTERNAL_DESIGN.md)
   - [TAM Admin Console and TAM Server](./doc/ADMIN_CONSOLE_EXTERNAL_DESIGN.md)
   - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
-  - [SUIT Manifest Store](./doc/SUIT_MANIFEST_STORE.md)
+  - [SUIT Manifest Store](./doc/SUIT_MANIFEST_REPOSITORY.md)
   - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
 - [Internal Design](./doc/INTERNAL_DESIGN.md)
   - [TAM Admin Console BFF Server](./doc/ADMIN_CONSOLE_INTERNAL_DESIGN.md)
-  - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_STORE.md)
+  - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md)
   - [TAM Status TEEP Agent Status](./doc/TAM_STATUS_TEEP_AGENT_STATUS.md)
-  - [Database Disgn](./doc/DATABASE_DESIGN.md)
+  - [Database Design](./doc/DATABASE_DESIGN.md)
 
 ## Development Workflow
 
