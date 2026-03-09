@@ -60,6 +60,7 @@ go run ./cmd/attestam -insecure-demo-mode
 
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
 Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `ATTESTAM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs the decoded verifier responses. No attestation files are written to disk.
+The SQLite state database defaults to `tam_state.db` in the current working directory and can be overridden with `-db-path` or `ATTESTAM_DB_PATH`.
 Use `go run ./cmd/attestam -h` to see available CLI options.
 Detailed references for flags and environment variables are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
 
@@ -76,6 +77,7 @@ docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_DB_PATH=/data/tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
