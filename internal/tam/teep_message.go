@@ -208,8 +208,8 @@ const (
 	TEEPTypeQueryRequest  TEEPMessageType = 1
 	TEEPTypeQueryResponse TEEPMessageType = 2
 	TEEPTypeUpdate        TEEPMessageType = 3
-	TEEPTypeSuccess       TEEPMessageType = 5
-	TEEPTypeError         TEEPMessageType = 6
+	TEEPTypeSuccess       TEEPMessageType = 4
+	TEEPTypeError         TEEPMessageType = 5
 )
 
 func (t TEEPMessageType) CBORDiagString(indent int) string {
@@ -221,9 +221,9 @@ func (t TEEPMessageType) CBORDiagString(indent int) string {
 	case TEEPTypeUpdate:
 		return "3 / update /"
 	case TEEPTypeSuccess:
-		return "5 / success /"
+		return "4 / success /"
 	case TEEPTypeError:
-		return "6 / error /"
+		return "5 / error /"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(t))
 	}
@@ -234,21 +234,21 @@ type TEEPOptions struct {
 	Challenge                    util.BytesHexMax32                            `cbor:"2,keyasint,omitempty"`
 	Versions                     util.DiagList[TEEPVersion]                    `cbor:"3,keyasint,omitempty"`
 	SupportedSUITCOSEProfiles    util.DiagList[suit.COSEProfile]               `cbor:"4,keyasint,omitempty"`
-	SelectedVersion              *TEEPVersion                                  `cbor:"6,keyasint,omitempty"`
-	AttestationPayload           util.BytesHexMax32                            `cbor:"7,keyasint,omitempty"`
-	TCList                       util.DiagList[suit.SystemPropertyClaims]      `cbor:"8,keyasint,omitempty"`
-	ExtList                      util.DiagList[TEEPExtInfo]                    `cbor:"9,keyasint,omitempty"`
-	ManifestList                 util.DiagList[util.BytesHexMax32]             `cbor:"10,keyasint,omitempty"`
-	Msg                          *util.DiagString                              `cbor:"11,keyasint,omitempty"`
-	ErrMsg                       *util.DiagString                              `cbor:"12,keyasint,omitempty"`
-	AttestationPayloadFormat     *util.DiagString                              `cbor:"13,keyasint,omitempty"`
-	RequestedTCList              util.DiagList[RequestedTCInfo]                `cbor:"14,keyasint,omitempty"`
-	UnneededManifestList         util.DiagList[util.BytesHexMax32]             `cbor:"15,keyasint,omitempty"`
-	SUITReports                  util.DiagList[util.BytesHexMax32]             `cbor:"19,keyasint,omitempty"`
-	Token                        util.BytesHexMax32                            `cbor:"20,keyasint,omitempty"`
-	SupportedFreshnessMechanisms util.DiagList[FreshnessMechanism]             `cbor:"21,keyasint,omitempty"`
-	ErrLang                      *util.DiagString                              `cbor:"22,keyasint,omitempty"`
-	ErrCode                      *TEEPErrCode                                  `cbor:"23,keyasint,omitempty"`
+	SelectedVersion              *TEEPVersion                                  `cbor:"5,keyasint,omitempty"`
+	AttestationPayload           util.BytesHexMax32                            `cbor:"6,keyasint,omitempty"`
+	TCList                       util.DiagList[suit.SystemPropertyClaims]      `cbor:"7,keyasint,omitempty"`
+	ExtList                      util.DiagList[TEEPExtInfo]                    `cbor:"8,keyasint,omitempty"`
+	ManifestList                 util.DiagList[util.BytesHexMax32]             `cbor:"9,keyasint,omitempty"`
+	Msg                          *util.DiagString                              `cbor:"10,keyasint,omitempty"`
+	ErrMsg                       *util.DiagString                              `cbor:"11,keyasint,omitempty"`
+	AttestationPayloadFormat     *util.DiagString                              `cbor:"12,keyasint,omitempty"`
+	RequestedTCList              util.DiagList[RequestedTCInfo]                `cbor:"13,keyasint,omitempty"`
+	UnneededManifestList         util.DiagList[util.BytesHexMax32]             `cbor:"14,keyasint,omitempty"`
+	SUITReports                  util.DiagList[util.BytesHexMax32]             `cbor:"18,keyasint,omitempty"`
+	Token                        util.BytesHexMax32                            `cbor:"19,keyasint,omitempty"`
+	SupportedFreshnessMechanisms util.DiagList[FreshnessMechanism]             `cbor:"20,keyasint,omitempty"`
+	ErrLang                      *util.DiagString                              `cbor:"21,keyasint,omitempty"`
+	ErrCode                      *TEEPErrCode                                  `cbor:"22,keyasint,omitempty"`
 }
 
 func (o TEEPOptions) CBORDiagString(indent int) string {
@@ -268,49 +268,49 @@ func (o TEEPOptions) CBORDiagString(indent int) string {
 		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-suit-cose-profiles / 4: %v", pad2, o.SupportedSUITCOSEProfiles.CBORDiagString(indent+1)))
 	}
 	if o.SelectedVersion != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ selected-version / 6: %v", pad2, *o.SelectedVersion))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ selected-version / 5: %v", pad2, *o.SelectedVersion))
 	}
 	if o.AttestationPayload != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload / 7: %s", pad2, o.AttestationPayload.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload / 6: %s", pad2, o.AttestationPayload.CBORDiagString(indent+1)))
 	}
 	if o.TCList != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ tc-list / 8: %v", pad2, o.TCList.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ tc-list / 7: %v", pad2, o.TCList.CBORDiagString(indent+1)))
 	}
 	if o.ExtList != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ ext-list / 9: %v", pad2, o.ExtList.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ ext-list / 8: %v", pad2, o.ExtList.CBORDiagString(indent+1)))
 	}
 	if o.ManifestList != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ manifest-list / 10: %v", pad2, o.ManifestList.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ manifest-list / 9: %v", pad2, o.ManifestList.CBORDiagString(indent+1)))
 	}
 	if o.Msg != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ msg / 11: %s", pad2, o.Msg.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ msg / 10: %s", pad2, o.Msg.CBORDiagString(indent+1)))
 	}
 	if o.ErrMsg != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-msg / 12: %s", pad2, o.ErrMsg.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-msg / 11: %s", pad2, o.ErrMsg.CBORDiagString(indent+1)))
 	}
 	if o.AttestationPayloadFormat != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload-format / 13: %s", pad2, o.AttestationPayloadFormat.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ attestation-payload-format / 12: %s", pad2, o.AttestationPayloadFormat.CBORDiagString(indent+1)))
 	}
 	if o.RequestedTCList != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ requested-tc-list / 14: %v", pad2, o.RequestedTCList.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ requested-tc-list / 13: %v", pad2, o.RequestedTCList.CBORDiagString(indent+1)))
 	}
 	if o.UnneededManifestList != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ unneeded-manifest-list / 15: %v", pad2, o.UnneededManifestList.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ unneeded-manifest-list / 14: %v", pad2, o.UnneededManifestList.CBORDiagString(indent+1)))
 	}
 	if o.SUITReports != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ suit-reports / 19: %v", pad2, o.SUITReports.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ suit-reports / 18: %v", pad2, o.SUITReports.CBORDiagString(indent+1)))
 	}
 	if o.Token != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ token / 20: %s", pad2, o.Token.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ token / 19: %s", pad2, o.Token.CBORDiagString(indent+1)))
 	}
 	if o.SupportedFreshnessMechanisms != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-freshness-mechanisms / 21: %v", pad2, o.SupportedFreshnessMechanisms.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ supported-freshness-mechanisms / 20: %v", pad2, o.SupportedFreshnessMechanisms.CBORDiagString(indent+1)))
 	}
 	if o.ErrLang != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-lang / 22: %s", pad2, o.ErrLang.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-lang / 21: %s", pad2, o.ErrLang.CBORDiagString(indent+1)))
 	}
 	if o.ErrCode != nil {
-		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-code / 23: %s", pad2, o.ErrCode.CBORDiagString(indent+1)))
+		outputStrings = append(outputStrings, fmt.Sprintf("%s/ err-code / 22: %s", pad2, o.ErrCode.CBORDiagString(indent+1)))
 	}
 	return fmt.Sprintf("{\n%s\n%s}", strings.Join(outputStrings, ",\n"), pad1)
 }
@@ -401,7 +401,7 @@ const (
 	TEEPErrUnsupportedSUITReport          = 8
 	TEEPErrCertificateExpired             = 9
 	TEEPErrTemporaryError                 = 10
-	TEEPErrManifestProcessingFailed       = 17
+	TEEPErrManifestProcessingFailed       = 11
 )
 
 func (e TEEPErrCode) CBORDiagString(indent int) string {
@@ -427,7 +427,7 @@ func (e TEEPErrCode) CBORDiagString(indent int) string {
 	case TEEPErrTemporaryError:
 		return "10 / ERR_TEMPORARY_ERROR /"
 	case TEEPErrManifestProcessingFailed:
-		return "17 / ERR_MANIFEST_PROCESSING_FAILED /"
+		return "11 / ERR_MANIFEST_PROCESSING_FAILED /"
 	default:
 		return fmt.Sprintf("unknown(%d)", int(e))
 	}
@@ -454,21 +454,21 @@ func (c TEEPCipherSuite) CBORDiagString(indent int) string {
 }
 
 type RequestedTCInfo struct {
-	ComponentID              suit.ComponentID `cbor:"16,keyasint,omitempty"`
-	TCManifestSequenceNumber *uint64          `cbor:"17,keyasint,omitempty"`
-	HaveBinary               *bool            `cbor:"18,keyasint,omitempty"`
+	ComponentID              suit.ComponentID `cbor:"15,keyasint,omitempty"`
+	TCManifestSequenceNumber *uint64          `cbor:"16,keyasint,omitempty"`
+	HaveBinary               *bool            `cbor:"17,keyasint,omitempty"`
 }
 
 func (r RequestedTCInfo) CBORDiagString(indent int) string {
 	var pad1 = strings.Repeat("  ", indent)
 	var pad2 = strings.Repeat("  ", indent+1)
 	var encodedStrings []string
-	encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ component-id / 16: %s", pad2, r.ComponentID.CBORDiagString(0)))
+	encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ component-id / 15: %s", pad2, r.ComponentID.CBORDiagString(0)))
 	if r.TCManifestSequenceNumber != nil {
-		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ tc-manifest-sequence-number / 17: %d", pad2, *r.TCManifestSequenceNumber))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ tc-manifest-sequence-number / 16: %d", pad2, *r.TCManifestSequenceNumber))
 	}
 	if r.HaveBinary != nil {
-		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ have-binary / 18: %t", pad2, *r.HaveBinary))
+		encodedStrings = append(encodedStrings, fmt.Sprintf("%s/ have-binary / 17: %t", pad2, *r.HaveBinary))
 	}
 	return fmt.Sprintf("{\n%s\n%s}", strings.Join(encodedStrings, ",\n"), pad1)
 }
