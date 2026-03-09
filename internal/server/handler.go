@@ -162,14 +162,7 @@ func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
 		manifests = append(manifests, &overview)
 	}
 
-	if len(manifests) == 0 {
-		resp := responseSpec{
-			status:      http.StatusNoContent,
-			contentType: "application/cbor",
-		}
-		h.writeResponse(w, resp)
-		return
-	}
+	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no manifest found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(manifests)
 	if err != nil {
 		h.logger.Printf("failed to encode SUIT Manifests: %v", err)
@@ -421,14 +414,7 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 		statusList = append(statusList, agentStatus)
 	}
 
-	if len(statusList) == 0 {
-		resp := responseSpec{
-			status:      http.StatusNoContent,
-			contentType: "application/cbor",
-		}
-		h.writeResponse(w, resp)
-		return
-	}
+	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no matching agent found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(statusList)
 	if err != nil {
 		h.logger.Printf("failed to encode TEEP Agent status: %v", err)
