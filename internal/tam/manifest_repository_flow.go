@@ -73,3 +73,13 @@ func (t *TAM) GetManifest(componentID []byte) (*model.SuitManifest, error) {
 	}
 	return manifest, nil
 }
+
+// may accessed from outside the TAM, such as management API handler
+func (t *TAM) GetManifests() ([]model.SuitManifest, error) {
+	mrepo := sqlite.NewSuitManifestRepository(t.db)
+	manifests, err := mrepo.FindLatestAll(t.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return manifests, nil
+}
