@@ -2,7 +2,7 @@
 
 ## TEEP Protocol Interactions Defined in Draft RFCs
 
-[Section 3 of the TEEP Protocol draft](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-21#section-3) defines how TEEP Agents reply to TAM messages:
+[Section 3 of the TEEP Protocol draft](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol-26#section-3) defines how TEEP Agents reply to TAM messages:
 
 ```mermaid
 flowchart LR

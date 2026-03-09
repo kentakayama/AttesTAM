@@ -214,6 +214,7 @@ func startRealTAMServer(t *testing.T) string {
 	addr := reserveTCPAddr(t)
 	srv, err := tamserver.New(config.TAMConfig{
 		Addr:             addr,
+		DBPath:           ":memory:",
 		InsecureDemoMode: true,
 		Logger:           log.New(io.Discard, "", 0),
 	})

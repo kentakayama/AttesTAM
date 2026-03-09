@@ -759,11 +759,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 	return response, nil
 }
 
-// Init initializes the TAM by setting up database connections and loading/creating default entities.
-func (t *TAM) Init() error {
-	return t.InitWithPath("tam_state.db")
-}
-
+// initializes the TAM by setting up database connections
 func (t *TAM) InitWithPath(dbPath string) error {
 	t.ctx = context.Background()
 	// Initialize SQLite database (stored in tam_state.db or even could be :memory:)

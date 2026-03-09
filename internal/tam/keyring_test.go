@@ -41,7 +41,7 @@ func TestKeyring_GetSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	err = tam.Init()
+	err = tam.InitWithPath(":memory:")
 	if err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}

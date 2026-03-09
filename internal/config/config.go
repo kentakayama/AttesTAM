@@ -14,6 +14,7 @@ import (
 // Config captures the tunables required to start the TAM mock server.
 type TAMConfig struct {
 	Addr                  string
+	DBPath                string
 	InsecureDemoMode      bool
 	TAMTEEPPrivateKeyPath string
 	Logger                *log.Logger
