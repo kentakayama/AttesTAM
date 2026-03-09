@@ -231,7 +231,11 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 	w0 := httptest.NewRecorder()
 
 	h.getAgentStatus(w0, req0)
-	assert.Equal(t, http.StatusNoContent, w0.Result().StatusCode)
+	assert.Equal(t, http.StatusOK, w0.Result().StatusCode)
+	var agentStatus []tam.AgentStatusRecord
+	err = cbor.Unmarshal(w0.Body.Bytes(), &agentStatus)
+	require.Nil(t, err)
+	assert.Len(t, agentStatus, 0)
 }
 
 func TestGetManifests_OK(t *testing.T) {

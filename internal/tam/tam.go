@@ -922,18 +922,31 @@ func (t *TAM) EnsureDefaultEntity(withManifest bool) error {
 	if withManifest {
 		manifestRepo := sqlite.NewSuitManifestRepository(t.db)
 		trusted1 := []byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D} // ['app1.wasm']
-		digestM1 := []byte("digest1")
-		m1 := &model.SuitManifest{Manifest: []byte("m1"), Digest: digestM1, SigningKeyID: devKeyID, TrustedComponentID: trusted1, SequenceNumber: 3}
-		_, err = manifestRepo.Create(t.ctx, m1)
-		if err != nil {
-			t.logger.Printf("create manifest m1 error: %v", err)
+		m, err := manifestRepo.FindLatestByTrustedComponentID(t.ctx, trusted1)
+		if m != nil && err == nil {
+			// found, do nothing
+		} else {
+			// not found, create a default manifest1
+			digestM1 := []byte("digest1")
+			m1 := &model.SuitManifest{Manifest: []byte("m1"), Digest: digestM1, SigningKeyID: devKeyID, TrustedComponentID: trusted1, SequenceNumber: 3}
+			_, err = manifestRepo.Create(t.ctx, m1)
+			if err != nil {
+				t.logger.Printf("create manifest m1 error: %v", err)
+			}
 		}
+
 		trusted2 := []byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D} // ['app2.wasm']
-		digestM2 := []byte("digest2")
-		m2 := &model.SuitManifest{Manifest: []byte("m2"), Digest: digestM2, SigningKeyID: devKeyID, TrustedComponentID: trusted2, SequenceNumber: 2}
-		_, err = manifestRepo.Create(t.ctx, m2)
-		if err != nil {
-			t.logger.Printf("create manifest m2 error: %v", err)
+		m, err = manifestRepo.FindLatestByTrustedComponentID(t.ctx, trusted2)
+		if m != nil && err == nil {
+			// found, do nothing
+		} else {
+			// not found, create a default manifest2
+			digestM2 := []byte("digest2")
+			m2 := &model.SuitManifest{Manifest: []byte("m2"), Digest: digestM2, SigningKeyID: devKeyID, TrustedComponentID: trusted2, SequenceNumber: 2}
+			_, err = manifestRepo.Create(t.ctx, m2)
+			if err != nil {
+				t.logger.Printf("create manifest m2 error: %v", err)
+			}
 		}
 
 		tcID := []byte{
@@ -1013,7 +1026,7 @@ func (t *TAM) EnsureDefaultEntity(withManifest bool) error {
 			SequenceNumber:     0,
 		}
 
-		m, err := manifestRepo.FindLatestByTrustedComponentID(t.ctx, tcID)
+		m, err = manifestRepo.FindLatestByTrustedComponentID(t.ctx, tcID)
 		if err != nil {
 			return fmt.Errorf("failed to find default TC Manifest: %w", err)
 		}
