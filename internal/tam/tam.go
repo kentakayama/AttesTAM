@@ -67,6 +67,11 @@ func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Log
 	if err != nil {
 		return nil, errors.New("failed to load TAM's private key")
 	}
+	kid, _ := key.Thumbprint(crypto.SHA256)
+	logger.Printf("TAM's ESP256 Key = {x: %s, y:%s, kid: %s}",
+		hex.EncodeToString(key.Params[cose.KeyLabelEC2X].([]byte)),
+		hex.EncodeToString(key.Params[cose.KeyLabelEC2Y].([]byte)),
+		hex.EncodeToString(kid))
 
 	return &TAM{
 		verifier: verifier,
