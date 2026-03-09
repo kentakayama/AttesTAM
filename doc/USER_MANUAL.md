@@ -3,7 +3,7 @@
 ## Purpose
 This document explains how to start the AttesTAM server (`cmd/attestam`) and the TAM Admin Console server (`admin-console`), and how to use the Admin Console UI.
 
-## Quick Flow
+## Quick Flow (for Demo)
 
 1. Start AttesTAM server (`go run ./cmd/attestam -insecure-demo-mode`).
 2. Start TAM admin console server (`go run ./cmd/admin-console`).
