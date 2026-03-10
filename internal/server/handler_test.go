@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/tam"
 	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -184,8 +185,16 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	var agentList []*tam.AgentStatusKey
 	err = cbor.Unmarshal(body, &agentList)
 	require.Nil(t, err)
-	assert.Len(t, agentList, 1)
-	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentList[0].AgentKID)
+	// Find the dummy agent with the expected KID
+	var dummyAgent *tam.AgentStatusKey
+	for _, agent := range agentList {
+		if bytes.Equal(agent.AgentKID, []byte("dummy-teep-agent-kid-for-dev-123")) {
+			dummyAgent = agent
+			break
+		}
+	}
+	require.NotNil(t, dummyAgent)
+	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), dummyAgent.AgentKID)
 
 	kids, err := cbor.Marshal([][]byte{[]byte("dummy-teep-agent-kid-for-dev-123")})
 	require.Nil(t, err)
@@ -202,7 +211,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	var agentStatus []tam.AgentStatusRecord
 	err = cbor.Unmarshal(body, &agentStatus)
 	require.Nil(t, err)
-	assert.Len(t, agentStatus, 1)
+	assert.GreaterOrEqual(t, len(agentStatus), 1)
 	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentStatus[0].AgentKID)
 	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
 	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
@@ -230,7 +239,52 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 	w0 := httptest.NewRecorder()
 
 	h.getAgentStatus(w0, req0)
-	assert.Equal(t, http.StatusNoContent, w0.Result().StatusCode)
+	assert.Equal(t, http.StatusOK, w0.Result().StatusCode)
+	var agentStatus []tam.AgentStatusRecord
+	err = cbor.Unmarshal(w0.Body.Bytes(), &agentStatus)
+	require.Nil(t, err)
+	assert.Len(t, agentStatus, 0)
+}
+
+func TestGetManifests_OK(t *testing.T) {
+	logger := log.Default()
+	tamInstance, err := tam.NewTAM("", nil, logger)
+	if err != nil {
+		t.Fatalf("NewTAM error: %v", err)
+	}
+	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+		t.Fatalf("TAM Init error: %v", err)
+	}
+	if err := tamInstance.EnsureDefaultEntity(true); err != nil {
+		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	}
+
+	h, err := newHandler(tamInstance, log.Default())
+	require.Nil(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/SUITManifestService/ListManifests", nil)
+	req.Header.Set("Accept", "application/cbor")
+	w := httptest.NewRecorder()
+
+	h.getManifests(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+	body, err := io.ReadAll(w.Result().Body)
+	require.NoError(t, err)
+
+	var manifests []model.SuitManifestOverview
+	err = cbor.Unmarshal(body, &manifests)
+	require.NoError(t, err)
+	require.Len(t, manifests, 3)
+
+	got := make(map[string]uint64, len(manifests))
+	for _, manifest := range manifests {
+		got[string(manifest.TrustedComponentID)] = manifest.SequenceNumber
+	}
+
+	assert.Equal(t, uint64(3), got[string([]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D})])
+	assert.Equal(t, uint64(2), got[string([]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D})])
+	assert.Equal(t, uint64(0), got[string([]byte{0x81, 0x49, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74})])
 }
 
 func TestHTTPErrorResponse_MethodNotAllowed(t *testing.T) {

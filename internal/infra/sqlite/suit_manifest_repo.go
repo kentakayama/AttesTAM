@@ -64,6 +64,41 @@ func (r *SuitManifestRepository) FindLatestByTrustedComponentID(ctx context.Cont
 	return &m, nil
 }
 
+// FindLatestAll returns the latest manifest for each trusted component.
+func (r *SuitManifestRepository) FindLatestAll(ctx context.Context) ([]model.SuitManifest, error) {
+	const q = `
+		SELECT sm.id, sm.manifest, sm.digest, sm.signing_key_id, sm.trusted_component_id, sm.sequence_number, sm.created_at
+		FROM suit_manifests sm
+		INNER JOIN (
+			SELECT trusted_component_id, MAX(sequence_number) AS max_sequence_number
+			FROM suit_manifests
+			GROUP BY trusted_component_id
+		) latest
+			ON sm.trusted_component_id = latest.trusted_component_id
+			AND sm.sequence_number = latest.max_sequence_number
+		ORDER BY sm.trusted_component_id
+	`
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("query latest suit manifests: %w", err)
+	}
+	defer rows.Close()
+
+	manifests := make([]model.SuitManifest, 0)
+	for rows.Next() {
+		var m model.SuitManifest
+		if err := rows.Scan(&m.ID, &m.Manifest, &m.Digest, &m.SigningKeyID, &m.TrustedComponentID, &m.SequenceNumber, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan latest suit manifest: %w", err)
+		}
+		manifests = append(manifests, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate latest suit manifests: %w", err)
+	}
+
+	return manifests, nil
+}
+
 // Create inserts a new SUIT manifest and returns the inserted id.
 func (r *SuitManifestRepository) Create(ctx context.Context, m *model.SuitManifest) (int64, error) {
 	if m.SequenceNumber >= math.MaxInt64 {

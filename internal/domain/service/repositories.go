@@ -24,6 +24,7 @@ type AgentRepository interface {
 // SuitManifestRepository defines the interface for SUIT manifest persistence.
 type SuitManifestRepository interface {
 	FindLatestByTrustedComponentID(ctx context.Context, trustedComponentID []byte) (*model.SuitManifest, error)
+	FindLatestAll(ctx context.Context) ([]model.SuitManifest, error)
 	Create(ctx context.Context, m *model.SuitManifest) (int64, error)
 }
 
