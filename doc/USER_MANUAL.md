@@ -109,6 +109,7 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 
 - Click `View Managed Devices` in the sidebar.
 - Agent table is loaded from `GET /console/view-managed-devices`.
+- `Agent KID` is displayed as a Base64URL string without padding.
 - Click an `Agent KID` row to open the detail panel.
 - Detail panel shows installed TC list (`name`, `version`) for the selected agent.
 - Clicking the selected agent again closes the detail panel.

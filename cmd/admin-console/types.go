@@ -20,6 +20,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"time"
@@ -43,7 +44,7 @@ func (a Agent) MarshalJSON() ([]byte, error) {
 		InstalledTCList []TrustedComponent `json:"installed-tc"`
 	}
 	out := alias{
-		KID:             string(a.KID),
+		KID:             base64.RawURLEncoding.EncodeToString(a.KID),
 		LastUpdate:      formatUpdatedAt(a.LastUpdate),
 		Attributes:      a.Attributes,
 		InstalledTCList: a.InstalledTCList,
