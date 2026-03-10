@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-AGENT_LIST_CBOR := example-agent-list.cbor
+AGENT_LIST_CBOR := agent-list/example-agent-list.cbor
 AGENT_LIST_CDDL := agent-list.cddl
-AGENT_STATUS_CBOR := example-agent-status.cbor
+AGENT_STATUS_CBOR := agent-status/example-agent-status.cbor
 AGENT_STATUS_CDDL := concatenated-agent-status.cddl
-SUIT_MANIFEST_OVERVIEW_CBOR := example-suit-manifest-overview.cbor
+SUIT_MANIFEST_OVERVIEW_CBOR := manifest-overview/example-suit-manifest-overview.cbor
 SUIT_MANIFEST_OVERVIEW_CDDL := concatenated-suit-manifest-overview.cddl
 
 RUBYDEBUG=RUBYOPT="-W0"

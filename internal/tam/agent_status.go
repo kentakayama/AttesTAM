@@ -89,34 +89,27 @@ func (t *TAM) GetAgentStatus(entity *model.Entity, agentKID []byte) (*AgentStatu
 func (t *TAM) GetAgentStatuses(entity *model.Entity) ([]*AgentStatusKey, error) {
 	// TODO: switch query based on the entity role, and get this info without joining with Agent table, to avoid unnecessary DB access for each agent.
 
-	// XXX: returns dummy data for testing, and will be removed after implementing the actual DB access logic.
-	agentStatus := &AgentStatusKey{
-		AgentKID:  []byte("dummy-teep-agent-kid-for-dev-123"),
-		UpdatedAt: time.Now(),
+	arepo := sqlite.NewAgentRepository(t.db)
+	agents, err := arepo.GetAll(t.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list agents: %w", err)
 	}
-	agentStatuses := []*AgentStatusKey{agentStatus}
 
-	// arepo := sqlite.NewAgentRepository(t.db)
-	// agents, err := arepo.GetAll(t.ctx)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to list agents: %w", err)
-	// }
-
-	// agentStatuses := make([]*AgentStatusKey, 0, len(agents))
-	// astatusRepo := sqlite.NewAgentStatusRepository(t.db)
-	// for _, agent := range agents {
-	// 	agentStatus, err := astatusRepo.GetAgentStatus(t.ctx, agent.KID)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to get agent status for agent KID %x: %w", agent.KID, err)
-	// 	}
-	// 	if agentStatus == nil {
-	// 		continue
-	// 	}
-	// 	agentStatuses = append(agentStatuses, &AgentStatusKey{
-	// 		AgentKID:  agentStatus.AgentKID,
-	// 		UpdatedAt: agentStatus.UpdatedAt,
-	// 	})
-	// }
+	agentStatuses := make([]*AgentStatusKey, 0, len(agents))
+	astatusRepo := sqlite.NewAgentStatusRepository(t.db)
+	for _, agent := range agents {
+		agentStatus, err := astatusRepo.GetAgentStatus(t.ctx, agent.KID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get agent status for agent KID %x: %w", agent.KID, err)
+		}
+		if agentStatus == nil {
+			continue
+		}
+		agentStatuses = append(agentStatuses, &AgentStatusKey{
+			AgentKID:  agentStatus.AgentKID,
+			UpdatedAt: agentStatus.UpdatedAt,
+		})
+	}
 
 	return agentStatuses, nil
 }

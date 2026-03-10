@@ -93,3 +93,80 @@ func TestSuitManifest_CreateFindLatest_OK(t *testing.T) {
 		t.Fatalf("sequence mismatch: want %d got %d", m2.SequenceNumber, got.SequenceNumber)
 	}
 }
+
+func TestSuitManifest_FindLatestAll_OK(t *testing.T) {
+	ctx := context.Background()
+	db, err := InitDB(ctx, ":memory:")
+	if err != nil {
+		t.Fatalf("InitDB error: %v", err)
+	}
+	defer CloseDB(db)
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	entityRepo := NewEntityRepository(db)
+	devID, err := entityRepo.Create(ctx, &model.Entity{Name: "Test Corp", IsTCDeveloper: true, CreatedAt: now})
+	if err != nil {
+		t.Fatalf("Create developer error: %v", err)
+	}
+
+	keyRepo := NewManifestSigningKeyRepository(db)
+	keyID, err := keyRepo.Create(ctx, &model.ManifestSigningKey{
+		KID:       []byte("key-1"),
+		EntityID:  devID,
+		PublicKey: []byte("pub-key-1"),
+		CreatedAt: now,
+		ExpiredAt: now.Add(1 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("Create key error: %v", err)
+	}
+
+	repo := NewSuitManifestRepository(db)
+	manifests := []*model.SuitManifest{
+		{
+			Manifest:           []byte("mfst-1"),
+			Digest:             []byte("digest-1"),
+			SigningKeyID:       keyID,
+			TrustedComponentID: []byte("tc-1"),
+			SequenceNumber:     1,
+			CreatedAt:          now,
+		},
+		{
+			Manifest:           []byte("mfst-2"),
+			Digest:             []byte("digest-2"),
+			SigningKeyID:       keyID,
+			TrustedComponentID: []byte("tc-1"),
+			SequenceNumber:     2,
+			CreatedAt:          now.Add(1 * time.Minute),
+		},
+		{
+			Manifest:           []byte("mfst-3"),
+			Digest:             []byte("digest-3"),
+			SigningKeyID:       keyID,
+			TrustedComponentID: []byte("tc-2"),
+			SequenceNumber:     7,
+			CreatedAt:          now.Add(2 * time.Minute),
+		},
+	}
+
+	for _, manifest := range manifests {
+		if _, err := repo.Create(ctx, manifest); err != nil {
+			t.Fatalf("Create manifest error: %v", err)
+		}
+	}
+
+	got, err := repo.FindLatestAll(ctx)
+	if err != nil {
+		t.Fatalf("FindLatestAll error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 manifests, got %d", len(got))
+	}
+	if string(got[0].TrustedComponentID) != "tc-1" || got[0].SequenceNumber != 2 {
+		t.Fatalf("unexpected first manifest: tc=%s seq=%d", got[0].TrustedComponentID, got[0].SequenceNumber)
+	}
+	if string(got[1].TrustedComponentID) != "tc-2" || got[1].SequenceNumber != 7 {
+		t.Fatalf("unexpected second manifest: tc=%s seq=%d", got[1].TrustedComponentID, got[1].SequenceNumber)
+	}
+}

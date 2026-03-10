@@ -62,8 +62,8 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	if err := json.Unmarshal(body, &agents); err != nil {
 		t.Fatalf("decode devices json: %v", err)
 	}
-	if len(agents) != 1 {
-		t.Fatalf("expected 1 agent, got %d", len(agents))
+	if len(agents) == 0 {
+		t.Fatalf("expected at least 1 agent, got %d", len(agents))
 	}
 
 	var agent *integrationAgent
@@ -109,14 +109,23 @@ func TestAdminConsoleIntegrationViewManagedTCs(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&manifests); err != nil {
 		t.Fatalf("decode manifests json: %v", err)
 	}
-	if len(manifests) != 1 {
-		t.Fatalf("expected 1 manifest, got %d", len(manifests))
+	if len(manifests) != 3 {
+		t.Fatalf("expected 3 manifests, got %d", len(manifests))
 	}
-	if manifests[0].Name != "['hello.txt']" {
-		t.Fatalf("unexpected manifest name: %q", manifests[0].Name)
+
+	got := make(map[string]uint64, len(manifests))
+	for _, manifest := range manifests {
+		got[manifest.Name] = manifest.Version
 	}
-	if manifests[0].Version != 0 {
-		t.Fatalf("unexpected manifest version: %d", manifests[0].Version)
+
+	if got["['app1.wasm']"] != 3 {
+		t.Fatalf("unexpected app1.wasm version: %d", got["['app1.wasm']"])
+	}
+	if got["['app2.wasm']"] != 2 {
+		t.Fatalf("unexpected app2.wasm version: %d", got["['app2.wasm']"])
+	}
+	if got["['hello.txt']"] != 0 {
+		t.Fatalf("unexpected hello.txt version: %d", got["['hello.txt']"])
 	}
 }
 
@@ -124,7 +133,7 @@ func TestAdminConsoleIntegrationRegisterTC(t *testing.T) {
 	tamBase := startRealTAMServer(t)
 	console := startAdminConsoleServer(t, tamBase)
 
-	manifestBytes, err := os.ReadFile(resolvePath(filepath.Join("..", "..", "doc", "examples", "text.1.envelope.cbor")))
+	manifestBytes, err := os.ReadFile(resolvePath(filepath.Join("..", "..", "doc", "examples", "manifests", "text.1.envelope.cbor")))
 	if err != nil {
 		t.Fatalf("read manifest fixture: %v", err)
 	}
@@ -168,14 +177,23 @@ func TestAdminConsoleIntegrationRegisterTC(t *testing.T) {
 	}
 
 	manifests := fetchManifestList(t, console.URL)
-	if len(manifests) != 1 {
-		t.Fatalf("expected 1 manifest after register, got %d", len(manifests))
+	if len(manifests) != 3 {
+		t.Fatalf("expected 3 manifests after register, got %d", len(manifests))
 	}
-	if manifests[0].Name != "['hello.txt']" {
-		t.Fatalf("unexpected manifest name after register: %q", manifests[0].Name)
+
+	got := make(map[string]uint64, len(manifests))
+	for _, manifest := range manifests {
+		got[manifest.Name] = manifest.Version
 	}
-	if manifests[0].Version != 1 {
-		t.Fatalf("expected manifest version 1 after register, got %d", manifests[0].Version)
+
+	if got["['hello.txt']"] != 1 {
+		t.Fatalf("expected hello.txt version 1 after register, got %d", got["['hello.txt']"])
+	}
+	if got["['app1.wasm']"] != 3 {
+		t.Fatalf("unexpected app1.wasm version after register: %d", got["['app1.wasm']"])
+	}
+	if got["['app2.wasm']"] != 2 {
+		t.Fatalf("unexpected app2.wasm version after register: %d", got["['app2.wasm']"])
 	}
 }
 
