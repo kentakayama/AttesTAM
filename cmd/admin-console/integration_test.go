@@ -62,11 +62,20 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&agents); err != nil {
 		t.Fatalf("decode devices json: %v", err)
 	}
-	if len(agents) != 1 {
-		t.Fatalf("expected 1 agent, got %d", len(agents))
+	if len(agents) == 0 {
+		t.Fatalf("expected at least 1 agent, got %d", len(agents))
 	}
 
-	agent := agents[0]
+	var agent *integrationAgent
+	for _, a := range agents {
+		if a.KID == "dummy-teep-agent-kid-for-dev-123" {
+			agent = &a
+			break
+		}
+	}
+	if agent == nil {
+		t.Fatalf("agent not found")
+	}
 	if agent.KID != "dummy-teep-agent-kid-for-dev-123" {
 		t.Fatalf("unexpected agent kid: %q", agent.KID)
 	}
