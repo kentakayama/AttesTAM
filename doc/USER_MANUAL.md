@@ -227,12 +227,12 @@ A SUIT Manifest tells the TEEP Agent how to fetch and verify Trusted Component b
 
 For TC Developers, the TAM provides the `/SUITManifestService/RegisterManifest` endpoint, which accepts signed SUIT Manifests.
 
-There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
+There is an example SUIT Manifest [text.1.envelope.diag](./examples/manifests/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
 You can post it with the following command from the repository root:
 ```bash
 curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./doc/examples/text.1.envelope.cbor"
+  --data-binary "@./doc/examples/manifests/text.1.envelope.cbor"
 ```
 
 Example output:
