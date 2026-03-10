@@ -52,23 +52,29 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 		t.Fatalf("GET devices: %v", err)
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("unexpected status: %d body=%s", resp.StatusCode, body)
 	}
 
 	var agents []integrationAgent
-	if err := json.NewDecoder(resp.Body).Decode(&agents); err != nil {
+	if err := json.Unmarshal(body, &agents); err != nil {
 		t.Fatalf("decode devices json: %v", err)
 	}
 	if len(agents) != 1 {
 		t.Fatalf("expected 1 agent, got %d", len(agents))
 	}
 
-	agent := agents[0]
-	if agent.KID != "dummy-teep-agent-kid-for-dev-123" {
-		t.Fatalf("unexpected agent kid: %q", agent.KID)
+	var agent *integrationAgent
+	for _, a := range agents {
+		if a.KID == "dummy-teep-agent-kid-of-building-dev-123-00" {
+			agent = &a
+			break
+		}
+	}
+	if agent == nil {
+		t.Fatalf("agent not found")
 	}
 	if agent.LastUpdate == "" {
 		t.Fatal("expected last_update to be populated")

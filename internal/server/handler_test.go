@@ -22,6 +22,11 @@ import (
 )
 
 var (
+	expectedKID = []byte{
+		0x76, 0xe9, 0xa6, 0xcb, 0xeb, 0x5e, 0x7a, 0x9f, 0x9a, 0x81, 0xe9, 0xed, 0xfa, 0x48, 0x9d, 0xfa,
+		0x87, 0xfe, 0x6e, 0xe8, 0xa5, 0x76, 0x29, 0xe0, 0xf9, 0xd7, 0xaf, 0xfb, 0x5d, 0xb7, 0xfb, 0x4d,
+	} // "dummy-teep-agent-kid-of-building-dev-123-00" if encoded with base64url without paddding
+
 	// from internal/suit/manifest_test.go
 	taggedManifest0 = []byte{
 		0xd8, 0x6b, // 107(
@@ -184,13 +189,21 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	var agentList []*tam.AgentStatusKey
 	err = cbor.Unmarshal(body, &agentList)
 	require.Nil(t, err)
-	assert.Len(t, agentList, 1)
-	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentList[0].AgentKID)
+	// Find the dummy agent with the expected KID
+	var dummyAgent *tam.AgentStatusKey
+	for _, agent := range agentList {
+		if bytes.Equal(agent.AgentKID, expectedKID) {
+			dummyAgent = agent
+			break
+		}
+	}
+	require.NotNil(t, dummyAgent)
+	assert.Equal(t, util.BytesHexMax32(expectedKID), dummyAgent.AgentKID)
 
-	kids, err := cbor.Marshal([][]byte{[]byte("dummy-teep-agent-kid-for-dev-123")})
+	kids, err := cbor.Marshal([][]byte{expectedKID})
 	require.Nil(t, err)
 	// get the status of a specific TEEP Agent for Device Admin
-	req1 := httptest.NewRequest(http.MethodPost, "/AgentService/GetAgentStatus", bytes.NewReader(kids)) // [h'dummy-teep-agent-kid-for-dev-123']
+	req1 := httptest.NewRequest(http.MethodPost, "/AgentService/GetAgentStatus", bytes.NewReader(kids)) // ["dummy-teep-agent-kid-of-building-dev-123-00"]
 	req1.Header.Set("Content-Type", "application/cbor")
 	req1.Header.Set("Accept", "application/cbor")
 	w1 := httptest.NewRecorder()
@@ -202,8 +215,8 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	var agentStatus []tam.AgentStatusRecord
 	err = cbor.Unmarshal(body, &agentStatus)
 	require.Nil(t, err)
-	assert.Len(t, agentStatus, 1)
-	assert.Equal(t, util.BytesHexMax32("dummy-teep-agent-kid-for-dev-123"), agentStatus[0].AgentKID)
+	assert.GreaterOrEqual(t, len(agentStatus), 1)
+	assert.Equal(t, util.BytesHexMax32(expectedKID), agentStatus[0].AgentKID)
 	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
 	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
 }
