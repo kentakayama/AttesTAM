@@ -15,7 +15,7 @@ Current limitation:
 Covered scope:
 - Public interface of admin-console:
   - `GET /`
-    - Admin console page
+    - Admin console page (index.html)
   - `GET /console/view-managed-devices`
     - Listing managed devices
   - `GET /console/view-managed-tcs`

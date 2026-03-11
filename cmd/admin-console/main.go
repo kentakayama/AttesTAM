@@ -38,7 +38,7 @@ func main() {
 	mux.HandleFunc("/console/view-managed-devices", handleListAgents)
 	mux.HandleFunc("/console/view-managed-tcs", handleListManifestsService)
 	mux.HandleFunc("/console/register-tc", handleRegisterManifest)
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(resolvePath("static")))))
+	mux.Handle("/static/", withNoStore(http.StripPrefix("/static/", http.FileServer(http.Dir(resolvePath("static"))))))
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
 
@@ -46,4 +46,11 @@ func main() {
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func withNoStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setNoStoreHeaders(w)
+		next.ServeHTTP(w, r)
+	})
 }

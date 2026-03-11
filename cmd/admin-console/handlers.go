@@ -10,16 +10,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type indexViewData struct {
 	ConnectedTAM string
+	AssetVersion string
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
+	setNoStoreHeaders(w)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := indexViewData{
 		ConnectedTAM: conf.TAMAPIBase,
+		AssetVersion: strconv.FormatInt(buildTime.Unix(), 10),
 	}
 
 	if err := tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
