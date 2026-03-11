@@ -154,10 +154,13 @@ Defined in `cmd/admin-console/config.go`.
 Primary flags:
 - `--port`
 - `--tam-api-base`
+- `--tam-api-debug`
 
 Behavior:
 - `port` defaults to `9090`.
 - `tam-api-base` defaults to `http://127.0.0.1:8080/`.
+- `tam-api-debug` defaults to `false` and enables HTTP request/response logging for AttesTAM API calls.
+- For `SUITManifestService/RegisterManifest`, debug logging does not print the binary request body; it logs the uploaded filename instead.
 - Startup validation requires non-empty `tam-api-base`.
 
 ## 7. Test Strategy

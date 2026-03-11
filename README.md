@@ -69,6 +69,7 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```
 
 `cmd/admin-console` uses `http://127.0.0.1:8080/` as the default `--tam-api-base` and no longer supports local testvector fallback mode.
+Add `--tam-api-debug` when you want the console to log AttesTAM API requests and responses to stderr. For `Register TC`, the upload body itself is not dumped; the log shows the uploaded filename instead.
 
 ### B) Docker
 

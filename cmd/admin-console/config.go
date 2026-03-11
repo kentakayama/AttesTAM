@@ -18,13 +18,15 @@ type AppConfig struct {
 	Server struct {
 		Port int
 	}
-	TAMAPIBase string
+	TAMAPIBase  string
+	TAMAPIDebug bool
 }
 
 func loadConfigFromFlags() AppConfig {
 	var cfg AppConfig
 	flag.IntVar(&cfg.Server.Port, "port", 9090, "HTTP listen port for admin console")
 	flag.StringVar(&cfg.TAMAPIBase, "tam-api-base", "http://127.0.0.1:8080/", "TAM API base URL")
+	flag.BoolVar(&cfg.TAMAPIDebug, "tam-api-debug", false, "Log TAM API HTTP requests and responses to stderr")
 	flag.Parse()
 
 	return cfg

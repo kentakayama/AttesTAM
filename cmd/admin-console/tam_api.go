@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,7 +59,7 @@ func resetTAMDeviceCachesForTest() {
 }
 
 func fetchTAMDevices(base string) ([]Agent, error) {
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	keys, err := fetchTAMListAgents(base, client)
 	if err != nil {
 		return nil, err
@@ -188,7 +189,7 @@ func formatUpdatedAt(t time.Time) string {
 
 func fetchTAMManifests(base string) ([]TrustedComponent, error) {
 	url := strings.TrimRight(base, "/") + "/SUITManifestService/ListManifests"
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -221,7 +222,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		return fmt.Errorf("failed to parse form: %w", err)
 	}
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		return fmt.Errorf("file is required")
 	}
@@ -237,9 +238,10 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(context.WithValue(req.Context(), tamAPIDebugFilenameContextKey, fileHeader.Filename))
 	req.Header.Set("Content-Type", "application/suit-envelope+cose")
 
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

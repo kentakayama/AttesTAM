@@ -38,6 +38,7 @@ Notes:
 - Operators are expected to access the console via loopback (`127.0.0.1`) or another explicitly controlled host route.
 - `port` is determined by command-line flag `--port` (default: `9090`).
 - `--tam-api-base` defaults to `http://127.0.0.1:8080/`.
+- `--tam-api-debug` can be enabled to log Admin Console <-> AttesTAM API traffic to stderr. For manifest registration, the binary upload body is not shown; the uploaded filename is logged instead.
 
 ```mermaid
 flowchart LR
