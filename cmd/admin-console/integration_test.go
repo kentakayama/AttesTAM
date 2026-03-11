@@ -67,14 +67,18 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	}
 
 	var agent *integrationAgent
+	wantKID := "dummy-teep-agent-kid-of-building-dev-123-00"
 	for _, a := range agents {
-		if a.KID == "dummy-teep-agent-kid-of-building-dev-123-00" {
+		if a.KID == wantKID {
 			agent = &a
 			break
 		}
 	}
 	if agent == nil {
 		t.Fatalf("agent not found")
+	}
+	if agent.KID != wantKID {
+		t.Fatalf("unexpected agent kid: %q", agent.KID)
 	}
 	if agent.LastUpdate == "" {
 		t.Fatal("expected last_update to be populated")

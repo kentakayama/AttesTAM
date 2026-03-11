@@ -85,7 +85,7 @@ Defined in `cmd/admin-console/types.go`.
 Internal model keeps precise raw-typed data, and JSON encoding applies display-oriented conversion.
 
 - `Agent.MarshalJSON`:
-  - `kid`: `[]byte` -> string
+  - `kid`: `[]byte` -> Base64URL string without padding
   - `last_update`: `time.Time` -> RFC3339 string (`formatUpdatedAt`), always included even when zero-valued
 - `Attribute.MarshalJSON`:
   - `ueid`: `eat.UEID` -> hex string
