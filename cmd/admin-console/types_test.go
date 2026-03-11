@@ -7,6 +7,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -58,4 +59,27 @@ func TestAgentMarshalJSONAlwaysIncludesLastUpdate(t *testing.T) {
 			t.Fatalf("unexpected last_update: %#v", got["last_update"])
 		}
 	})
+}
+
+func TestAgentMarshalJSONEncodesKIDAsBase64URL(t *testing.T) {
+	agent := Agent{
+		KID:             []byte("dev-1"),
+		Attributes:      Attribute{},
+		InstalledTCList: []TrustedComponent{},
+	}
+
+	raw, err := json.Marshal(agent)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	want := base64.RawURLEncoding.EncodeToString([]byte("dev-1"))
+	if got["kid"] != want {
+		t.Fatalf("unexpected kid: got=%#v want=%q", got["kid"], want)
+	}
 }

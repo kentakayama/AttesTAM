@@ -9,6 +9,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log"
@@ -67,8 +68,9 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	}
 
 	var agent *integrationAgent
+	wantKID := base64.RawURLEncoding.EncodeToString([]byte("dummy-teep-agent-kid-for-dev-123"))
 	for _, a := range agents {
-		if a.KID == "dummy-teep-agent-kid-for-dev-123" {
+		if a.KID == wantKID {
 			agent = &a
 			break
 		}
@@ -76,7 +78,7 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	if agent == nil {
 		t.Fatalf("agent not found")
 	}
-	if agent.KID != "dummy-teep-agent-kid-for-dev-123" {
+	if agent.KID != wantKID {
 		t.Fatalf("unexpected agent kid: %q", agent.KID)
 	}
 	if agent.LastUpdate == "" {

@@ -93,7 +93,7 @@ Success response:
 - Body: JSON array of agents
 
 Agent response schema:
-- `kid`: string
+- `kid`: Base64URL string without padding
 - `last_update`: RFC3339 string
 - `attribute.ueid`: hex string
 - `installed-tc`: array of trusted components
@@ -106,14 +106,14 @@ Example:
 ```json
 [
   {
-    "kid": "dev-1",
+    "kid": "ZHVtbXktdGVlcC1hZ2VudC1raWQtZm9yLWRldi0xMjM",
     "last_update": "2026-02-18T10:00:00Z",
     "attribute": {
-      "ueid": "10"
+      "ueid": "1773105745"
     },
     "installed-tc": [
       {
-        "name": "['app-1']",
+        "name": "['app1.wasm']",
         "version": 1
       }
     ]
@@ -149,8 +149,8 @@ Example:
 ```json
 [
   {
-    "name": "['manifest-a']",
-    "version": 7
+    "name": "['app1.wasm']",
+    "version": 1
   }
 ]
 ```
