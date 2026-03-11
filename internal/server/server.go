@@ -53,7 +53,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Init(); err != nil {
+	if err := t.InitWithPath(cfg.DBPath); err != nil {
 		return nil, err
 	}
 	if cfg.InsecureDemoMode {

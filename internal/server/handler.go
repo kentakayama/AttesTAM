@@ -146,45 +146,23 @@ func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// devName := "developer1@example.com" // get developer id
-	// entity, err := h.tam.FindEntity(devName)
-	// if err != nil {
-	// 	h.logger.Printf("failed to find TC Developer entity: %v", err)
-	// 	http.Error(w, "failed to find TC Developer entity", http.StatusBadRequest)
-	// 	return
-	// }
-	tcIDs := [][]byte{
-		{0x81, 0x49, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74}, // ['hello.txt']
+	storedManifests, err := h.tam.GetManifests()
+	if err != nil {
+		h.logger.Printf("failed to get SUIT Manifests: %v", err)
+		http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
+		return
 	}
 
 	var manifests []*model.SuitManifestOverview
-	for i := 0; i < len(tcIDs); i++ {
-		manifest, err := h.tam.GetManifest(tcIDs[i])
-		if err != nil {
-			h.logger.Printf("failed to get SUIT Manifest: %v", err)
-			http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
-			return
-		}
-		if manifest == nil {
-			h.logger.Printf("SUIT Manifest for TC %v not found", tcIDs[i])
-			continue
-		}
-
+	for i := 0; i < len(storedManifests); i++ {
 		overview := model.SuitManifestOverview{
-			TrustedComponentID: manifest.TrustedComponentID,
-			SequenceNumber:     manifest.SequenceNumber,
+			TrustedComponentID: storedManifests[i].TrustedComponentID,
+			SequenceNumber:     storedManifests[i].SequenceNumber,
 		}
 		manifests = append(manifests, &overview)
 	}
 
-	if len(manifests) == 0 {
-		resp := responseSpec{
-			status:      http.StatusNoContent,
-			contentType: "application/cbor",
-		}
-		h.writeResponse(w, resp)
-		return
-	}
+	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no manifest found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(manifests)
 	if err != nil {
 		h.logger.Printf("failed to encode SUIT Manifests: %v", err)
@@ -436,14 +414,7 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 		statusList = append(statusList, agentStatus)
 	}
 
-	if len(statusList) == 0 {
-		resp := responseSpec{
-			status:      http.StatusNoContent,
-			contentType: "application/cbor",
-		}
-		h.writeResponse(w, resp)
-		return
-	}
+	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no matching agent found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(statusList)
 	if err != nil {
 		h.logger.Printf("failed to encode TEEP Agent status: %v", err)

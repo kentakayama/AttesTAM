@@ -8,7 +8,9 @@ Source used:
 - Runtime schema builder: `internal/infra/sqlite/database.go`
 
 Note:
-- A runtime DB (`tam_state.db`) exists at repository root and may be WAL-locked while the server is running.
+- The server uses `tam_state.db` by default, relative to the current working directory.
+- Override the database location with `-db-path` or `ATTESTAM_DB_PATH`.
+- A runtime DB may be WAL-locked while the server is running.
 
 ## Database Configuration
 Runtime initialization (`internal/infra/sqlite/database.go`) applies:

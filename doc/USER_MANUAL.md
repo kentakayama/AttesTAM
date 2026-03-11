@@ -22,12 +22,20 @@ This document explains how to start the AttesTAM server (`cmd/attestam`) and the
 go run ./cmd/attestam -insecure-demo-mode
 ```
 
+The SQLite state database defaults to `tam_state.db` in the current working directory. Override it with `-db-path` or `ATTESTAM_DB_PATH` when you want the server state elsewhere.
+
+Example:
+```bash
+ATTESTAM_DB_PATH=/var/lib/attestam/tam_state.db go run ./cmd/attestam -insecure-demo-mode
+```
+
 ### Docker
 ```bash
 docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_DB_PATH=/data/tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
@@ -54,6 +62,7 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | ---- | ------- | ------- | ----------- |
 | `-addr` | `ATTESTAM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
 | `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
+| `-db-path` | `ATTESTAM_DB_PATH` | `tam_state.db` | File path to the SQLite state database. Relative paths are resolved from the current working directory. |
 | `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
 | `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
@@ -100,6 +109,7 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 
 - Click `View Managed Devices` in the sidebar.
 - Agent table is loaded from `GET /console/view-managed-devices`.
+- `Agent KID` is displayed as a Base64URL string without padding.
 - Click an `Agent KID` row to open the detail panel.
 - Detail panel shows installed TC list (`name`, `version`) for the selected agent.
 - Clicking the selected agent again closes the detail panel.
