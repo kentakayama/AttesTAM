@@ -286,9 +286,11 @@ curl -X GET http://localhost:8080/AgentService/ListAgents \
   -H "Accept: application/cbor" -s | cbor2diag.rb
 ```
 
-You will get some `[agent, last-updated]` data array, and you can request their details, for example:
+You will get some `[agent kid in bytes, last updated integer]` data array, and you can get their details with the next API.
 
 ### 4) Get Agent Status
+
+Here let's get the agent status with kid `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` (with base64url encode, this is `"dummy-teep-agent-kid-of-building-dev-123-00"`).
 
 ```bash
 echo "[h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D']" | diag2cbor.rb > /tmp/agent-kids.cbor
@@ -315,10 +317,6 @@ The output is equivalent to:
   ]
 ]
 ```
-
-> ![NOTE]
-> When you encode a byte string `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` with base64url,
-> you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for Admin Console.
 
 ### 5) Update TEEP Agent Status
 
