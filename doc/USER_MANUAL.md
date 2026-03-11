@@ -5,6 +5,14 @@ This document explains how to start the AttesTAM server (`cmd/attestam`) and the
 
 ## Quick Flow (for Demo)
 
+### Docker
+
+1. Start both AttesTAM and the TAM Admin Console with Docker.
+2. Open `http://127.0.0.1:9090` in a browser.
+3. Use the admin console to inspect managed devices / TCs and register manifests.
+
+### Native
+
 1. Start AttesTAM server (`go run ./cmd/attestam -insecure-demo-mode`).
 2. Start TAM admin console server (`go run ./cmd/admin-console`).
 3. Open `http://127.0.0.1:9090` in a browser.
@@ -15,31 +23,25 @@ This document explains how to start the AttesTAM server (`cmd/attestam`) and the
 - Go toolchain (`go run`)
 - Browser (Chrome/Safari/Firefox, etc.)
 
-## Start the AttesTAM Server
+## Start with Docker
 
-### Native
-```bash
-go run ./cmd/attestam -insecure-demo-mode
-```
+The Docker image starts both the AttesTAM server and the TAM Admin Console in one container.
 
-The SQLite state database defaults to `tam_state.db` in the current working directory. Override it with `-db-path` or `ATTESTAM_DB_PATH` when you want the server state elsewhere.
-
-Example:
-```bash
-ATTESTAM_DB_PATH=/var/lib/attestam/tam_state.db go run ./cmd/attestam -insecure-demo-mode
-```
-
-### Docker
 ```bash
 docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ATTESTAM_DB_PATH=/data/tam_state.db \
+  -e ATTESTAM_DB_PATH=tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
 ```
+
+This starts:
+
+- AttesTAM server on `http://127.0.0.1:8080`
+- TAM Admin Console on `http://127.0.0.1:9090`
 
 With verifier settings:
 ```bash
@@ -52,6 +54,21 @@ docker run --rm \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
+```
+
+## Start Natively
+
+### Start the AttesTAM Server
+
+```bash
+go run ./cmd/attestam -insecure-demo-mode
+```
+
+The SQLite state database defaults to `tam_state.db` in the current working directory. Override it with `-db-path` or `ATTESTAM_DB_PATH` when you want the server state elsewhere.
+
+Example:
+```bash
+ATTESTAM_DB_PATH=/var/lib/attestam/tam_state.db go run ./cmd/attestam -insecure-demo-mode
 ```
 
 ### AttesTAM Server Command Options
@@ -74,7 +91,7 @@ Print live defaults with:
 go run ./cmd/attestam -h
 ```
 
-## Start the Admin Console Server
+### Start the Admin Console Server
 
 Start the admin console in another terminal:
 ```bash
@@ -101,7 +118,7 @@ Example:
 go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 ```
 
-## UI Operation Guide
+## Admin Console Usage
 
 
 
@@ -175,13 +192,9 @@ make test-integrated
 - Empty tables in UI:
   - Validate that TAM has device or manifest data to return.
 
-## 
-```
-The following should be moved to another location:
-```
 ## TAM Server API Summary
 
-There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
+There are five main API endpoints for TC Developer, TEEP Agent, and Device Admin:
 
 ```mermaid
 flowchart LR
@@ -194,8 +207,9 @@ Section | Method | Endpoint | Notes
 --|--|--|--
 [1](#1-get-manifest-overviews-cbor) | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
 [2](#2-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
-[3](#3-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
-[4](#4-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+[3](#3-get-agent-list) | `GET` | `/AgentService/ListAgents` | Returns agent list in CBOR.
+[4](#4-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+[5](#5-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
 
 ### Prerequisites
 
@@ -263,9 +277,18 @@ For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSI
 > [!NOTE]
 > If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.
 
-### 3) Get Agent Status
+### 3) Get Agent List
 
-Prepare a CBOR request body that contains an array of KIDs:
+Get Agent list with the following command:
+
+```bash
+curl -X GET http://localhost:8080/AgentService/ListAgents \
+  -H "Accept: application/cbor" -s | cbor2diag.rb
+```
+
+You will get some `[agent, last-updated]` data array, and you can request their details, for example:
+
+### 4) Get Agent Status
 
 ```bash
 echo "[h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D']" | diag2cbor.rb > /tmp/agent-kids.cbor
@@ -297,10 +320,10 @@ The output is equivalent to:
 > When you encode a byte string `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` with base64url,
 > you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for Admin Console.
 
-### 4) Update TEEP Agent Status
+### 5) Update TEEP Agent Status
 
 This requires a TEEP Agent implementation that communicates with the `/tam` endpoint.
 See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
 For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
-One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider trying it.
+One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/taws), so consider trying it.
