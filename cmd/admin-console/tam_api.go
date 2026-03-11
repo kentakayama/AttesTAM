@@ -68,13 +68,6 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 	orderedKIDs := make([]string, 0, len(keys))
 	cache := getTAMDevicesCache(base)
 
-	cache.mu.RLock()
-	cachedSnapshot := make(map[string]cachedAgent, len(cache.byKID))
-	for kid, entry := range cache.byKID {
-		cachedSnapshot[kid] = entry
-	}
-	cache.mu.RUnlock()
-
 	kidsToFetch := make([][]byte, 0, len(keys))
 	for _, key := range keys {
 		if len(key.AgentKID) == 0 {
@@ -84,10 +77,7 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 		orderedKIDs = append(orderedKIDs, kid)
 		lastUpdated := key.UpdatedAt
 		lastUpdatedByKID[kid] = lastUpdated
-		cached, ok := cachedSnapshot[kid]
-		if !ok || !cached.lastUpdate.Equal(lastUpdated) {
-			kidsToFetch = append(kidsToFetch, key.AgentKID)
-		}
+		kidsToFetch = append(kidsToFetch, key.AgentKID)
 	}
 	if len(orderedKIDs) == 0 {
 		cache.mu.Lock()
@@ -112,14 +102,6 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 				lastUpdate: lastUpdatedByKID[string(agent.KID)],
 			}
 		}
-		for kid := range cache.byKID {
-			if _, ok := lastUpdatedByKID[kid]; !ok {
-				delete(cache.byKID, kid)
-			}
-		}
-		cache.mu.Unlock()
-	} else {
-		cache.mu.Lock()
 		for kid := range cache.byKID {
 			if _, ok := lastUpdatedByKID[kid]; !ok {
 				delete(cache.byKID, kid)
