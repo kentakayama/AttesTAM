@@ -77,7 +77,7 @@ docker build -t attestam .
 docker run --rm \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ATTESTAM_DB_PATH=/data/tam_state.db \
+  -e ATTESTAM_DB_PATH=tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
