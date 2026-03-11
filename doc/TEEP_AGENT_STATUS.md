@@ -112,7 +112,8 @@ agent-kid-and-last-updated = [
 ```cbor-diag
 [
   [
-    'dummy-teep-agent-kid-for-dev-123',
+    h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'
+      / "dummy-teep-agent-kid-of-building-dev-123-00" with base64url encode /,
     1771338065
   ]
 ]
@@ -157,7 +158,7 @@ You can find CDDL definitions for dependencies in:
 ```cbor-diag
 [
   [
-    'dummy-teep-agent-kid-for-dev-123',
+    h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D',
     {
       / attributes / 1: {
         / ueid / 256: h'016275696C64696E672D6465762D313233' / 0x01 + 'building-dev-123' /
@@ -212,4 +213,4 @@ Agent-2 | Manifest-C-seq0 | Component-c0 | Installed but not in `tc-list`
 > [!WARNING]
 > As you can see the table above, the status of TEEP Agents could be complicated.
 > For now, the TAM only accepts SUIT Manifest with exactly ONE Trusted Component and reports the Trusted Components with explicit successful SUIT Report to avoid implementation complexity.
-> That's why [example-agent-status.diag](./examples/example-agent-status.diag) does not contain the details.
+> That's why [example-agent-status.diag](./examples/agent-status/example-agent-status.diag) does not contain the details.

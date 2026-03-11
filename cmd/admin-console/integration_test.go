@@ -9,7 +9,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log"
@@ -53,14 +52,14 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 		t.Fatalf("GET devices: %v", err)
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("unexpected status: %d body=%s", resp.StatusCode, body)
 	}
 
 	var agents []integrationAgent
-	if err := json.NewDecoder(resp.Body).Decode(&agents); err != nil {
+	if err := json.Unmarshal(body, &agents); err != nil {
 		t.Fatalf("decode devices json: %v", err)
 	}
 	if len(agents) == 0 {
@@ -68,7 +67,7 @@ func TestAdminConsoleIntegrationViewManagedDevices(t *testing.T) {
 	}
 
 	var agent *integrationAgent
-	wantKID := base64.RawURLEncoding.EncodeToString([]byte("dummy-teep-agent-kid-for-dev-123"))
+	wantKID := "dummy-teep-agent-kid-of-building-dev-123-00"
 	for _, a := range agents {
 		if a.KID == wantKID {
 			agent = &a
@@ -138,7 +137,7 @@ func TestAdminConsoleIntegrationRegisterTC(t *testing.T) {
 	tamBase := startRealTAMServer(t)
 	console := startAdminConsoleServer(t, tamBase)
 
-	manifestBytes, err := os.ReadFile(resolvePath(filepath.Join("..", "..", "doc", "examples", "text.1.envelope.cbor")))
+	manifestBytes, err := os.ReadFile(resolvePath(filepath.Join("..", "..", "doc", "examples", "manifests", "text.1.envelope.cbor")))
 	if err != nil {
 		t.Fatalf("read manifest fixture: %v", err)
 	}

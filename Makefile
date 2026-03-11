@@ -10,10 +10,12 @@ run-demo:
 
 .PHONY: test
 test:
+	$(MAKE) -C doc/examples/
 	go test ./...
 
 .PHONY: test-integrated
 test-integrated:
+	$(MAKE) -C doc/examples/
 	go test -tags=integration ./...
 
 .PHONY: clean

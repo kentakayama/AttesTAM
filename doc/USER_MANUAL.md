@@ -228,12 +228,12 @@ A SUIT Manifest tells the TEEP Agent how to fetch and verify Trusted Component b
 
 For TC Developers, the TAM provides the `/SUITManifestService/RegisterManifest` endpoint, which accepts signed SUIT Manifests.
 
-There is an example SUIT Manifest [text.1.envelope.diag](./examples/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
+There is an example SUIT Manifest [text.1.envelope.diag](./examples/manifests/text.1.envelope.diag) signed with the demo purpose key to be accepted by the TAM.
 You can post it with the following command from the repository root:
 ```bash
 curl -X POST http://localhost:8080/SUITManifestService/RegisterManifest \
   -H "Content-Type: application/suit-envelope+cose" \
-  --data-binary "@./doc/examples/text.1.envelope.cbor"
+  --data-binary "@./doc/examples/manifests/text.1.envelope.cbor"
 ```
 
 Example output:
@@ -268,7 +268,7 @@ For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSI
 Prepare a CBOR request body that contains an array of KIDs:
 
 ```bash
-echo "['dummy-teep-agent-kid-for-dev-123']" | diag2cbor.rb > /tmp/agent-kids.cbor
+echo "[h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D']" | diag2cbor.rb > /tmp/agent-kids.cbor
 ```
 
 ```bash
@@ -282,7 +282,7 @@ The output is equivalent to:
 ```cbor-diag
 [
   [
-    'dummy-teep-agent-kid-for-dev-123',
+    h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D',
     {
       / attributes / 1: {256: h'016275696C64696E672D6465762D313233'},
       / installed-tc / 2: [
@@ -292,6 +292,10 @@ The output is equivalent to:
   ]
 ]
 ```
+
+> ![NOTE]
+> When you encode a byte string `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` with base64url,
+> you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for Admin Console.
 
 ### 4) Update TEEP Agent Status
 
