@@ -52,6 +52,10 @@ See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 > The commands below start the server in insecure demo mode for local testing and evaluation only.
 > Do not use this configuration in production.
 
+> [!NOTE]
+> This TAM requires customized & provisioned [VERAISON](https://github.com/kentakayama/services) server.
+> [teep-wasm-demo](https://github.com/s-miyazawa/teep-wasm-demo) provides such guidance.
+
 ### A) Native
 
 ```bash
@@ -75,9 +79,12 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```bash
 docker build -t attestam .
 docker run --rm \
+  --net=host \
   -p 8080:8080 -p 9090:9090 \
+  -e ATTESTAM_ADDR=":8080" \
+  -e ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
+  -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ATTESTAM_DB_PATH=tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam

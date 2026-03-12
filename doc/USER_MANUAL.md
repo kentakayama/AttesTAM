@@ -46,9 +46,10 @@ This starts:
 With verifier settings:
 ```bash
 docker run --rm \
+  --net=host \
   -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_ADDR=":8080" \
-  -e ATTESTAM_CHALLENGE_SERVER="https://verifier.example.com" \
+  -e ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
   -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
   -e ADMIN_CONSOLE_PORT=9090 \
