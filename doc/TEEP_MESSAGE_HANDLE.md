@@ -66,6 +66,7 @@ This TAM implementation enforces the following requirements for incoming `POST /
    - If QueryResponse cannot be authenticated with stored agent keys, attestation payload is required.
    - The TEEP Agent must reply on QueryRequest with attestation request and challenge, sending back QueryResponse with Evidence using `challenge`
    - The TAM asks the Verifier for an attestation result, and it must be `affirming`.
+   - If the verifier client is not configured, attestation-required `POST /tam` requests fail with HTTP `503 Service Unavailable`.
    - QueryResponse signature is re-verified using the key extracted from Attestation Result.
    - Confirmed key is stored for future message authentication.
 
@@ -159,6 +160,7 @@ Validation layers:
 1. Attestation Result appraisal layer
    - posts the Evidence in the `attestation-payload` field in the QueryResponse message to the VERAISON challenge-response endpoint.
    - confirms the Attestation Result is `affirming`.
+   - if the verifier endpoint is not configured, the HTTP handler returns `503 Service Unavailable` instead of continuing the attestation flow.
 2. Evidence appraisal layer
    - validates `eat.Nonce` field in EAT contains TAM's `challenge` value.
    - extracts `cwt.cnf.key` and verifies QueryResponse COSE signature using that key.

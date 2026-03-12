@@ -43,18 +43,22 @@ This starts:
 - AttesTAM server on `http://127.0.0.1:8080`
 - TAM Admin Console on `http://127.0.0.1:9090`
 
+This default image configuration also sets `ATTESTAM_CHALLENGE_SERVER=https://localhost:8443`, so attestation verification expects a verifier reachable from inside the container.
+
 With verifier settings:
 ```bash
 docker run --rm \
-  -p 8080:8080 -p 9090:9090 \
+  --net=host \
   -e ATTESTAM_ADDR=":8080" \
-  -e ATTESTAM_CHALLENGE_SERVER="https://verifier.example.com" \
+  -e ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
   -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
 ```
+
+`--net=host` is used here so the container can reach a verifier running on `https://localhost:8443` on the host.
 
 ## Start Natively
 
@@ -81,7 +85,7 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-db-path` | `ATTESTAM_DB_PATH` | `tam_state.db` | File path to the SQLite state database. Relative paths are resolved from the current working directory. |
 | `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
-| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
+| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. If set to an empty string, requests that require attestation verification return HTTP `503 Service Unavailable`. |
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
 | `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
@@ -145,52 +149,6 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 - Select a file and click `Upload`.
 - Browser sends `multipart/form-data` to `POST /console/register-tc`.
 - On success, UI displays `Upload complete.` and refreshes manifest list.
-
-## Run Tests
-
-Basic tests:
-```bash
-go test ./...
-```
-
-Integration tests with VERAISON (you need to run VERAISON on localhost):
-```bash
-go test -tags=integration ./...
-```
-
-Equivalent Make targets:
-```bash
-make test
-make test-integrated
-```
-
-## Troubleshooting
-
-### Server startup failure
-
-- `tam-api-base is required`:
-  - Do not pass an empty `--tam-api-base`.
-  - If TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
-- `parse template: ...`:
-  - Ensure `templates/index.html` is available from the current working directory (or run from repository root).
-- `listen tcp ...: bind: address already in use`:
-  - Another process is already using the port (default `9090`).
-  - Use a different port, for example: `go run ./cmd/admin-console --port=19090`.
-
-### HTTP error
-
-- `500 admin console is misconfigured: tam-api-base is required`:
-  - Start admin-console with a valid `--tam-api-base`.
-- `502 TAM API fetch failed: ...` / `502 TAM API post failed: ...`:
-  - Verify TAM is running and reachable.
-  - Verify `--tam-api-base` is correct.
-  - Verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, `/SUITManifestService/ListManifests`, and `/SUITManifestService/RegisterManifest` are reachable.
-- If upload fails with a message that includes `status 400 from TAM API`:
-  - Verify SUIT envelope encoding and signature.
-  - Verify signer key is pre-registered in TAM.
-  - Verify that you are not uploading a manifest whose sequence number is the same as, or older than, a manifest already registered in TAM.
-- Empty tables in UI:
-  - Validate that TAM has device or manifest data to return.
 
 ## TAM Server API Summary
 

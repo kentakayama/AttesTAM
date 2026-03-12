@@ -49,6 +49,12 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, err
 	}
 
+	if verifierClient != nil {
+		logger.Printf("Verifier client configured with base URL: `%s`, content type: `%s`, insecure TLS: %t, timeout: %s", cfg.ChallengeServerURL, cfg.ChallengeContentType, cfg.ChallengeInsecureTLS, cfg.ChallengeTimeout)
+	} else {
+		logger.Printf("No verifier client configured. Verifier challenge-response interactions will be disabled.")
+	}
+
 	t, err := tam.NewTAM(cfg.TAMTEEPPrivateKeyPath, verifierClient, logger)
 	if err != nil {
 		return nil, err

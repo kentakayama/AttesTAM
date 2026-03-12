@@ -299,7 +299,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 		require.Equal(t, 1, len(agentStatus.Status.SuitManifests))
 		encodedComponentID, err := cbor.Marshal(tcID)
 		require.Nil(t, err)
-		require.Equal(t, encodedComponentID, agentStatus.Status.SuitManifests[0].TrustedComponentID)
+		require.Equal(t, util.BytesHexMax32(encodedComponentID), agentStatus.Status.SuitManifests[0].TrustedComponentID)
 		require.Equal(t, uint64(0), agentStatus.Status.SuitManifests[0].SequenceNumber)
 	} else {
 		// TEST#4a: generate TEEP Agent's Error with Token

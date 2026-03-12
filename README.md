@@ -49,8 +49,9 @@ To support the architecture shown above, the TAM provides three primary communic
 See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 
 > [!WARNING]
-> The commands below start the server in insecure demo mode for local testing and evaluation only.
-> Do not use this configuration in production.
+> The commands below start the server in insecure demo mode for local testing and evaluation only. Do not use this configuration in production.
+> With demo mode, the TAM trusts [a TEEP Agent private key](./doc/examples/keys/agent_priv.diag) to communicate with this TAM, so the TEE Device may use it.
+> Otherwise, the TAM requires an Remote Attestation Evidence binding a public key. See [teep-wasm-demo](https://github.com/s-miyazawa/teep-wasm-demo) how to configure the Verifier and how the TEEP Agent acts.
 
 ### A) Native
 
@@ -59,10 +60,13 @@ go run ./cmd/attestam -insecure-demo-mode
 ```
 
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
-Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. When a verifier endpoint is configured (via `-challenge-server` or `ATTESTAM_CHALLENGE_SERVER`), the server forwards attestation payloads and logs the decoded verifier responses. No attestation files are written to disk.
-The SQLite state database defaults to `tam_state.db` in the current working directory and can be overridden with `-db-path` or `ATTESTAM_DB_PATH`.
+Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. TAM communicates with a Verifier endpoint configured with `-challenge-server` command line argument (default value is `https://localhost:8443/`), forwarding attestation payloads and logging the decoded Verifier responses. No attestation files are written to disk.
+If `-challenge-server` is set to an empty string, verifier-backed attestation is unavailable and requests that require attestation verification return HTTP `503 Service Unavailable`.
+The SQLite state database defaults to `tam_state.db` in the current working directory and can be overridden with `-db-path`.
 Use `go run ./cmd/attestam -h` to see available CLI options.
 Detailed references for flags and environment variables are documented in [`doc/USER_MANUAL.md`](./doc/USER_MANUAL.md).
+
+You can use TAM Admin Console with following command:
 
 ```bash
 go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
@@ -75,9 +79,9 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```bash
 docker build -t attestam .
 docker run --rm \
-  -p 8080:8080 -p 9090:9090 \
+  --net=host \
+  -e ATTESTAM_ADDR=":8080" \
   -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ATTESTAM_DB_PATH=tam_state.db \
   -e ADMIN_CONSOLE_PORT=9090 \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
@@ -88,7 +92,7 @@ This container starts both services:
 - TAM core server on `http://localhost:8080` (`POST /tam`)
 - TAM admin console on `http://127.0.0.1:9090`
 
-Then open `http://127.0.0.1:9090` in your Web browser.
+`--net=host` is used so the containerized TAM can reach a verifier running on `https://localhost:8443` on the host. Then open `http://127.0.0.1:9090` in your Web browser.
 
 ## Documentation
 
@@ -103,21 +107,6 @@ Then open `http://127.0.0.1:9090` in your Web browser.
   - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md)
   - [TAM Status TEEP Agent Status](./doc/TAM_STATUS_TEEP_AGENT_STATUS.md)
   - [Database Design](./doc/DATABASE_DESIGN.md)
-
-## Development Workflow
-
-```bash
-make run-demo         # Start server locally in insecure demo mode (evaluation only; not for production)
-make test             # Run unit tests (go test ./...)
-make test-integrated  # Run integration-tagged tests (requires provisioned VERAISON server)
-
-# Equivalent direct Go commands:
-go run ./cmd/attestam -insecure-demo-mode
-go test ./...
-go test -tags=integration ./...
-```
-
-The handler logs every received TEEP message. Verifier responses are decoded and logged, and confirmed TEEP Agent keys are stored in SQLite.
 
 ## Contributing
 

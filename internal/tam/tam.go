@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -68,10 +69,7 @@ func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Log
 		return nil, errors.New("failed to load TAM's private key")
 	}
 	kid, _ := key.Thumbprint(crypto.SHA256)
-	logger.Printf("TAM's ESP256 Key = {x: %s, y:%s, kid: %s}",
-		hex.EncodeToString(key.Params[cose.KeyLabelEC2X].([]byte)),
-		hex.EncodeToString(key.Params[cose.KeyLabelEC2Y].([]byte)),
-		hex.EncodeToString(kid))
+	logger.Printf("TAM's Key = %s, kid = %s", util.PrintCOSEKey(&key), util.BytesHexMax32(kid))
 
 	return &TAM{
 		verifier: verifier,
@@ -100,7 +98,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	// case 1) TAM sent QueryRequest with challenge & request-attestation
 	// case 2) someone created malformed TEEP Protocol messages
 
-	t.logger.Printf("received TEEP Message %s.", incomingMessage.Type.CBORDiagString(0))
+	t.logger.Printf("received %s.", incomingMessage.CBORDiagString(0))
 
 	switch incomingMessage.Type {
 	case TEEPTypeQueryResponse:
@@ -171,9 +169,9 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 					t.logger.Printf("failed to store attestation public key: %v", err)
 					return nil, ErrFatal
 				} else {
-					t.logger.Printf("stored attestation public key %v in system keyring.", key)
+					agentKID, _ = key.Thumbprint(crypto.SHA256)
+					t.logger.Printf("stored attestation public key %s, kid %s in system keyring.", util.PrintCOSEKey(key), util.BytesHexMax32(agentKID))
 				}
-				agentKID, _ = key.Thumbprint(crypto.SHA256)
 			}
 		}
 
@@ -641,9 +639,10 @@ func (t *TAM) verifyAttestationPayload(incoming *TEEPMessage) (*rats.ProcessedAt
 }
 
 func (t *TAM) submitAttestationPayload(data []byte) (*rats.ProcessedAttestation, error) {
-	if t.verifier == nil {
-		return nil, ErrAttestationFailed
+	if t.verifier == nil || (t.verifier != nil && reflect.ValueOf(t.verifier).IsNil()) {
+		return nil, ErrVerifierNotConfigured
 	}
+	t.logger.Printf("submitting attestation payload to verifier: %v", t.verifier)
 
 	att, err := t.verifier.Process(data)
 	if err != nil {
@@ -662,8 +661,6 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 	if !bytes.Equal(incomingMessage.Options.Token, sentMessage.Options.Token) {
 		return nil, ErrFatal
 	}
-
-	t.logger.Printf("QueryResponse payload (COSE CBOR):\n%#v", *incomingMessage)
 
 	token := t.generateToken()
 	if token == nil {
@@ -1088,10 +1085,7 @@ func (t *TAM) EnsureDefaultTEEPAgent(withStatus bool) error {
 		return errors.New("failed to initialize fixed TEEP Agent's key")
 	}
 	kidESP256, _ := keyESP256.Thumbprint(crypto.SHA256)
-	t.logger.Printf("Default TEEP Agent ESP256 Key = {x: %s, y: %s, kid: %s}",
-		hex.EncodeToString(keyESP256.Params[cose.KeyLabelEC2X].([]byte)),
-		hex.EncodeToString(keyESP256.Params[cose.KeyLabelEC2Y].([]byte)),
-		hex.EncodeToString(kidESP256))
+	t.logger.Printf("Default TEEP Agent Key = %s, kid = %s", util.PrintCOSEKey(&keyESP256), util.BytesHexMax32(kidESP256))
 	agentESP256, _ := t.getTEEPAgentKey(kidESP256)
 	if agentESP256 != nil {
 		// OK, already exists
