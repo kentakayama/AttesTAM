@@ -40,18 +40,18 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 		Logger:      logger,
 	})
 	require.Nil(t, err)
-	tam, err := NewTAM(verifierClient, logger)
+	tam, err := NewTAM("", verifierClient, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.Init(); err != nil {
+	if err = tam.InitWithPath(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultEntity(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
+	if err = tam.SeedDemoEntities(false); err != nil {
+		t.Fatalf("TAM SeedDemoEntities error: %v", err)
 	}
-	if err = tam.EnsureDefaultTEEPAgent(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	if err = tam.SeedDemoAgent(false); err != nil {
+		t.Fatalf("TAM SeedDemoAgent error: %v", err)
 	}
 
 	// tam.EnsureDefaultTEEPAgent is not required, because EAT can carry the public key of the TEEP Agent

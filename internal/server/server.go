@@ -64,10 +64,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 	}
 	if cfg.InsecureDemoMode {
 		logger.Printf("[WARNING] Insecure demo mode is enabled. This should NOT be used in production environments.")
-		if err := t.EnsureDefaultEntity(true); err != nil {
-			return nil, err
-		}
-		if err := t.EnsureDefaultTEEPAgent(true); err != nil {
+		if err := t.SeedDemoData(); err != nil {
 			return nil, err
 		}
 	}
