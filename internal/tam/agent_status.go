@@ -34,7 +34,7 @@ type AgentStatus struct {
 }
 
 type AgentAttributes struct {
-	DeviceUEID []byte `cbor:"256,keyasint,omitempty"`
+	DeviceUEID util.BytesHexMax32 `cbor:"256,keyasint,omitempty"`
 }
 
 func (s *AgentStatusRecord) MarshalCBOR() ([]byte, error) {

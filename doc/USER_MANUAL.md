@@ -43,11 +43,12 @@ This starts:
 - AttesTAM server on `http://127.0.0.1:8080`
 - TAM Admin Console on `http://127.0.0.1:9090`
 
+This default image configuration also sets `ATTESTAM_CHALLENGE_SERVER=https://localhost:8443`, so attestation verification expects a verifier reachable from inside the container.
+
 With verifier settings:
 ```bash
 docker run --rm \
   --net=host \
-  -p 8080:8080 -p 9090:9090 \
   -e ATTESTAM_ADDR=":8080" \
   -e ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
   -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
@@ -56,6 +57,8 @@ docker run --rm \
   -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
   attestam
 ```
+
+`--net=host` is used here so the container can reach a verifier running on `https://localhost:8443` on the host.
 
 ## Start Natively
 
@@ -82,7 +85,7 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-db-path` | `ATTESTAM_DB_PATH` | `tam_state.db` | File path to the SQLite state database. Relative paths are resolved from the current working directory. |
 | `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
-| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
+| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. If set to an empty string, requests that require attestation verification return HTTP `503 Service Unavailable`. |
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
 | `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |

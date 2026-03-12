@@ -8,6 +8,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"io"
 	"log"
 	"net/http"
@@ -20,6 +23,7 @@ import (
 	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/veraison/go-cose"
 )
 
 var (
@@ -218,7 +222,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	require.Nil(t, err)
 	assert.GreaterOrEqual(t, len(agentStatus), 1)
 	assert.Equal(t, util.BytesHexMax32(expectedKID), agentStatus[0].AgentKID)
-	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
+	assert.Equal(t, util.BytesHexMax32(append([]byte{0x01}, []byte("building-dev-123")...)), agentStatus[0].Status.Attributes.DeviceUEID)
 	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
 }
 
@@ -348,4 +352,80 @@ func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
 	// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and
 	// refactoring the handler to return 413 instead of 500 when the body exceeds the limit.
 	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
+
+func TestTAMOverHTTP_VerifierNotConfigured_ReturnsServiceUnavailable(t *testing.T) {
+	logger := log.Default()
+	tamInstance, err := tam.NewTAM("", nil, logger)
+	require.NoError(t, err)
+	require.NoError(t, tamInstance.InitWithPath(":memory:"))
+	require.NoError(t, tamInstance.EnsureDefaultEntity(false))
+
+	h, err := newHandler(tamInstance, logger)
+	require.NoError(t, err)
+
+	ecdsaAgentKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	agentKey, err := cose.NewKeyEC2(cose.AlgorithmESP256, ecdsaAgentKey.PublicKey.X.Bytes(), ecdsaAgentKey.PublicKey.Y.Bytes(), ecdsaAgentKey.D.Bytes())
+	require.NoError(t, err)
+
+	// First POST creates a session and returns QueryRequest(token).
+	req := httptest.NewRequest(http.MethodPost, "/tam", nil)
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w := httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+	var queryRequestWithToken tam.TEEPMessage
+	require.NoError(t, decodeSignedTEEPMessage(w.Body.Bytes(), &queryRequestWithToken))
+	require.NotNil(t, queryRequestWithToken.Options.Token)
+
+	// An unauthenticated QueryResponse with the matching token forces attestation.
+	queryResponseWithToken := tam.TEEPMessage{
+		Type: tam.TEEPTypeQueryResponse,
+		Options: tam.TEEPOptions{
+			Token: queryRequestWithToken.Options.Token,
+		},
+	}
+	signedQueryResponseWithToken, err := queryResponseWithToken.COSESign1Sign(agentKey)
+	require.NoError(t, err)
+
+	req = httptest.NewRequest(http.MethodPost, "/tam", bytes.NewReader(signedQueryResponseWithToken))
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w = httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+	var queryRequestWithChallenge tam.TEEPMessage
+	require.NoError(t, decodeSignedTEEPMessage(w.Body.Bytes(), &queryRequestWithChallenge))
+	require.NotNil(t, queryRequestWithChallenge.Options.Challenge)
+
+	// Without a configured verifier, the attestation-required response path returns HTTP 503.
+	queryResponseWithEvidence := tam.TEEPMessage{
+		Type: tam.TEEPTypeQueryResponse,
+		Options: tam.TEEPOptions{
+			AttestationPayload: []byte{0x41, 0x00},
+		},
+	}
+	signedQueryResponseWithEvidence, err := queryResponseWithEvidence.COSESign1Sign(agentKey)
+	require.NoError(t, err)
+
+	req = httptest.NewRequest(http.MethodPost, "/tam", bytes.NewReader(signedQueryResponseWithEvidence))
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w = httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Result().StatusCode)
+	assert.Contains(t, w.Body.String(), "verifier client is not configured")
+}
+
+func decodeSignedTEEPMessage(body []byte, msg *tam.TEEPMessage) error {
+	var sign1 cose.Sign1Message
+	if err := sign1.UnmarshalCBOR(body); err != nil {
+		return err
+	}
+	return cbor.Unmarshal(sign1.Payload, msg)
 }

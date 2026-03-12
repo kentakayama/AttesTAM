@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/veraison/go-cose"
 )
 
 func RenderCBORPretty(decoded any) (string, error) {
@@ -128,6 +129,10 @@ func (l DiagList[T]) CBORDiagString(indent int) string {
 
 type BytesHexMax32 []byte
 
+func (b BytesHexMax32) String() string {
+	return b.CBORDiagString(0)
+}
+
 func (b BytesHexMax32) CBORDiagString(indent int) string {
 	l := len(b)
 	if l > 32 {
@@ -140,4 +145,129 @@ type DiagString string
 
 func (d DiagString) CBORDiagString(indent int) string {
 	return fmt.Sprintf("\"%s\"", string(d))
+}
+
+func PrintCOSEKey(key *cose.Key) string {
+	if key == nil {
+		return "null"
+	}
+
+	var b strings.Builder
+	b.WriteByte('{')
+	fieldCount := 0
+
+	appendField := func(name, value string) {
+		if value == "" {
+			return
+		}
+		if fieldCount > 0 {
+			b.WriteByte(',')
+		}
+		fieldCount++
+		b.WriteByte('"')
+		b.WriteString(name)
+		b.WriteString(`":`)
+		b.WriteString(value)
+	}
+	appendDiagString := func(name, value string) {
+		if value == "" {
+			return
+		}
+		appendField(name, DiagString(value).CBORDiagString(0))
+	}
+	appendBytes := func(name string, value []byte) {
+		if len(value) == 0 {
+			return
+		}
+		appendField(name, BytesHexMax32(value).CBORDiagString(0))
+	}
+
+	appendDiagString("kty", key.Type.String())
+
+	var skipParamLabels map[any]struct{}
+	switch key.Type {
+	case cose.KeyTypeEC2:
+		crv, x, y, d := key.EC2()
+		appendDiagString("crv", crv.String())
+		appendBytes("x", x)
+		appendBytes("y", y)
+		appendBytes("d", d)
+		skipParamLabels = map[any]struct{}{
+			cose.KeyLabelEC2Curve: {},
+			cose.KeyLabelEC2X:     {},
+			cose.KeyLabelEC2Y:     {},
+			cose.KeyLabelEC2D:     {},
+		}
+	case cose.KeyTypeOKP:
+		crv, x, d := key.OKP()
+		appendDiagString("crv", crv.String())
+		appendBytes("x", x)
+		appendBytes("d", d)
+		skipParamLabels = map[any]struct{}{
+			cose.KeyLabelOKPCurve: {},
+			cose.KeyLabelOKPX:     {},
+			cose.KeyLabelOKPD:     {},
+		}
+	case cose.KeyTypeSymmetric:
+		appendBytes("k", key.Symmetric())
+	}
+
+	appendBytes("kid", key.ID)
+	if key.Algorithm != cose.AlgorithmReserved {
+		appendDiagString("alg", key.Algorithm.String())
+	}
+	if len(key.Ops) > 0 {
+		ops := make([]string, len(key.Ops))
+		for i, op := range key.Ops {
+			ops[i] = DiagString(op.String()).CBORDiagString(0)
+		}
+		appendField("key_ops", "["+strings.Join(ops, ",")+"]")
+	}
+	appendBytes("base_iv", key.BaseIV)
+
+	if len(key.Params) > 0 {
+		type entry struct {
+			label string
+			value string
+		}
+		entries := make([]entry, 0, len(key.Params))
+		for label, value := range key.Params {
+			if _, ok := skipParamLabels[label]; ok {
+				continue
+			}
+			entries = append(entries, entry{
+				label: stringifyCBORKey(label),
+				value: stringifyCBORValue(value),
+			})
+		}
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].label < entries[j].label
+		})
+		for _, e := range entries {
+			appendField(e.label, e.value)
+		}
+	}
+
+	b.WriteByte('}')
+	return b.String()
+}
+
+func stringifyCBORValue(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return "null"
+	case string:
+		return DiagString(v).CBORDiagString(0)
+	case []byte:
+		return BytesHexMax32(v).CBORDiagString(0)
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	case fmt.Stringer:
+		return DiagString(v.String()).CBORDiagString(0)
+	default:
+		return fmt.Sprint(v)
+	}
 }
