@@ -50,7 +50,8 @@ See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 
 > [!WARNING]
 > The commands below start the server in insecure demo mode for local testing and evaluation only. Do not use this configuration in production.
-> With demo mode, the TAM trusts [a TEEP Agent private key](./doc/examples/keys/agent_priv.diag) to communicate with this TAM, so the TEE Device may use it.
+> With demo mode, the TAM uses a public insecure demo private key embedded in the binary and trusts [a demo TEEP Agent private key](./doc/examples/keys/agent_priv.diag) to communicate with this TAM.
+> Outside insecure demo mode, you must provide `-tam-teep-private-key-path` (or `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH`).
 > Otherwise, the TAM requires an Remote Attestation Evidence binding a public key. See [teep-wasm-demo](https://github.com/s-miyazawa/teep-wasm-demo) how to configure the Verifier and how the TEEP Agent acts.
 
 ### A) Native
