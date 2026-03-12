@@ -84,11 +84,15 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | `-addr` | `ATTESTAM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
 | `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-db-path` | `ATTESTAM_DB_PATH` | `tam_state.db` | File path to the SQLite state database. Relative paths are resolved from the current working directory. |
-| `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
+| `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with the public insecure demo TAM key, demo TC Developer key, and demo seed data (not for production). |
 | `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. If set to an empty string, requests that require attestation verification return HTTP `503 Service Unavailable`. |
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
 | `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
+
+> [!WARNING]
+> The insecure demo TAM private key is public and is embedded only for explicit demo/test flows.
+> If `-insecure-demo-mode` is `false`, AttesTAM refuses to start unless `-tam-teep-private-key-path` or `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` is set.
 
 Print live defaults with:
 ```bash

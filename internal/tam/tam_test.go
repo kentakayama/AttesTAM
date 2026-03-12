@@ -62,11 +62,11 @@ func (e *MockEATVerifier) Process(data []byte) (*rats.ProcessedAttestation, erro
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err = tam.SeedDemoEntities(false); err != nil {
@@ -183,11 +183,11 @@ func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err = tam.SeedDemoData(); err != nil {
@@ -352,11 +352,11 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err = tam.SeedDemoEntities(true); err != nil {
@@ -417,11 +417,11 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err = tam.SeedDemoData(); err != nil {
@@ -477,11 +477,11 @@ func TestTAMNoTCMatch(t *testing.T) {
 	// The handler should return nil without error even if there is no matching TC in the TCList
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err = tam.SeedDemoAgent(false); err != nil {

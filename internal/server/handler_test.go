@@ -66,11 +66,11 @@ var (
 
 func TestTCHandler_Update_OK(t *testing.T) {
 	logger := log.Default()
-	tam, err := tam.NewTAM("", nil, logger)
+	tam, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err := tam.SeedDemoEntities(false); err != nil {
@@ -104,11 +104,11 @@ func TestTCHandler_Update_OK(t *testing.T) {
 
 func TestGetAgentStatus_OK(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err := tamInstance.SeedDemoData(); err != nil {
@@ -164,11 +164,11 @@ func TestGetAgentStatus_OK(t *testing.T) {
 
 func TestGetAgentStatus_NoContent(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err := tamInstance.SeedDemoEntities(false); err != nil {
@@ -193,11 +193,11 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 
 func TestGetManifests_OK(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
 	if err := tamInstance.SeedDemoEntities(true); err != nil {
@@ -290,9 +290,9 @@ func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
 
 func TestTAMOverHTTP_VerifierNotConfigured_ReturnsServiceUnavailable(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	require.NoError(t, err)
-	require.NoError(t, tamInstance.InitWithPath(":memory:"))
+	require.NoError(t, tamInstance.InitDB(":memory:"))
 	require.NoError(t, tamInstance.SeedDemoEntities(false))
 
 	h, err := newHandler(tamInstance, logger)

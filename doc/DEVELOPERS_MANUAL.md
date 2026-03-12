@@ -13,6 +13,10 @@ go test ./...
 go test -tags=integration ./...
 ```
 
+Notes:
+- The embedded TAM private key is a public insecure demo key and is only used through explicit insecure demo/test flows.
+- Outside `-insecure-demo-mode`, startup requires `-tam-teep-private-key-path` or `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH`.
+
 ## Troubleshooting
 
 ### Server startup failure

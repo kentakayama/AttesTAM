@@ -37,11 +37,11 @@ var (
 
 func TestKeyring_GetSet(t *testing.T) {
 	logger := log.Default()
-	tam, err := NewTAM("", nil, logger)
+	tam, err := NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	err = tam.InitWithPath(":memory:")
+	err = tam.InitDB(":memory:")
 	if err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}

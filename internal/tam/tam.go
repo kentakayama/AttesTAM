@@ -39,30 +39,18 @@ type TAM struct {
 }
 
 func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
-	var keyBytes []byte
 	if tamPrivateKeyPath == "" {
-		// Use fixed key for demo mode. This should not be used in production environments.
-		// Caller of this function should ensure that this branch is not taken in production environments.
-		keyBytes = []byte{
-			0xa6, 0x01, 0x02, 0x03, 0x28, 0x20, 0x01, 0x21, 0x58, 0x20, 0x0e, 0x90,
-			0x8a, 0xa8, 0xf0, 0x66, 0xdb, 0x1f, 0x08, 0x4e, 0x0c, 0x36, 0x52, 0xc6,
-			0x39, 0x52, 0xbd, 0x99, 0xf2, 0xa5, 0xbd, 0xb2, 0x2f, 0x9e, 0x01, 0x36,
-			0x7a, 0xad, 0x03, 0xab, 0xa6, 0x8b, 0x22, 0x58, 0x20, 0x77, 0xda, 0x1b,
-			0xd8, 0xac, 0x4f, 0x0c, 0xb4, 0x90, 0xba, 0x21, 0x06, 0x48, 0xbf, 0x79,
-			0xab, 0x16, 0x4d, 0x49, 0xad, 0x35, 0x51, 0xd7, 0x1d, 0x31, 0x4b, 0x27,
-			0x49, 0xee, 0x42, 0xd2, 0x9a, 0x23, 0x58, 0x20, 0x84, 0x1a, 0xeb, 0xb7,
-			0xb9, 0xea, 0x6f, 0x02, 0x60, 0xbe, 0x73, 0x55, 0xa2, 0x45, 0x88, 0xb9,
-			0x77, 0xd2, 0x3d, 0x2a, 0xc5, 0xbf, 0x2b, 0x6b, 0x2d, 0x83, 0x79, 0x43,
-			0x2a, 0x1f, 0xea, 0x98,
-		}
-	} else {
-		var err error
-		keyBytes, err = os.ReadFile(tamPrivateKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read TAM private key from path %s: %w", tamPrivateKeyPath, err)
-		}
+		return nil, errors.New("tam private key path is required")
+	}
+	keyBytes, err := os.ReadFile(tamPrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read TAM private key from path %s: %w", tamPrivateKeyPath, err)
 	}
 
+	return NewTAMFromKeyBytes(keyBytes, verifier, logger)
+}
+
+func NewTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
 	var key cose.Key
 	err := cbor.Unmarshal(keyBytes, &key)
 	if err != nil {
@@ -76,6 +64,13 @@ func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Log
 		tamKey:   &key,
 		logger:   logger,
 	}, nil
+}
+
+func NewDemoTAM(verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+	if logger != nil {
+		logger.Printf("[WARNING] Using public insecure demo TAM private key. This must not be used outside demo or tests.")
+	}
+	return NewTAMFromKeyBytes(demo.DemoTAMPrivateKeyCBOR, verifier, logger)
 }
 
 func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
@@ -757,7 +752,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 }
 
 // initializes the TAM by setting up database connections
-func (t *TAM) InitWithPath(dbPath string) error {
+func (t *TAM) InitDB(dbPath string) error {
 	t.ctx = context.Background()
 	// Initialize SQLite database (stored in tam_state.db or even could be :memory:)
 	db, err := sqlite.InitDB(t.ctx, dbPath)
