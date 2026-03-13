@@ -1,8 +1,8 @@
-# Admin Console External Design
+# AttesTAM Console External Design
 
 ## 1. Purpose
 
-`cmd/admin-console` provides an operator UI and HTTP endpoints for:
+`cmd/admin-console` provides the AttesTAM Console operator UI and HTTP endpoints for:
 - Listing managed devices
 - Listing managed trusted components (TC manifests)
 - Registering a TC manifest
@@ -10,10 +10,10 @@
 This document defines externally visible behavior.
 
 Current limitation:
-- Authentication/authorization for console users is not implemented in the current version. This is planned for a future Admin Console revision.
+- Authentication/authorization for console users is not implemented in the current version. This is planned for a future AttesTAM Console revision.
 
 Covered scope:
-- Public interface of admin-console:
+- Public interface of the AttesTAM Console:
   - `GET /`
     - Admin console page (index.html)
   - `GET /console/view-managed-devices`
@@ -28,9 +28,9 @@ Covered scope:
 Not covered:
 - AttesTAM internal business logic and persistence behavior
 
-## 2. Admin Console Base URL And AttesTAM Dependency
+## 2. AttesTAM Console Base URL And AttesTAM Dependency
 
-Admin Console Base URL:
+AttesTAM Console Base URL:
 - `http://<host>:<port>`
 
 Notes:
@@ -38,26 +38,26 @@ Notes:
 - Operators are expected to access the console via loopback (`127.0.0.1`) or another explicitly controlled host route.
 - `port` is determined by command-line flag `--port` (default: `9090`).
 - `--tam-api-base` defaults to `http://127.0.0.1:8080/`.
-- `--tam-api-debug` can be enabled to log Admin Console <-> AttesTAM API traffic to stderr. For manifest registration, the binary upload body is not shown; the uploaded filename is logged instead.
+- `--tam-api-debug` can be enabled to log AttesTAM Console <-> AttesTAM API traffic to stderr. For manifest registration, the binary upload body is not shown; the uploaded filename is logged instead.
 
 ```mermaid
 flowchart LR
   A([AttesTAM Admin])
   BC[Browser]
-  AC["Admin Console Server<br>http://127.0.0.1:9090/ (default)"]
+  AC["AttesTAM Console Server<br>http://127.0.0.1:9090/ (default)"]
   TAM["AttesTAM Server<br>http://127.0.0.1:8080/ (default)"]
   A --> BC
   BC --> AC
   AC --> TAM
 ```
 
-## 3. Admin Console API
+## 3. AttesTAM Console API
 
 ### API call flow
 ```mermaid
 flowchart LR
   BC[Browser]
-  subgraph AC[Admin Console Server]
+  subgraph AC[AttesTAM Console Server]
     C_VMD["/console/view-managed-devices"]
     C_VMTC["/console/view-managed-tcs"]
     C_RTC["/console/register-tc"]

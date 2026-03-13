@@ -1,14 +1,14 @@
 # User Manual
 
 ## Purpose
-This document explains how to start the AttesTAM server (`cmd/attestam`) and the TAM Admin Console server (`admin-console`), and how to use the Admin Console UI.
+This document explains how to start the AttesTAM server (`cmd/attestam`) and the AttesTAM Console server (`admin-console`), and how to use the AttesTAM Console UI.
 
 ## Quick Flow (for Demo)
 
 1. Start AttesTAM server (`go run ./cmd/attestam -insecure-demo-mode`).
-2. Start TAM admin console server (`go run ./cmd/admin-console`).
+2. Start AttesTAM Console server (`go run ./cmd/admin-console`).
 3. Open `http://127.0.0.1:9090` in a browser.
-4. Use the admin console to inspect managed devices / TCs and register manifests.
+4. Use the AttesTAM Console to inspect managed devices / TCs and register manifests.
 
 ## Prerequisites
 
@@ -74,9 +74,9 @@ Print live defaults with:
 go run ./cmd/attestam -h
 ```
 
-## Start the Admin Console Server
+## Start the AttesTAM Console Server
 
-Start the admin console in another terminal:
+Start the AttesTAM Console in another terminal:
 ```bash
 go run ./cmd/admin-console
 ```
@@ -86,20 +86,20 @@ If TAM is not running on the default endpoint, set the console's TAM API base UR
 go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 ```
 
-If you want to inspect Admin Console <-> AttesTAM API traffic on the CLI:
+If you want to inspect AttesTAM Console <-> AttesTAM API traffic on the CLI:
 ```bash
 go run ./cmd/admin-console --tam-api-base=http://127.0.0.1:8080/ --tam-api-debug
 ```
 `--tam-api-debug` logs request and response headers and bodies to stderr. For `Register TC`, the uploaded manifest body is not printed; the log shows the uploaded filename instead.
 
-### TAM Admin Console Command Options
+### AttesTAM Console Command Options
 
 Use command-line flags:
 
 | Setting | Flag | Default | Description |
 | ---- | ---- | ---- | ---- |
-| Listen port | `--port` | `9090` | HTTP port for Admin Console |
-| TAM API base URL | `--tam-api-base` | `http://127.0.0.1:8080/` | Console calls TAM APIs for device/manifest listing and manifest upload |
+| Listen port | `--port` | `9090` | HTTP port for AttesTAM Console |
+| TAM API base URL | `--tam-api-base` | `http://127.0.0.1:8080/` | AttesTAM Console calls TAM APIs for device/manifest listing and manifest upload |
 | TAM API debug log | `--tam-api-debug` | `false` | Log AttesTAM API request/response details to stderr; `Register TC` request body is replaced by the uploaded filename |
 
 Example:
@@ -170,7 +170,7 @@ make test-integrated
 
 ### HTTP error
 
-- `500 admin console is misconfigured: tam-api-base is required`:
+- `500 AttesTAM Console is misconfigured: tam-api-base is required`:
   - Start admin-console with a valid `--tam-api-base`.
 - `502 TAM API fetch failed: ...` / `502 TAM API post failed: ...`:
   - Verify TAM is running and reachable.
@@ -303,7 +303,7 @@ The output is equivalent to:
 
 > ![NOTE]
 > When you encode a byte string `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` with base64url,
-> you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for Admin Console.
+> you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for AttesTAM Console.
 
 ### 4) Update TEEP Agent Status
 

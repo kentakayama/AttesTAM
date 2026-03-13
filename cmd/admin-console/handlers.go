@@ -39,7 +39,7 @@ func handleListAgents(w http.ResponseWriter, r *http.Request) {
 
 	base := conf.TAMAPIBase
 	if base == "" {
-		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
+		http.Error(w, "AttesTAM Console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
@@ -60,7 +60,7 @@ func handleListManifestsService(w http.ResponseWriter, r *http.Request) {
 
 	base := conf.TAMAPIBase
 	if base == "" {
-		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
+		http.Error(w, "AttesTAM Console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
@@ -81,7 +81,7 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 
 	base := conf.TAMAPIBase
 	if base == "" {
-		http.Error(w, "admin console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
+		http.Error(w, "AttesTAM Console is misconfigured: tam-api-base is required", http.StatusInternalServerError)
 		return
 	}
 
