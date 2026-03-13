@@ -42,7 +42,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
 
-	log.Printf("Admin Console listening on http://127.0.0.1%v (build: %s) tamApiBase=%q", addr, buildTime.Format(time.RFC3339), conf.TAMAPIBase)
+	log.Printf("AttesTAM Console listening on http://127.0.0.1%v (build: %s) tamApiBase=%q", addr, buildTime.Format(time.RFC3339), conf.TAMAPIBase)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}

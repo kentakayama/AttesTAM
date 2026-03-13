@@ -1,19 +1,19 @@
-# Admin Console Internal Design
+# AttesTAM Console Internal Design
 
 ## 1. Purpose And Scope
 
-`cmd/admin-console` provides a browser-based operation console for AttesTAM.
+`cmd/admin-console` provides the browser-based AttesTAM Console.
 It serves the admin UI, calls AttesTAM APIs, and converts CBOR responses into JSON/HTML that are easier for browsers and operators to consume.
 
 Current scope:
-- Serve the admin console UI and static assets.
+- Serve the AttesTAM Console UI and static assets.
 - Show managed devices and their installed trusted components.
 - Show managed trusted components (manifests).
 - Register a trusted component by relaying uploaded manifests to the AttesTAM API.
 - Operate only with a reachable AttesTAM API backend; no standalone mode is provided.
 
 Out of scope:
-- Authentication/authorization for console users in the current version. This is planned for a future Admin Console revision.
+- Authentication/authorization for console users in the current version. This is planned for a future AttesTAM Console revision.
 - AttesTAM server-side business logic, persistence, and policy decisions.
 - Fetching device or manifest state except through AttesTAM APIs.
 
@@ -154,10 +154,13 @@ Defined in `cmd/admin-console/config.go`.
 Primary flags:
 - `--port`
 - `--tam-api-base`
+- `--tam-api-debug`
 
 Behavior:
 - `port` defaults to `9090`.
 - `tam-api-base` defaults to `http://127.0.0.1:8080/`.
+- `tam-api-debug` defaults to `false` and enables HTTP request/response logging for AttesTAM API calls.
+- For `SUITManifestService/RegisterManifest`, debug logging does not print the binary request body; it logs the uploaded filename instead.
 - Startup validation requires non-empty `tam-api-base`.
 
 ## 7. Test Strategy

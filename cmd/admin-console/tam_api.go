@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,7 +59,7 @@ func resetTAMDeviceCachesForTest() {
 }
 
 func fetchTAMDevices(base string) ([]Agent, error) {
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	keys, err := fetchTAMListAgents(base, client)
 	if err != nil {
 		return nil, err
@@ -67,13 +68,6 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 	lastUpdatedByKID := make(map[string]time.Time, len(keys))
 	orderedKIDs := make([]string, 0, len(keys))
 	cache := getTAMDevicesCache(base)
-
-	cache.mu.RLock()
-	cachedSnapshot := make(map[string]cachedAgent, len(cache.byKID))
-	for kid, entry := range cache.byKID {
-		cachedSnapshot[kid] = entry
-	}
-	cache.mu.RUnlock()
 
 	kidsToFetch := make([][]byte, 0, len(keys))
 	for _, key := range keys {
@@ -84,10 +78,7 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 		orderedKIDs = append(orderedKIDs, kid)
 		lastUpdated := key.UpdatedAt
 		lastUpdatedByKID[kid] = lastUpdated
-		cached, ok := cachedSnapshot[kid]
-		if !ok || !cached.lastUpdate.Equal(lastUpdated) {
-			kidsToFetch = append(kidsToFetch, key.AgentKID)
-		}
+		kidsToFetch = append(kidsToFetch, key.AgentKID)
 	}
 	if len(orderedKIDs) == 0 {
 		cache.mu.Lock()
@@ -112,14 +103,6 @@ func fetchTAMDevices(base string) ([]Agent, error) {
 				lastUpdate: lastUpdatedByKID[string(agent.KID)],
 			}
 		}
-		for kid := range cache.byKID {
-			if _, ok := lastUpdatedByKID[kid]; !ok {
-				delete(cache.byKID, kid)
-			}
-		}
-		cache.mu.Unlock()
-	} else {
-		cache.mu.Lock()
 		for kid := range cache.byKID {
 			if _, ok := lastUpdatedByKID[kid]; !ok {
 				delete(cache.byKID, kid)
@@ -206,7 +189,7 @@ func formatUpdatedAt(t time.Time) string {
 
 func fetchTAMManifests(base string) ([]TrustedComponent, error) {
 	url := strings.TrimRight(base, "/") + "/SUITManifestService/ListManifests"
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -239,7 +222,7 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		return fmt.Errorf("failed to parse form: %w", err)
 	}
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		return fmt.Errorf("file is required")
 	}
@@ -255,9 +238,10 @@ func postTAMManifest(w http.ResponseWriter, r *http.Request, base string) error 
 	if err != nil {
 		return err
 	}
+	req = req.WithContext(context.WithValue(req.Context(), tamAPIDebugFilenameContextKey, fileHeader.Filename))
 	req.Header.Set("Content-Type", "application/suit-envelope+cose")
 
-	client := &http.Client{Timeout: 12 * time.Second}
+	client := newTAMAPIClient()
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

@@ -6,7 +6,7 @@
 
 /* Simple SPA-like behavior with vanilla JS.
  * - Tabs switch between views
- * - Fetch agents and manifests from the Admin Console API
+ * - Fetch agents and manifests from the AttesTAM Console API
  * - Upload manifests via multipart/form-data
  */
 

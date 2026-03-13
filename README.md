@@ -13,7 +13,7 @@ The TAM sends a fresh challenge in `QueryRequest`, the TEEP Agent returns attest
 **This implementation also exposes agent status to administrators as an explicit design choice.**
 Although the TEEP Architecture requires that a Device Administrator be able to learn which Trusted Applications are installed in the TEE, it does not assign that responsibility to the TAM. In this implementation, however, the TAM also provides this information as a design choice.
 
-This repository also includes a TAM console (`cmd/admin-console`), shown as the `Admin Console` in the diagram below. The console acts as a backend-for-frontend for the TAM Administrator and Device Administrator: it calls the TAM core server's TEEP Agent Service API, reads the agent/manifest status data returned in CBOR, and converts it into JSON (and HTML UI responses) that are easier for browser-based tools and operators to consume.
+This repository also includes a TAM console (`cmd/admin-console`), shown as the `AttesTAM Console` in the diagram below. The console acts as a backend-for-frontend for the TAM Administrator and Device Administrator: it calls the TAM core server's TEEP Agent Service API, reads the agent/manifest status data returned in CBOR, and converts it into JSON (and HTML UI responses) that are easier for browser-based tools and operators to consume.
 
 ```mermaid
 flowchart LR
@@ -23,7 +23,7 @@ flowchart LR
     BFF -- Current TEE status --> DeviceAdmin([Device Admin])
     BFF ~~~ DeviceAdmin
 
-    BFF[Admin Console] ~~~ AgentStore
+    BFF[AttesTAM Console] ~~~ AgentStore
     AgentStore --> BFF
     AgentStore ~~~ BFF
 
@@ -74,6 +74,7 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 ```
 
 `cmd/admin-console` uses `http://127.0.0.1:8080/` as the default `--tam-api-base` and no longer supports local testvector fallback mode.
+Add `--tam-api-debug` when you want the console to log AttesTAM API requests and responses to stderr. For `Register TC`, the upload body itself is not dumped; the log shows the uploaded filename instead.
 
 ### B) Docker
 
@@ -91,7 +92,7 @@ docker run --rm \
 This container starts both services:
 
 - TAM core server on `http://localhost:8080` (`POST /tam`)
-- TAM admin console on `http://127.0.0.1:9090`
+- AttesTAM Console on `http://127.0.0.1:9090`
 
 `--net=host` is used so the containerized TAM can reach a verifier running on `https://localhost:8443` on the host. Then open `http://127.0.0.1:9090` in your Web browser.
 
@@ -99,12 +100,12 @@ This container starts both services:
 
 - [User Manual](./doc/USER_MANUAL.md)
 - [External Design](./doc/EXTERNAL_DESIGN.md)
-  - [TAM Admin Console and TAM Server](./doc/ADMIN_CONSOLE_EXTERNAL_DESIGN.md)
+  - [AttesTAM Console and TAM Server](./doc/ADMIN_CONSOLE_EXTERNAL_DESIGN.md)
   - [TEEP Message Handling](./doc/TEEP_MESSAGE_HANDLE.md)
   - [SUIT Manifest Store](./doc/SUIT_MANIFEST_REPOSITORY.md)
   - [TEEP Agent Status](./doc/TEEP_AGENT_STATUS.md)
 - [Internal Design](./doc/INTERNAL_DESIGN.md)
-  - [TAM Admin Console BFF Server](./doc/ADMIN_CONSOLE_INTERNAL_DESIGN.md)
+  - [AttesTAM Console BFF Server](./doc/ADMIN_CONSOLE_INTERNAL_DESIGN.md)
   - [TAM Status SUIT Manifest Store](./doc/TAM_STATUS_SUIT_MANIFEST_REPOSITORY.md)
   - [TAM Status TEEP Agent Status](./doc/TAM_STATUS_TEEP_AGENT_STATUS.md)
   - [Database Design](./doc/DATABASE_DESIGN.md)

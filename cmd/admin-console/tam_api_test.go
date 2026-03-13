@@ -128,7 +128,7 @@ func TestFetchTAMDevicesNonCBORResponse(t *testing.T) {
 	}
 }
 
-func TestFetchTAMDevicesDeltaByUpdatedAt(t *testing.T) {
+func TestFetchTAMDevicesAlwaysRefreshesStatuses(t *testing.T) {
 	resetTAMDeviceCachesForTest()
 
 	type call struct {
@@ -242,14 +242,17 @@ func TestFetchTAMDevicesDeltaByUpdatedAt(t *testing.T) {
 		t.Fatalf("unexpected agents length: %d", len(agents))
 	}
 
-	if len(statusCalls) != 2 {
-		t.Fatalf("expected 2 GetAgentStatus calls, got %d", len(statusCalls))
+	if len(statusCalls) != 3 {
+		t.Fatalf("expected 3 GetAgentStatus calls, got %d", len(statusCalls))
 	}
 	if !slices.Equal(statusCalls[0].kids, []string{"dev-1", "dev-2"}) {
 		t.Fatalf("unexpected first call kids: %+v", statusCalls[0].kids)
 	}
-	if !slices.Equal(statusCalls[1].kids, []string{"dev-2"}) {
+	if !slices.Equal(statusCalls[1].kids, []string{"dev-1", "dev-2"}) {
 		t.Fatalf("unexpected second call kids: %+v", statusCalls[1].kids)
+	}
+	if !slices.Equal(statusCalls[2].kids, []string{"dev-1", "dev-2"}) {
+		t.Fatalf("unexpected third call kids: %+v", statusCalls[2].kids)
 	}
 }
 

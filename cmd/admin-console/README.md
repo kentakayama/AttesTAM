@@ -1,4 +1,4 @@
-# Admin Console Documents
+# AttesTAM Console Documents
 
 This directory uses the following documents in `doc/`.
 

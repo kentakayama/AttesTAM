@@ -5,7 +5,7 @@
  */
 
 // To keep the CBOR-based backend server free from any CBOR→JSON translation
-// responsibility, this admin console defines its own JSON-specific DTOs
+// responsibility, this AttesTAM Console defines its own JSON-specific DTOs
 // (MarshalJSON targets).
 //
 // CBOR decoding MUST use the backend protocol definitions:
