@@ -8,6 +8,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"io"
 	"log"
 	"net/http"
@@ -15,78 +18,18 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/demo"
 	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/tam"
 	"github.com/kentakayama/AttesTAM/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/veraison/go-cose"
 )
 
 var (
-	expectedKID = []byte{
-		0x76, 0xe9, 0xa6, 0xcb, 0xeb, 0x5e, 0x7a, 0x9f, 0x9a, 0x81, 0xe9, 0xed, 0xfa, 0x48, 0x9d, 0xfa,
-		0x87, 0xfe, 0x6e, 0xe8, 0xa5, 0x76, 0x29, 0xe0, 0xf9, 0xd7, 0xaf, 0xfb, 0x5d, 0xb7, 0xfb, 0x4d,
-	} // "dummy-teep-agent-kid-of-building-dev-123-00" if encoded with base64url without paddding
-
-	// from internal/suit/manifest_test.go
-	taggedManifest0 = []byte{
-		0xd8, 0x6b, // 107(
-		0xa3,             // {
-		0x02, 0x58, 0x96, // authentication-wrapper: <<
-		0x82, 0x58, 0x24, // [ <<
-		0x82,       // [
-		0x2f,       // -16 / :SHA256 /
-		0x58, 0x20, // h'
-		0x43, 0x13, 0x16, 0x04, 0x84, 0x18, 0x2f, 0x04, 0x11, 0x97, 0xf6, 0x95, 0xa4, 0x12, 0xb7, 0xc5,
-		0x91, 0xcb, 0x11, 0x2c, 0xca, 0xaa, 0x5d, 0x60, 0xc0, 0x32, 0x85, 0xef, 0x7e, 0x20, 0xfc, 0xb0,
-
-		0x58, 0x6d, 0xd2, // << 18(
-		0x84,                   // [
-		0x43, 0xa1, 0x01, 0x28, // << { / alg / 1: -9 / ESP256 / } >>
-		0xa1, 0x04, 0x58, 0x20, // { / kid / 4: h'
-		0xca, 0x9e, 0x35, 0xf2, 0x3b, 0x2b, 0x52, 0x5f, 0xb4, 0xfc, 0x83, 0xf5, 0x12, 0xb0, 0xdc, 0xac,
-		0x4a, 0xc2, 0x9e, 0x45, 0x7e, 0x87, 0x3a, 0x5d, 0x6a, 0x73, 0x13, 0xf7, 0x16, 0x90, 0xb3, 0x3c,
-		0xf6, // null
-		0x58, 0x40,
-		0x10, 0xab, 0x19, 0x47, 0x96, 0x8d, 0x60, 0x6e, 0x98, 0xb3, 0xd2, 0x26, 0x75, 0xe5, 0x9c, 0x71,
-		0x62, 0x44, 0x27, 0x27, 0x5f, 0xcd, 0x98, 0xcc, 0xa1, 0x54, 0x14, 0x4d, 0x0f, 0x51, 0xff, 0x52,
-		0xfb, 0xd9, 0x58, 0xbe, 0xbc, 0xc3, 0x30, 0xd0, 0xcf, 0xb2, 0xb6, 0x05, 0x31, 0xfa, 0x7a, 0x46,
-		0x2b, 0x57, 0x76, 0xda, 0x1e, 0xc1, 0xde, 0x94, 0xf9, 0xe1, 0x38, 0x31, 0x5d, 0xd2, 0x54, 0x19,
-
-		0x03, 0x58, 0x99, 0xa5, // manifest: << {
-		0x01, // manifest-version
-		0x01,
-		0x02, // manifest-sequence-number
-		0x00,
-		0x03, // common
-		0x58, 0x65, 0xa2, 0x02,
-		0x81, 0x81, // [ [
-		0x49, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74, // 'hello.txt'
-		0x04,             // shared-sequence
-		0x58, 0x54, 0x86, // << [
-		0x14, 0xa4, // override-parameters: {
-		0x01, 0x50, 0xfa, 0x6b, 0x4a, 0x53, 0xd5, 0xad, 0x5f, 0xdf, 0xbe, 0x9d, 0xe6, 0x63, 0xe4, 0xd4, 0x1f, 0xfe,
-		0x02, 0x50, 0x14, 0x92, 0xaf, 0x14, 0x25, 0x69, 0x5e, 0x48, 0xbf, 0x42, 0x9b, 0x2d, 0x51, 0xf2, 0xab, 0x45,
-		0x03, 0x58, 0x24, 0x82, // image-digest: << [
-		0x2f, // -16: SHA256
-		0x58, 0x20,
-		0xdf, 0xfd, 0x60, 0x21, 0xbb, 0x2b, 0xd5, 0xb0, 0xaf, 0x67, 0x62, 0x90, 0x80, 0x9e, 0xc3, 0xa5,
-		0x31, 0x91, 0xdd, 0x81, 0xc7, 0xf7, 0x0a, 0x4b, 0x28, 0x68, 0x8a, 0x36, 0x21, 0x82, 0x98, 0x6f,
-		0x0e, 0x0d, // image-size: 13}
-		0x01, 0x0f, // suit-condition-vendor-identifier
-		0x02, 0x0f, // suit-condition-class-identifier
-		0x05,                                                                                                                               // manifest-component-id:
-		0x81, 0x54, 0x6d, 0x61, 0x6e, 0x69, 0x66, 0x65, 0x73, 0x74, 0x2e, 0x74, 0x65, 0x78, 0x74, 0x2e, 0x30, 0x2e, 0x73, 0x75, 0x69, 0x74, // 'manifest.text.0.suit'
-		0x10,       // payload-fetch
-		0x53, 0x86, // << [
-		0x14, 0xa1, // override-parameters: {
-		0x15, 0x6a, 0x23, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74, // uri: "#hello.txt"}
-		0x15, 0x02,
-		0x03, 0x0f,
-
-		0x6a, 0x23, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74, // "#hello.txt":
-		0x4d, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x21, // "Hello, World!"
-	}
+	expectedKID     = demo.DefaultAgentKID
+	taggedManifest0 = demo.HelloTextManifestV0
 
 	untaggedManifest1 = []byte{
 		0xa3, 0x02, 0x58, 0x96, 0x82, 0x58, 0x24, 0x82, 0x2f, 0x58, 0x20, 0xb2,
@@ -123,15 +66,15 @@ var (
 
 func TestTCHandler_Update_OK(t *testing.T) {
 	logger := log.Default()
-	tam, err := tam.NewTAM("", nil, logger)
+	tam, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err := tam.EnsureDefaultEntity(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	if err := tam.SeedDemoEntities(false); err != nil {
+		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
 	h, err := newHandler(tam, log.Default())
@@ -161,18 +104,15 @@ func TestTCHandler_Update_OK(t *testing.T) {
 
 func TestGetAgentStatus_OK(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err := tamInstance.EnsureDefaultEntity(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
-	}
-	if err := tamInstance.EnsureDefaultTEEPAgent(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent: %v", err)
+	if err := tamInstance.SeedDemoData(); err != nil {
+		t.Fatalf("TAM SeedDemoData: %v", err)
 	}
 
 	h, err := newHandler(tamInstance, log.Default())
@@ -218,21 +158,21 @@ func TestGetAgentStatus_OK(t *testing.T) {
 	require.Nil(t, err)
 	assert.GreaterOrEqual(t, len(agentStatus), 1)
 	assert.Equal(t, util.BytesHexMax32(expectedKID), agentStatus[0].AgentKID)
-	assert.Equal(t, append([]byte{0x01}, []byte("building-dev-123")...), agentStatus[0].Status.Attributes.DeviceUEID)
+	assert.Equal(t, util.BytesHexMax32(append([]byte{0x01}, []byte("building-dev-123")...)), agentStatus[0].Status.Attributes.DeviceUEID)
 	assert.Len(t, agentStatus[0].Status.SuitManifests, 1)
 }
 
 func TestGetAgentStatus_NoContent(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err := tamInstance.EnsureDefaultEntity(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	if err := tamInstance.SeedDemoEntities(false); err != nil {
+		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
 	h, err := newHandler(tamInstance, log.Default())
@@ -253,15 +193,15 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 
 func TestGetManifests_OK(t *testing.T) {
 	logger := log.Default()
-	tamInstance, err := tam.NewTAM("", nil, logger)
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tamInstance.InitWithPath(":memory:"); err != nil {
+	if err = tamInstance.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err := tamInstance.EnsureDefaultEntity(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity: %v", err)
+	if err := tamInstance.SeedDemoEntities(true); err != nil {
+		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
 	h, err := newHandler(tamInstance, log.Default())
@@ -280,16 +220,14 @@ func TestGetManifests_OK(t *testing.T) {
 	var manifests []model.SuitManifestOverview
 	err = cbor.Unmarshal(body, &manifests)
 	require.NoError(t, err)
-	require.Len(t, manifests, 3)
+	require.Len(t, manifests, 1)
 
 	got := make(map[string]uint64, len(manifests))
 	for _, manifest := range manifests {
 		got[string(manifest.TrustedComponentID)] = manifest.SequenceNumber
 	}
 
-	assert.Equal(t, uint64(3), got[string([]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x31, 0x2E, 0x77, 0x61, 0x73, 0x6D})])
-	assert.Equal(t, uint64(2), got[string([]byte{0x81, 0x49, 0x61, 0x70, 0x70, 0x32, 0x2E, 0x77, 0x61, 0x73, 0x6D})])
-	assert.Equal(t, uint64(0), got[string([]byte{0x81, 0x49, 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x2e, 0x74, 0x78, 0x74})])
+	assert.Equal(t, uint64(0), got[string(demo.TrustedComponentHelloText)])
 }
 
 func TestHTTPErrorResponse_MethodNotAllowed(t *testing.T) {
@@ -348,4 +286,80 @@ func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
 	// Consider updating draft-ietf-teep-otrp-over-http to allow 413 for this case and
 	// refactoring the handler to return 413 instead of 500 when the body exceeds the limit.
 	assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
+
+func TestTAMOverHTTP_VerifierNotConfigured_ReturnsServiceUnavailable(t *testing.T) {
+	logger := log.Default()
+	tamInstance, err := tam.NewDemoTAM(nil, logger)
+	require.NoError(t, err)
+	require.NoError(t, tamInstance.InitDB(":memory:"))
+	require.NoError(t, tamInstance.SeedDemoEntities(false))
+
+	h, err := newHandler(tamInstance, logger)
+	require.NoError(t, err)
+
+	ecdsaAgentKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	agentKey, err := cose.NewKeyEC2(cose.AlgorithmESP256, ecdsaAgentKey.PublicKey.X.Bytes(), ecdsaAgentKey.PublicKey.Y.Bytes(), ecdsaAgentKey.D.Bytes())
+	require.NoError(t, err)
+
+	// First POST creates a session and returns QueryRequest(token).
+	req := httptest.NewRequest(http.MethodPost, "/tam", nil)
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w := httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+	var queryRequestWithToken tam.TEEPMessage
+	require.NoError(t, decodeSignedTEEPMessage(w.Body.Bytes(), &queryRequestWithToken))
+	require.NotNil(t, queryRequestWithToken.Options.Token)
+
+	// An unauthenticated QueryResponse with the matching token forces attestation.
+	queryResponseWithToken := tam.TEEPMessage{
+		Type: tam.TEEPTypeQueryResponse,
+		Options: tam.TEEPOptions{
+			Token: queryRequestWithToken.Options.Token,
+		},
+	}
+	signedQueryResponseWithToken, err := queryResponseWithToken.COSESign1Sign(agentKey)
+	require.NoError(t, err)
+
+	req = httptest.NewRequest(http.MethodPost, "/tam", bytes.NewReader(signedQueryResponseWithToken))
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w = httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+	var queryRequestWithChallenge tam.TEEPMessage
+	require.NoError(t, decodeSignedTEEPMessage(w.Body.Bytes(), &queryRequestWithChallenge))
+	require.NotNil(t, queryRequestWithChallenge.Options.Challenge)
+
+	// Without a configured verifier, the attestation-required response path returns HTTP 503.
+	queryResponseWithEvidence := tam.TEEPMessage{
+		Type: tam.TEEPTypeQueryResponse,
+		Options: tam.TEEPOptions{
+			AttestationPayload: []byte{0x41, 0x00},
+		},
+	}
+	signedQueryResponseWithEvidence, err := queryResponseWithEvidence.COSESign1Sign(agentKey)
+	require.NoError(t, err)
+
+	req = httptest.NewRequest(http.MethodPost, "/tam", bytes.NewReader(signedQueryResponseWithEvidence))
+	req.Header.Set("Content-Type", "application/teep+cbor")
+	req.Header.Set("Accept", "application/teep+cbor")
+	w = httptest.NewRecorder()
+	h.tamOverHttp(w, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Result().StatusCode)
+	assert.Contains(t, w.Body.String(), "verifier client is not configured")
+}
+
+func decodeSignedTEEPMessage(body []byte, msg *tam.TEEPMessage) error {
+	var sign1 cose.Sign1Message
+	if err := sign1.UnmarshalCBOR(body); err != nil {
+		return err
+	}
+	return cbor.Unmarshal(sign1.Payload, msg)
 }

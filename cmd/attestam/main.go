@@ -34,9 +34,9 @@ const (
 func main() {
 	var (
 		addr                 = flag.String("addr", "localhost:8080", "listen address in host:port form. If you want to listen on all interfaces, use :8080.")
-		privateKeyPath       = flag.String("tam-teep-private-key-path", "", "file path to the TAM's private key in COSE_Key format. If not provided, a fixed key will be used (not recommended for production).")
+		privateKeyPath       = flag.String("tam-teep-private-key-path", "", "file path to the TAM's private key in COSE_Key format. Required unless insecure demo mode is enabled.")
 		dbPath               = flag.String("db-path", "tam_state.db", "file path to the SQLite database")
-		insecureDemoMode     = flag.Bool("insecure-demo-mode", false, "enable insecure demo mode with fixed TAM's private key, TC Developer's private key and dummy data. (not recommended for production)")
+		insecureDemoMode     = flag.Bool("insecure-demo-mode", false, "enable insecure demo mode with the public insecure demo TAM key, demo TC Developer key, and demo seed data. (not recommended for production)")
 		challengeServer      = flag.String("challenge-server", "https://localhost:8443", "base URL for verifier challenge-response server")
 		challengeContentType = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")

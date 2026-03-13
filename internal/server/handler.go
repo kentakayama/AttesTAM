@@ -110,9 +110,16 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	var resp responseSpec
 	if err != nil {
 		// TODO: distinguish different types of errors and return appropriate status codes and messages.
-		h.logger.Printf("Internal Server Error occurred: %v", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+		switch err {
+		case tam.ErrVerifierNotConfigured:
+			h.logger.Printf("verifier client is not configured: %v", err)
+			http.Error(w, "verifier client is not configured, so attestation with challenge-response is not available", http.StatusServiceUnavailable)
+			return
+		default:
+			h.logger.Printf("failed to resolve TEEP Message: %v", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if len(responseBody) == 0 {

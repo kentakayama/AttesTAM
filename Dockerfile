@@ -38,7 +38,7 @@ COPY cmd/admin-console/static ./static
 
 # Default configuration based on the CLI flags defined in cmd/attestam/main.go.
 ENV ATTESTAM_ADDR=":8080" \
-    ATTESTAM_CHALLENGE_SERVER="" \
+    ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
     ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
     ATTESTAM_CHALLENGE_INSECURE_TLS="true" \
     ATTESTAM_CHALLENGE_TIMEOUT="1m0s" \

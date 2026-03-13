@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/demo"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
 	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
 	"github.com/kentakayama/AttesTAM/internal/suit"
@@ -61,15 +62,15 @@ func (e *MockEATVerifier) Process(data []byte) (*rats.ProcessedAttestation, erro
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultEntity(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
+	if err = tam.SeedDemoEntities(false); err != nil {
+		t.Fatalf("TAM SeedDemoEntities error: %v", err)
 	}
 	// tam.EnsureDefaultTEEPAgent is not required, because EAT can carry the public key of the TEEP Agent
 
@@ -182,18 +183,15 @@ func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultEntity(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
-	}
-	if err = tam.EnsureDefaultTEEPAgent(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	if err = tam.SeedDemoData(); err != nil {
+		t.Fatalf("TAM SeedDemoData error: %v", err)
 	}
 
 	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
@@ -299,7 +297,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 		require.Equal(t, 1, len(agentStatus.Status.SuitManifests))
 		encodedComponentID, err := cbor.Marshal(tcID)
 		require.Nil(t, err)
-		require.Equal(t, encodedComponentID, agentStatus.Status.SuitManifests[0].TrustedComponentID)
+		require.Equal(t, util.BytesHexMax32(encodedComponentID), agentStatus.Status.SuitManifests[0].TrustedComponentID)
 		require.Equal(t, uint64(0), agentStatus.Status.SuitManifests[0].SequenceNumber)
 	} else {
 		// TEST#4a: generate TEEP Agent's Error with Token
@@ -354,18 +352,18 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultEntity(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
+	if err = tam.SeedDemoEntities(true); err != nil {
+		t.Fatalf("TAM SeedDemoEntities error: %v", err)
 	}
-	if err = tam.EnsureDefaultTEEPAgent(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	if err = tam.SeedDemoAgent(false); err != nil {
+		t.Fatalf("TAM SeedDemoAgent error: %v", err)
 	}
 
 	kid, err := tam.tamKey.Thumbprint(crypto.SHA256)
@@ -419,25 +417,19 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultEntity(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultEntity error: %v", err)
-	}
-	if err = tam.EnsureDefaultTEEPAgent(true); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	if err = tam.SeedDemoData(); err != nil {
+		t.Fatalf("TAM SeedDemoData error: %v", err)
 	}
 
-	agentKID := []byte{
-		0x76, 0xe9, 0xa6, 0xcb, 0xeb, 0x5e, 0x7a, 0x9f, 0x9a, 0x81, 0xe9, 0xed, 0xfa, 0x48, 0x9d, 0xfa,
-		0x87, 0xfe, 0x6e, 0xe8, 0xa5, 0x76, 0x29, 0xe0, 0xf9, 0xd7, 0xaf, 0xfb, 0x5d, 0xb7, 0xfb, 0x4d,
-	} // "dummy-teep-agent-kid-of-building-dev-123-00" if encoded with base64url without paddding
-	ueid := append([]byte{0x01}, []byte("building-dev-123")...)
+	agentKID := demo.DefaultAgentKID
+	ueid := demo.DefaultDeviceUEID
 	agentStatusRepo := sqlite.NewAgentStatusRepository(tam.db)
 	agentStatus, err := agentStatusRepo.GetAgentStatus(tam.ctx, agentKID)
 	require.Nil(t, err)
@@ -485,15 +477,15 @@ func TestTAMNoTCMatch(t *testing.T) {
 	// The handler should return nil without error even if there is no matching TC in the TCList
 	logger := log.Default()
 	verifier := MockEATVerifier{}
-	tam, err := NewTAM("", &verifier, logger)
+	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
 	}
-	if err = tam.InitWithPath(":memory:"); err != nil {
+	if err = tam.InitDB(":memory:"); err != nil {
 		t.Fatalf("TAM Init error: %v", err)
 	}
-	if err = tam.EnsureDefaultTEEPAgent(false); err != nil {
-		t.Fatalf("TAM EnsureDefaultTEEPAgent error: %v", err)
+	if err = tam.SeedDemoAgent(false); err != nil {
+		t.Fatalf("TAM SeedDemoAgent error: %v", err)
 	}
 
 	// TEST#1: process QueryResponse with no matching TC to return empty

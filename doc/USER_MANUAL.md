@@ -5,6 +5,14 @@ This document explains how to start the AttesTAM server (`cmd/attestam`) and the
 
 ## Quick Flow (for Demo)
 
+### Docker
+
+1. Start both AttesTAM and the TAM Admin Console with Docker.
+2. Open `http://127.0.0.1:9090` in a browser.
+3. Use the admin console to inspect managed devices / TCs and register manifests.
+
+### Native
+
 1. Start AttesTAM server (`go run ./cmd/attestam -insecure-demo-mode`).
 2. Start AttesTAM Console server (`go run ./cmd/admin-console`).
 3. Open `http://127.0.0.1:9090` in a browser.
@@ -15,9 +23,47 @@ This document explains how to start the AttesTAM server (`cmd/attestam`) and the
 - Go toolchain (`go run`)
 - Browser (Chrome/Safari/Firefox, etc.)
 
-## Start the AttesTAM Server
+## Start with Docker
 
-### Native
+The Docker image starts both the AttesTAM server and the TAM Admin Console in one container.
+
+```bash
+docker build -t attestam .
+docker run --rm \
+  -p 8080:8080 -p 9090:9090 \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
+  -e ATTESTAM_DB_PATH=tam_state.db \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
+  attestam
+```
+
+This starts:
+
+- AttesTAM server on `http://127.0.0.1:8080`
+- TAM Admin Console on `http://127.0.0.1:9090`
+
+This default image configuration also sets `ATTESTAM_CHALLENGE_SERVER=https://localhost:8443`, so attestation verification expects a verifier reachable from inside the container.
+
+With verifier settings:
+```bash
+docker run --rm \
+  --net=host \
+  -e ATTESTAM_ADDR=":8080" \
+  -e ATTESTAM_CHALLENGE_SERVER="https://localhost:8443" \
+  -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
+  attestam
+```
+
+`--net=host` is used here so the container can reach a verifier running on `https://localhost:8443` on the host.
+
+## Start Natively
+
+### Start the AttesTAM Server
+
 ```bash
 go run ./cmd/attestam -insecure-demo-mode
 ```
@@ -29,31 +75,6 @@ Example:
 ATTESTAM_DB_PATH=/var/lib/attestam/tam_state.db go run ./cmd/attestam -insecure-demo-mode
 ```
 
-### Docker
-```bash
-docker build -t attestam .
-docker run --rm \
-  -p 8080:8080 -p 9090:9090 \
-  -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ATTESTAM_DB_PATH=/data/tam_state.db \
-  -e ADMIN_CONSOLE_PORT=9090 \
-  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  attestam
-```
-
-With verifier settings:
-```bash
-docker run --rm \
-  -p 8080:8080 -p 9090:9090 \
-  -e ATTESTAM_ADDR=":8080" \
-  -e ATTESTAM_CHALLENGE_SERVER="https://verifier.example.com" \
-  -e ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
-  -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ADMIN_CONSOLE_PORT=9090 \
-  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  attestam
-```
-
 ### AttesTAM Server Command Options
 
 The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by environment variables).
@@ -63,11 +84,15 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | `-addr` | `ATTESTAM_ADDR` | `localhost:8080` | Listen address for the HTTP server. By default, it accepts only local (loopback) connections. To allow connections from outside the device, set `:8080`. |
 | `-tam-teep-private-key-path` | `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` | (empty) | File path to the TAM's private key in COSE_Key format. Required unless demo mode is enabled. |
 | `-db-path` | `ATTESTAM_DB_PATH` | `tam_state.db` | File path to the SQLite state database. Relative paths are resolved from the current working directory. |
-| `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with fixed TAM/TC keys and dummy data (not for production). |
-| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. Leave empty to disable verifier submission. |
+| `-insecure-demo-mode` | `ATTESTAM_INSECURE_DEMO_MODE` | `false` | Enable insecure demo mode with the public insecure demo TAM key, demo TC Developer key, and demo seed data (not for production). |
+| `-challenge-server` | `ATTESTAM_CHALLENGE_SERVER` | `https://localhost:8443` | Base URL for the verifier challenge-response endpoint. If set to an empty string, requests that require attestation verification return HTTP `503 Service Unavailable`. |
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
 | `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
+
+> [!WARNING]
+> The insecure demo TAM private key is public and is embedded only for explicit demo/test flows.
+> If `-insecure-demo-mode` is `false`, AttesTAM refuses to start unless `-tam-teep-private-key-path` or `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH` is set.
 
 Print live defaults with:
 ```bash
@@ -108,7 +133,7 @@ Example:
 go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 ```
 
-## UI Operation Guide
+## Admin Console Usage
 
 
 
@@ -137,59 +162,9 @@ go run ./cmd/admin-console --port=9090 --tam-api-base=http://127.0.0.1:8080/
 - On success, UI displays `Upload complete.` and refreshes manifest list.
 - When admin-console is started with `--tam-api-debug`, the relay log for AttesTAM `RegisterManifest` shows the uploaded filename instead of the binary request body.
 
-## Run Tests
-
-Basic tests:
-```bash
-go test ./...
-```
-
-Integration tests with VERAISON (you need to run VERAISON on localhost):
-```bash
-go test -tags=integration ./...
-```
-
-Equivalent Make targets:
-```bash
-make test
-make test-integrated
-```
-
-## Troubleshooting
-
-### Server startup failure
-
-- `tam-api-base is required`:
-  - Do not pass an empty `--tam-api-base`.
-  - If TAM is not on the default endpoint, start the console with `--tam-api-base=http://<tam-host>:<tam-port>/`.
-- `parse template: ...`:
-  - Ensure `templates/index.html` is available from the current working directory (or run from repository root).
-- `listen tcp ...: bind: address already in use`:
-  - Another process is already using the port (default `9090`).
-  - Use a different port, for example: `go run ./cmd/admin-console --port=19090`.
-
-### HTTP error
-
-- `500 AttesTAM Console is misconfigured: tam-api-base is required`:
-  - Start admin-console with a valid `--tam-api-base`.
-- `502 TAM API fetch failed: ...` / `502 TAM API post failed: ...`:
-  - Verify TAM is running and reachable.
-  - Verify `--tam-api-base` is correct.
-  - Verify TAM endpoints `/AgentService/ListAgents`, `/AgentService/GetAgentStatus`, `/SUITManifestService/ListManifests`, and `/SUITManifestService/RegisterManifest` are reachable.
-- If upload fails with a message that includes `status 400 from TAM API`:
-  - Verify SUIT envelope encoding and signature.
-  - Verify signer key is pre-registered in TAM.
-  - Verify that you are not uploading a manifest whose sequence number is the same as, or older than, a manifest already registered in TAM.
-- Empty tables in UI:
-  - Validate that TAM has device or manifest data to return.
-
-## 
-```
-The following should be moved to another location:
-```
 ## TAM Server API Summary
 
-There are four main API endpoints for TC Developer, TEEP Agent, and Device Admin:
+There are five main API endpoints for TC Developer, TEEP Agent, and Device Admin:
 
 ```mermaid
 flowchart LR
@@ -202,8 +177,9 @@ Section | Method | Endpoint | Notes
 --|--|--|--
 [1](#1-get-manifest-overviews-cbor) | `GET` | `/SUITManifestService/ListManifests` | Returns SUIT manifest overviews in CBOR.
 [2](#2-register-suit-manifests-delivering-trusted-components) | `POST` | `/SUITManifestService/RegisterManifest` | Registers a signed SUIT envelope.
-[3](#3-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
-[4](#4-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
+[3](#3-get-agent-list) | `GET` | `/AgentService/ListAgents` | Returns agent list in CBOR.
+[4](#4-get-agent-status) | `POST` | `/AgentService/GetAgentStatus` | Returns agent status in CBOR. Request body: CBOR array of agent KIDs (`[+ bstr]`).
+[5](#5-update-teep-agent-status) | `POST` | `/tam` | TEEP over HTTP endpoint. Body is empty or TEEP message (COSE/CBOR).
 
 ### Prerequisites
 
@@ -271,9 +247,20 @@ For protocol details, see [`SUIT_MANIFEST_REPOSITORY.md`](./SUIT_MANIFEST_REPOSI
 > [!NOTE]
 > If you want to register your own SUIT Manifest, the manifest signing key must be registered in advance.
 
-### 3) Get Agent Status
+### 3) Get Agent List
 
-Prepare a CBOR request body that contains an array of KIDs:
+Get Agent list with the following command:
+
+```bash
+curl -X GET http://localhost:8080/AgentService/ListAgents \
+  -H "Accept: application/cbor" -s | cbor2diag.rb
+```
+
+You will get some `[agent kid in bytes, last updated integer]` data array, and you can get their details with the next API.
+
+### 4) Get Agent Status
+
+Here let's get the agent status with kid `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` (with base64url encode, this is `"dummy-teep-agent-kid-of-building-dev-123-00"`).
 
 ```bash
 echo "[h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D']" | diag2cbor.rb > /tmp/agent-kids.cbor
@@ -301,14 +288,10 @@ The output is equivalent to:
 ]
 ```
 
-> ![NOTE]
-> When you encode a byte string `h'76E9A6CBEB5E7A9F9A81E9EDFA489DFA87FE6EE8A57629E0F9D7AFFB5DB7FB4D'` with base64url,
-> you would get `"dummy-teep-agent-kid-of-building-dev-123-00"`, which can be a comprehensive dummy data for AttesTAM Console.
-
-### 4) Update TEEP Agent Status
+### 5) Update TEEP Agent Status
 
 This requires a TEEP Agent implementation that communicates with the `/tam` endpoint.
 See [`TEEP_MESSAGE_HANDLE.md`](./TEEP_MESSAGE_HANDLE.md), [TEEP Protocol](https://datatracker.ietf.org/doc/html/draft-ietf-teep-protocol), and [TEEP over HTTP](https://datatracker.ietf.org/doc/html/draft-ietf-teep-otrp-over-http).
 For working examples, reference `TestTAMResolveTEEPMessage_AgentAttestation_OK` and `TestTAMResolveTEEPMessage_AgentUpdate_OK` in [`../internal/tam/tam_test.go`](../internal/tam/tam_test.go).
 
-One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/sgx-teep-agent), so consider trying it.
+One implementation is [SGX-based Implementation of a TEEP Agent](https://github.com/yuma-nishi/taws), so consider trying it.

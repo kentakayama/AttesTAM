@@ -64,12 +64,16 @@ flowchart LR
 ## Startup and Wiring
 1. AttesTAM entrypoint `cmd/attestam/main.go` builds `config.TAMConfig` from flags/env.
 2. `server.New` creates verifier client (`rats.NewVerifierClient`).
-3. `server.New` creates `tam.TAM`, then calls:
+3. `server.New` creates `tam.TAM`:
+   - if `-insecure-demo-mode` is false:
+     - `tam.NewTAM(path, verifier, logger)` loads the TAM private key from `-tam-teep-private-key-path`.
+   - if `-insecure-demo-mode` is true:
+     - `tam.NewDemoTAM(verifier, logger)` loads the public insecure demo TAM private key from `internal/demo`.
+4. `server.New` then calls:
    - `tam.Init()` -> opens `tam_state.db`, applies schema/PRAGMA.
    - if `-insecure-demo-mode` is true:
-     - `tam.EnsureDefaultEntity(true)` -> seeds demo entities/keys/manifests.
-     - `tam.EnsureDefaultTEEPAgent(true)` -> seeds demo agent/device/status.
-4. HTTP server starts with a single handler multiplexer implemented in `handler.ServeHTTP`.
+     - `tam.SeedDemoData()` -> seeds demo entities, signing keys, `['hello.txt']` manifest, demo device, demo agent, and demo status.
+5. HTTP server starts with a single handler multiplexer implemented in `handler.ServeHTTP`.
 
 ## Request Flow and State Ownership
 

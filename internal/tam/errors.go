@@ -16,6 +16,7 @@ var (
 	ErrInvalidValue               = errors.New("invalid value")
 	ErrKidIsMissing               = errors.New("kid is missing")
 	ErrNotAuthenticated           = errors.New("not authenticated")
+	ErrVerifierNotConfigured      = errors.New("verifier is not configured")
 	ErrAttestationFailed          = errors.New("attestataion failed")
 	ErrNotAResponse               = errors.New("corresponding sent message not found")
 	ErrAttestationPayloadNotFound = errors.New("attestation payload not found")
