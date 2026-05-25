@@ -26,7 +26,6 @@ import (
 	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
 	"github.com/kentakayama/AttesTAM/internal/suit"
 	"github.com/kentakayama/AttesTAM/internal/util"
-	"github.com/veraison/eat"
 	"github.com/veraison/go-cose"
 )
 
@@ -116,42 +115,24 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 			}
 
 			if agentKID == nil {
-				// TODO: extract AttestationResult in EAT form, not Evidence
-				var sign1 cose.Sign1Message
-				if err := sign1.UnmarshalCBOR(incomingMessage.Options.AttestationPayload); err != nil {
-					return nil, ErrAttestationFailed
-				}
-				rawAttestationPayload := sign1.Payload
-
-				var eat eat.Eat
-				if err := eat.FromCBOR(rawAttestationPayload); err != nil {
-					t.logger.Printf("failed to extract attestation public key: %v", err)
-					return nil, ErrNotAuthenticated
+				// Legacy Veraison path carries EAT in attestation-payload directly.
+				if attestationResults.AttestationKey == nil {
+					if err := rats.PopulateAttestedClaimsFromSign1(attestationResults, incomingMessage.Options.AttestationPayload); err != nil {
+						t.logger.Printf("failed to extract attested claims: %v", err)
+						return nil, ErrNotAuthenticated
+					}
 				}
 
-				// validate that the EAT payload is generated with the challenge the TAM sent
-				if err := eat.Nonce.Validate(); err != nil {
-					t.logger.Printf("failed to validate nonce: %v", err)
-					return nil, ErrNotAuthenticated
-				}
-				if eat.Nonce.Len() != 1 {
-					return nil, ErrNotAuthenticated
-				}
-				sentMessage = t.searchSentMessageWithChallenge(eat.Nonce.GetI(0))
+				sentMessage = t.searchSentMessageWithChallenge(attestationResults.AttestationNonce)
 				if sentMessage == nil {
 					return nil, ErrNotAuthenticated
 				}
 
-				if eat.Cnf == nil || eat.Cnf.Key == nil {
+				if attestationResults.AttestationKey == nil {
 					t.logger.Printf("attestation public key missing in payload")
 					return nil, ErrNotAuthenticated
 				}
-				key := eat.Cnf.Key
-
-				var ueid []byte
-				if eat.UEID != nil && eat.UEID.Validate() != nil {
-					ueid = []byte(*eat.UEID)
-				}
+				key := attestationResults.AttestationKey
 
 				// verify QueryResponse signature
 				if err := verifyCOSESignature(body, key); err != nil {
@@ -160,7 +141,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 				}
 
 				// store the public key for future use
-				if err := t.setTEEPAgentKey(key, ueid); err != nil {
+				if err := t.setTEEPAgentKey(key, attestationResults.AttestationUEID); err != nil {
 					t.logger.Printf("failed to store attestation public key: %v", err)
 					return nil, ErrFatal
 				} else {

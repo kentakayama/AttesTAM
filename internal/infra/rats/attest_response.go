@@ -16,6 +16,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/kentakayama/AttesTAM/internal/util"
+	"github.com/veraison/go-cose"
 )
 
 var (
@@ -45,8 +46,12 @@ type ProcessedAttestation struct {
 	EvidencePretty     string
 	JWTHeaderPretty    string
 	JWTPayloadPretty   string
+	Backend            string
 	EarStatus          string
 	SendUpdate         bool
+	AttestationNonce   []byte
+	AttestationUEID    []byte
+	AttestationKey     *cose.Key
 	updateArtifactPath string
 	updateSelectionErr error
 }
@@ -88,6 +93,7 @@ func DecodeAttestationResponse(payload []byte) (*ProcessedAttestation, error) {
 		EvidencePretty:     evidencePretty,
 		JWTHeaderPretty:    headerPretty,
 		JWTPayloadPretty:   payloadPretty,
+		Backend:            VerifierBackendVeraison,
 		EarStatus:          earStatus,
 		SendUpdate:         resp.ShouldSendUpdate(),
 		updateArtifactPath: updatePath,
