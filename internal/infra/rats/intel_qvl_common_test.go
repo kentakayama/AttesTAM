@@ -7,7 +7,9 @@
 package rats
 
 import (
+	"crypto"
 	"crypto/sha256"
+	"crypto/sha512"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,18 +79,31 @@ func TestBuildIntelQVLExpectedReportData(t *testing.T) {
 	}
 }
 
-func TestBuildIntelQVLExpectedReportData_FixtureMatchesQuote(t *testing.T) {
-	reportDataPath := filepath.Join("testdata", "report_data.dat")
-	quotePath := filepath.Join("testdata", "quote.dat")
-
-	rawReportData, err := os.ReadFile(reportDataPath)
+func TestBuildIntelQVLExpectedReportData_SHA384(t *testing.T) {
+	raw := []byte{0xa1, 0x01, 0x02}
+	expected, err := buildIntelQVLExpectedReportDataWithDigest(raw, crypto.SHA384)
 	require.NoError(t, err)
-	quote, err := os.ReadFile(quotePath)
+	require.Len(t, expected, 64)
+
+	sum := sha512.Sum384(raw)
+	require.Equal(t, sum[:], expected[:sha512.Size384])
+	for _, b := range expected[sha512.Size384:] {
+		require.Zero(t, b)
+	}
+}
+
+func TestBuildIntelQVLExpectedReportData_FixtureBundleMatchesQuote_SHA384(t *testing.T) {
+	bundlePath := filepath.Join("testdata", "sgx-quote3-teep-bundle.cbor")
+
+	bundleBytes, err := os.ReadFile(bundlePath)
+	require.NoError(t, err)
+	var bundle intelQVLAttestationPayload
+	err = cbor.Unmarshal(bundleBytes, &bundle)
 	require.NoError(t, err)
 
-	expected, err := buildIntelQVLExpectedReportData(rawReportData)
+	expected, err := buildIntelQVLExpectedReportDataWithDigest(bundle.RawReportData, crypto.SHA384)
 	require.NoError(t, err)
 
-	err = verifyQuoteReportData(quote, expected)
+	err = verifyQuoteReportData(bundle.Quote, expected)
 	require.NoError(t, err)
 }

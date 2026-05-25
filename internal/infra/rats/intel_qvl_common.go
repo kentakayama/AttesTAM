@@ -7,7 +7,9 @@
 package rats
 
 import (
+	"crypto"
 	"crypto/sha256"
+	"crypto/sha512"
 	"errors"
 	"fmt"
 
@@ -41,13 +43,25 @@ func decodeIntelQVLAttestationPayload(payload []byte) (*intelQVLAttestationPaylo
 }
 
 func buildIntelQVLExpectedReportData(rawReportData []byte) ([]byte, error) {
+	return buildIntelQVLExpectedReportDataWithDigest(rawReportData, crypto.SHA256)
+}
+
+func buildIntelQVLExpectedReportDataWithDigest(rawReportData []byte, digest crypto.Hash) ([]byte, error) {
 	if len(rawReportData) == 0 {
 		return nil, errors.New("raw-report-data is empty")
 	}
 
-	sum := sha256.Sum256(rawReportData)
 	expected := make([]byte, 64)
-	copy(expected, sum[:])
+	switch digest {
+	case crypto.SHA256:
+		sum := sha256.Sum256(rawReportData)
+		copy(expected, sum[:])
+	case crypto.SHA384:
+		sum := sha512.Sum384(rawReportData)
+		copy(expected, sum[:])
+	default:
+		return nil, fmt.Errorf("unsupported digest %v", digest)
+	}
 	return expected, nil
 }
 
