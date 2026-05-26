@@ -8,6 +8,10 @@
 run-demo:
 	go run ./cmd/attestam -insecure-demo-mode
 
+.PHONY: run-demo-qvl
+run-demo-qvl:
+	CGO_ENABLED=1 go run -tags=intel_qvl ./cmd/attestam -insecure-demo-mode
+
 .PHONY: test
 test:
 	$(MAKE) -C doc/examples/

@@ -75,6 +75,40 @@ Example:
 ATTESTAM_DB_PATH=/var/lib/attestam/tam_state.db go run ./cmd/attestam -insecure-demo-mode
 ```
 
+### Start the AttesTAM Server with Intel QVL
+
+To enable Intel QVL support in a native run, AttesTAM must be built with both cgo and the `intel_qvl` build tag:
+
+```bash
+make run-demo-qvl
+```
+
+This target runs:
+
+```bash
+CGO_ENABLED=1 go run -tags=intel_qvl ./cmd/attestam -insecure-demo-mode
+```
+
+> [!NOTE]
+> `intel_qvl` support depends on the native Intel DCAP quote verification library (`sgx_dcap_quoteverify`).
+> If `make run-demo-qvl` fails at link time or startup, ensure the library is installed and reachable from your shell environment.
+> On Debian/Ubuntu systems, install it first with:
+>
+> ```bash
+> sudo apt-get update
+> sudo apt-get install -y libsgx-dcap-quote-verify-dev
+> ```
+>
+> Depending on your system, you may need to export `LD_LIBRARY_PATH` so the dynamic loader can find it.
+
+Example:
+
+```bash
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu make run-demo-qvl
+```
+
+AttesTAM does not use Intel QVL for every attestation. The QVL backend is selected only when the incoming `QueryResponse.attestation-payload-format` is `application/sgx-quote3-teep-bundle`.
+
 ### AttesTAM Server Command Options
 
 The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by environment variables).
