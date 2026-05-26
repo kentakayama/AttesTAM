@@ -11,6 +11,7 @@ package rats
 /*
 #cgo LDFLAGS: -lsgx_dcap_quoteverify
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <sgx_dcap_quoteverify.h>
 
@@ -72,6 +73,7 @@ static quote3_error_t attestam_qvl_verify_quote(
 import "C"
 
 import (
+	"crypto"
 	"fmt"
 	"log"
 	"time"
@@ -96,11 +98,8 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		return nil, fmt.Errorf("intel-qvl attestation payload missing raw-report-data")
 	}
 
-	expectedReportData, err := buildIntelQVLExpectedReportData(decoded.RawReportData)
+	digest, err := verifyIntelQVLQuoteReportData(decoded.Quote, decoded.RawReportData)
 	if err != nil {
-		return nil, err
-	}
-	if err := verifyQuoteReportData(decoded.Quote, expectedReportData); err != nil {
 		return nil, err
 	}
 
@@ -118,7 +117,7 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", uint32(nativeResult.dcap_status))
 	}
 
-	ok := nativeResult.verification_result == C.TEE_QV_RESULT_OK && nativeResult.collateral_expiration_status == 0
+	ok := isIntelQVLResultAffirming(nativeResult.verification_result, nativeResult.collateral_expiration_status)
 	result := &ProcessedAttestation{
 		Backend:    VerifierBackendIntelQVL,
 		EarStatus:  resultToEarStatus(ok),
@@ -128,7 +127,8 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		return nil, err
 	}
 	if v.logger != nil {
-		v.logger.Printf("Intel QVL verification result: dcap_status=0x%04x verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
+		v.logger.Printf("Intel QVL verification result: digest=%s dcap_status=0x%04x verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
+			digest,
 			uint32(nativeResult.dcap_status),
 			uint32(nativeResult.verification_result),
 			uint32(nativeResult.collateral_expiration_status),
@@ -137,4 +137,46 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	}
 
 	return result, nil
+}
+
+func verifyIntelQVLQuoteReportData(quote, rawReportData []byte) (crypto.Hash, error) {
+	digests := []crypto.Hash{
+		crypto.SHA256,
+		crypto.SHA384,
+	}
+
+	var lastErr error
+	for _, digest := range digests {
+		expectedReportData, err := buildIntelQVLExpectedReportDataWithDigest(rawReportData, digest)
+		if err != nil {
+			return 0, err
+		}
+		if err := verifyQuoteReportData(quote, expectedReportData); err == nil {
+			return digest, nil
+		} else {
+			lastErr = err
+		}
+	}
+
+	return 0, lastErr
+}
+
+func isIntelQVLResultAffirming(verificationResult C.sgx_ql_qv_result_t, collateralExpirationStatus C.uint32_t) bool {
+	if collateralExpirationStatus != 0 {
+		return false
+	}
+
+	switch verificationResult {
+	case C.TEE_QV_RESULT_OK,
+		C.TEE_QV_RESULT_CONFIG_NEEDED,
+		C.TEE_QV_RESULT_OUT_OF_DATE,
+		C.TEE_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED,
+		C.TEE_QV_RESULT_SW_HARDENING_NEEDED,
+		C.TEE_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED,
+		C.TEE_QV_RESULT_TD_RELAUNCH_ADVISED,
+		C.TEE_QV_RESULT_TD_RELAUNCH_ADVISED_CONFIG_NEEDED:
+		return true
+	default:
+		return false
+	}
 }

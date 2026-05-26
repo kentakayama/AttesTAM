@@ -25,7 +25,6 @@ const (
 	envTAMTEEPPrivateKeyPath = "ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH"
 	envDBPath                = "ATTESTAM_DB_PATH"
 	envInsecureDemoMode      = "ATTESTAM_INSECURE_DEMO_MODE"
-	envVerifierBackend       = "ATTESTAM_VERIFIER_BACKEND"
 	envChallengeServer       = "ATTESTAM_CHALLENGE_SERVER"
 	envChallengeContentType  = "ATTESTAM_CHALLENGE_CONTENT_TYPE"
 	envChallengeInsecureTLS  = "ATTESTAM_CHALLENGE_INSECURE_TLS"
@@ -38,7 +37,6 @@ func main() {
 		privateKeyPath       = flag.String("tam-teep-private-key-path", "", "file path to the TAM's private key in COSE_Key format. Required unless insecure demo mode is enabled.")
 		dbPath               = flag.String("db-path", "tam_state.db", "file path to the SQLite database")
 		insecureDemoMode     = flag.Bool("insecure-demo-mode", false, "enable insecure demo mode with the public insecure demo TAM key, demo TC Developer key, and demo seed data. (not recommended for production)")
-		verifierBackend      = flag.String("verifier-backend", "veraison", "attestation verifier backend: veraison or intel-qvl")
 		challengeServer      = flag.String("challenge-server", "https://localhost:8443", "base URL for verifier challenge-response server")
 		challengeContentType = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")
@@ -52,7 +50,6 @@ func main() {
 	privateKeyPathVal := stringFromEnv(logger, envTAMTEEPPrivateKeyPath, *privateKeyPath)
 	dbPathVal := stringFromEnv(logger, envDBPath, *dbPath)
 	insecureDemoModeVal := boolFromEnv(logger, envInsecureDemoMode, *insecureDemoMode)
-	verifierBackendVal := stringFromEnv(logger, envVerifierBackend, *verifierBackend)
 	challengeServerVal := stringFromEnv(logger, envChallengeServer, *challengeServer)
 	challengeContentTypeVal := stringFromEnv(logger, envChallengeContentType, *challengeContentType)
 	challengeInsecureTLSVal := boolFromEnv(logger, envChallengeInsecureTLS, *challengeInsecureTLS)
@@ -64,7 +61,6 @@ func main() {
 		DBPath:                dbPathVal,
 		InsecureDemoMode:      insecureDemoModeVal,
 		Logger:                logger,
-		VerifierBackend:       verifierBackendVal,
 		ChallengeServerURL:    challengeServerVal,
 		ChallengeContentType:  challengeContentTypeVal,
 		ChallengeInsecureTLS:  challengeInsecureTLSVal,

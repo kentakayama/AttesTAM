@@ -16,10 +16,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/config"
 	"github.com/kentakayama/AttesTAM/internal/demo"
 	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
@@ -29,12 +30,15 @@ import (
 	"github.com/veraison/go-cose"
 )
 
+type verifierResolver func(attestationPayloadFormat string) (rats.IRAVerifier, error)
+
 type TAM struct {
-	verifier rats.IRAVerifier
-	tamKey   *cose.Key
-	logger   *log.Logger
-	db       *sql.DB         // Database connection for TAM state
-	ctx      context.Context // Background context for database operations
+	verifier        rats.IRAVerifier
+	resolveVerifier verifierResolver
+	tamKey          *cose.Key
+	logger          *log.Logger
+	db              *sql.DB         // Database connection for TAM state
+	ctx             context.Context // Background context for database operations
 }
 
 func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
@@ -50,6 +54,26 @@ func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Log
 }
 
 func NewTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+	return newTAMFromKeyBytes(keyBytes, verifier, nil, logger)
+}
+
+func NewTAMWithRAConfig(tamPrivateKeyPath string, raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+	if tamPrivateKeyPath == "" {
+		return nil, errors.New("tam private key path is required")
+	}
+	keyBytes, err := os.ReadFile(tamPrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read TAM private key from path %s: %w", tamPrivateKeyPath, err)
+	}
+
+	return NewTAMFromKeyBytesWithRAConfig(keyBytes, raCfg, logger)
+}
+
+func NewTAMFromKeyBytesWithRAConfig(keyBytes []byte, raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+	return newTAMFromKeyBytes(keyBytes, nil, newVerifierResolver(raCfg), logger)
+}
+
+func newTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, resolver verifierResolver, logger *log.Logger) (*TAM, error) {
 	var key cose.Key
 	err := cbor.Unmarshal(keyBytes, &key)
 	if err != nil {
@@ -59,9 +83,10 @@ func NewTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, logger *log.
 	logger.Printf("TAM's Key = %s, kid = %s", util.PrintCOSEKey(&key), util.BytesHexMax32(kid))
 
 	return &TAM{
-		verifier: verifier,
-		tamKey:   &key,
-		logger:   logger,
+		verifier:        verifier,
+		resolveVerifier: resolver,
+		tamKey:          &key,
+		logger:          logger,
 	}, nil
 }
 
@@ -70,6 +95,13 @@ func NewDemoTAM(verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
 		logger.Printf("[WARNING] Using public insecure demo TAM private key. This must not be used outside demo or tests.")
 	}
 	return NewTAMFromKeyBytes(demo.DemoTAMPrivateKeyCBOR, verifier, logger)
+}
+
+func NewDemoTAMWithRAConfig(raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+	if logger != nil {
+		logger.Printf("[WARNING] Using public insecure demo TAM private key. This must not be used outside demo or tests.")
+	}
+	return NewTAMFromKeyBytesWithRAConfig(demo.DemoTAMPrivateKeyCBOR, raCfg, logger)
 }
 
 func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
@@ -606,7 +638,7 @@ func (t *TAM) verifyAttestationPayload(incoming *TEEPMessage) (*rats.ProcessedAt
 		return nil, ErrAttestationPayloadNotFound
 	}
 
-	result, err := t.submitAttestationPayload(incoming.Options.AttestationPayload)
+	result, err := t.submitAttestationPayload(incoming.Options.AttestationPayloadFormat, incoming.Options.AttestationPayload)
 	if err != nil {
 		t.logger.Printf("failed to save attestation payload: %v", err)
 		return nil, err
@@ -614,19 +646,68 @@ func (t *TAM) verifyAttestationPayload(incoming *TEEPMessage) (*rats.ProcessedAt
 	return result, nil
 }
 
-func (t *TAM) submitAttestationPayload(data []byte) (*rats.ProcessedAttestation, error) {
-	if t.verifier == nil || (t.verifier != nil && reflect.ValueOf(t.verifier).IsNil()) {
+func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString, data []byte) (*rats.ProcessedAttestation, error) {
+	verifier, backend, err := t.selectVerifier(attestationPayloadFormat)
+	if err != nil {
+		return nil, err
+	}
+	if verifier == nil {
 		return nil, ErrVerifierNotConfigured
 	}
-	t.logger.Printf("submitting attestation payload to verifier: %v", t.verifier)
+	t.logger.Printf("submitting attestation payload to verifier backend %q: %T", backend, verifier)
 
-	att, err := t.verifier.Process(data)
+	att, err := verifier.Process(data)
 	if err != nil {
 		t.logger.Printf("challenge-response submission failed: %v", err)
 		return nil, ErrAttestationFailed
 	}
 
 	return att, nil
+}
+
+func (t *TAM) selectVerifier(attestationPayloadFormat *util.DiagString) (rats.IRAVerifier, string, error) {
+	format := ""
+	if attestationPayloadFormat != nil {
+		format = string(*attestationPayloadFormat)
+	}
+	backend := rats.VerifierBackendForAttestationPayloadFormat(format)
+
+	if t.resolveVerifier != nil {
+		verifier, err := t.resolveVerifier(format)
+		if err != nil {
+			return nil, backend, err
+		}
+		return verifier, backend, nil
+	}
+
+	return t.verifier, backend, nil
+}
+
+func newVerifierResolver(raCfg config.RAConfig) verifierResolver {
+	var (
+		mu    sync.Mutex
+		cache = map[string]rats.IRAVerifier{}
+	)
+
+	return func(attestationPayloadFormat string) (rats.IRAVerifier, error) {
+		backend := rats.VerifierBackendForAttestationPayloadFormat(attestationPayloadFormat)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if verifier, ok := cache[backend]; ok {
+			return verifier, nil
+		}
+
+		cfg := raCfg
+		cfg.Backend = backend
+		verifier, err := rats.NewVerifierForBackend(backend, cfg)
+		if err != nil {
+			return nil, err
+		}
+		cache[backend] = verifier
+		return verifier, nil
+	}
 }
 
 func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte, sentMessage *TEEPMessage) ([]byte, error) {

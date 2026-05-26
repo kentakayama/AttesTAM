@@ -14,10 +14,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/config"
 	"github.com/kentakayama/AttesTAM/internal/demo"
+	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
 	"github.com/kentakayama/AttesTAM/internal/infra/sqlite"
 	"github.com/kentakayama/AttesTAM/internal/suit"
@@ -121,12 +125,12 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	require.Nil(t, err)
 
 	// TEST#3: process QueryRequest with Token to return QueryRequest with Challenge
-	responseTCList, err := tam.ResolveTEEPMessage(signedQueryResponseWithTCList)
+	responseQueryRequest, err := tam.ResolveTEEPMessage(signedQueryResponseWithTCList)
 	require.Nil(t, err)
-	require.NotNil(t, responseTCList)
+	require.NotNil(t, responseQueryRequest)
 
 	var outgoingQueryRequestWithChallenge TEEPMessage
-	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.tamKey, responseTCList)
+	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.tamKey, responseQueryRequest)
 	require.Nil(t, err)
 	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithChallenge.Type)
 
@@ -175,9 +179,131 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	require.Equal(t, agentKID, ckt)
 }
 
+func TestTAMResolveTEEPMessage_AgentAttestationIntelQVLFixture_OK(t *testing.T) {
+	logger := log.Default()
+	verifier, err := rats.NewIntelQVLVerifier(config.RAConfig{Logger: logger})
+	if err != nil {
+		t.Skipf("intel-qvl verifier unavailable: %v", err)
+	}
+
+	tam, err := NewDemoTAM(verifier, logger)
+	require.NoError(t, err)
+	require.NoError(t, tam.InitDB(":memory:"))
+
+	// generate TEEP Agent's key
+	agentKey := &cose.Key{}
+	require.NoError(t, agentKey.UnmarshalCBOR(demo.DefaultTrustedAgentKey))
+	agentKID, err := agentKey.Thumbprint(crypto.SHA256)
+	require.NoError(t, err)
+
+	// TEST#1: process empty body to return QueryRequest with Token
+	responseEmpty, err := tam.ResolveTEEPMessage(nil)
+	require.Nil(t, err)
+
+	var outgoingQueryRequestWithToken TEEPMessage
+	err = outgoingQueryRequestWithToken.COSESign1Verify(tam.tamKey, responseEmpty)
+	require.Nil(t, err)
+	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithToken.Type)
+
+	// TEST#2: generate TEEP Agent's QueryResponse with Token
+	assert.Nil(t, outgoingQueryRequestWithToken.Options.Challenge)
+	require.NotNil(t, outgoingQueryRequestWithToken.Options.Token)
+	assert.Equal(t, true, outgoingQueryRequestWithToken.DataItemRequested.TCListRequested())
+	queryResponseWithTCList := TEEPMessage{
+		Type: TEEPTypeQueryResponse,
+		Options: TEEPOptions{
+			Token: outgoingQueryRequestWithToken.Options.Token,
+		},
+	}
+	signedQueryResponseWithTCList, err := queryResponseWithTCList.COSESign1Sign(agentKey)
+	require.Nil(t, err)
+
+	// TEST#3: process QueryRequest with Token to return QueryRequest with Challenge
+	responseTCList, err := tam.ResolveTEEPMessage(signedQueryResponseWithTCList)
+	require.Nil(t, err)
+	require.NotNil(t, responseTCList)
+
+	var outgoingQueryRequestWithChallenge TEEPMessage
+	err = outgoingQueryRequestWithChallenge.COSESign1Verify(tam.tamKey, responseTCList)
+	require.Nil(t, err)
+	assert.Equal(t, TEEPTypeQueryRequest, outgoingQueryRequestWithChallenge.Type)
+
+	// TEST#4: generate TEEP Agent's QueryResponse with Challenge
+	assert.Nil(t, outgoingQueryRequestWithChallenge.Options.Token)
+	require.NotNil(t, outgoingQueryRequestWithChallenge.Options.Challenge)
+
+	fixturePath := filepath.Join("testdata", "sgx_quote3_teep_bundle.cbor")
+	fixture, err := os.ReadFile(fixturePath)
+	require.NoError(t, err)
+
+	expectedAttestation, err := verifier.Process(fixture)
+	require.NoError(t, err)
+	require.Equal(t, "affirming", expectedAttestation.EarStatus)
+	require.NotNil(t, expectedAttestation.AttestationKey)
+	require.NotEmpty(t, expectedAttestation.AttestationNonce)
+
+	format := util.DiagString(string("application/sgx-quote3-teep-bundle"))
+	queryResponseWithEvidence := TEEPMessage{
+		Type: TEEPTypeQueryResponse,
+		Options: TEEPOptions{
+			AttestationPayload:       fixture,
+			AttestationPayloadFormat: &format,
+		},
+	}
+	signedQueryResponseWithQuote3, err := queryResponseWithEvidence.COSESign1Sign(agentKey)
+	require.Nil(t, err)
+
+	challengeRepo := sqlite.NewChallengeRepository(tam.db)
+	require.NotNil(t, challengeRepo)
+	_, err = challengeRepo.Create(tam.ctx, &model.Challenge{
+		Challenge: expectedAttestation.AttestationNonce,
+	})
+	require.NoError(t, err)
+	sentQueryRequestRepo := sqlite.NewSentQueryRequestMessageRepository(tam.db)
+	_, err = sentQueryRequestRepo.CreateWithChallenge(tam.ctx, expectedAttestation.AttestationNonce, &model.SentQueryRequestMessage{
+		AttestationRequested: true,
+		TCListRequested:      false,
+	})
+	require.NoError(t, err)
+
+	// TEST#5: process QueryResponse with Evidence to return empty
+	responseEvidence, err := tam.ResolveTEEPMessage(signedQueryResponseWithQuote3)
+	require.Nil(t, err)
+	assert.Nil(t, responseEvidence)
+	// make sure that the key is trusted while resolving QueryResponse with the attested quote payload
+
+	// TEST#6: confirm stored TEEP Agent's key
+	key, err := tam.getTEEPAgentKey(agentKID)
+	require.Nil(t, err)
+	require.Equal(t, cose.AlgorithmESP256, key.Algorithm)
+	ckt, err := key.Thumbprint(crypto.SHA256)
+	require.Nil(t, err)
+	require.Equal(t, agentKID, ckt)
+
+	expectedCurve, expectedX, expectedY, expectedD := expectedAttestation.AttestationKey.EC2()
+	require.Equal(t, cose.CurveP256, expectedCurve)
+	require.Empty(t, expectedD)
+	require.Len(t, expectedX, 32)
+	require.Len(t, expectedY, 32)
+
+	storedCurve, storedX, storedY, storedD := key.EC2()
+	require.Equal(t, expectedCurve, storedCurve)
+	require.Equal(t, expectedX, storedX)
+	require.Equal(t, expectedY, storedY)
+	require.Empty(t, storedD)
+}
+
 func TestTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T) {
 	testTAMResolveTEEPMessage_AgentUpdate_OK(t, true)
 	testTAMResolveTEEPMessage_AgentUpdate_OK(t, false)
+}
+
+func decodeSignedTEEPMessageWithoutVerify(body []byte, msg *TEEPMessage) error {
+	var sign1 cose.Sign1Message
+	if err := sign1.UnmarshalCBOR(body); err != nil {
+		return err
+	}
+	return cbor.Unmarshal(sign1.Payload, msg)
 }
 
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {

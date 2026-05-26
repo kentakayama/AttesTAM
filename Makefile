@@ -18,6 +18,11 @@ test-integrated:
 	$(MAKE) -C doc/examples/
 	go test -tags=integration ./...
 
+.PHONY: test-qvl
+test-qvl:
+	$(MAKE) -C doc/examples/
+	CGO_ENABLED=1 go test -tags=intel_qvl ./...
+
 .PHONY: clean
 clean:
 	@echo "[WARNING] Are you sure to clear the TAM's Status?"
