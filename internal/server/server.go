@@ -46,7 +46,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		Logger:      logger,
 	}
 
-	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use Veraison.", rats.AttestationPayloadFormatSGXQuote3TEEP)
+	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use VERAISON.", rats.AttestationPayloadFormatSGXQuote3TEEP)
 
 	var t *tam.TAM
 	var err error

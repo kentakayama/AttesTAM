@@ -147,7 +147,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 			}
 
 			if agentKID == nil {
-				// Legacy Veraison path carries EAT in attestation-payload directly.
+				// Legacy VERAISON path carries EAT in attestation-payload directly.
 				if attestationResults.AttestationKey == nil {
 					if err := rats.PopulateAttestedClaimsFromSign1(attestationResults, incomingMessage.Options.AttestationPayload); err != nil {
 						t.logger.Printf("failed to extract attested claims: %v", err)

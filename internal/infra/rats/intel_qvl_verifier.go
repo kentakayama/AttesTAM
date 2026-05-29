@@ -114,9 +114,16 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		&nativeResult,
 	)
 	if status != C.TEE_SUCCESS {
+		if v.logger != nil {
+			v.logNativeResult(digest, &nativeResult, intelQVLClassificationFailure, resultToEarStatus(false))
+		}
 		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", uint32(nativeResult.dcap_status))
 	}
 
+	classification := classifyIntelQVLResult(
+		uint32(nativeResult.verification_result),
+		uint32(nativeResult.collateral_expiration_status),
+	)
 	ok := isIntelQVLResultAffirming(nativeResult.verification_result, nativeResult.collateral_expiration_status)
 	result := &ProcessedAttestation{
 		Backend:    VerifierBackendIntelQVL,
@@ -127,16 +134,23 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		return nil, err
 	}
 	if v.logger != nil {
-		v.logger.Printf("Intel QVL verification result: digest=%s dcap_status=0x%04x verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
-			digest,
-			uint32(nativeResult.dcap_status),
-			uint32(nativeResult.verification_result),
-			uint32(nativeResult.collateral_expiration_status),
-			uint32(nativeResult.supplemental_data_size),
-		)
+		v.logNativeResult(digest, &nativeResult, classification, result.EarStatus)
 	}
 
 	return result, nil
+}
+
+func (v *IntelQVLVerifier) logNativeResult(digest crypto.Hash, nativeResult *C.attestam_qvl_result_t, classification string, earStatus string) {
+	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s digest=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
+		classification,
+		earStatus,
+		digest,
+		uint32(nativeResult.dcap_status),
+		intelQVLVerificationResultName(uint32(nativeResult.verification_result)),
+		uint32(nativeResult.verification_result),
+		uint32(nativeResult.collateral_expiration_status),
+		uint32(nativeResult.supplemental_data_size),
+	)
 }
 
 func verifyIntelQVLQuoteReportData(quote, rawReportData []byte) (crypto.Hash, error) {
@@ -162,21 +176,5 @@ func verifyIntelQVLQuoteReportData(quote, rawReportData []byte) (crypto.Hash, er
 }
 
 func isIntelQVLResultAffirming(verificationResult C.sgx_ql_qv_result_t, collateralExpirationStatus C.uint32_t) bool {
-	if collateralExpirationStatus != 0 {
-		return false
-	}
-
-	switch verificationResult {
-	case C.TEE_QV_RESULT_OK,
-		C.TEE_QV_RESULT_CONFIG_NEEDED,
-		C.TEE_QV_RESULT_OUT_OF_DATE,
-		C.TEE_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED,
-		C.TEE_QV_RESULT_SW_HARDENING_NEEDED,
-		C.TEE_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED,
-		C.TEE_QV_RESULT_TD_RELAUNCH_ADVISED,
-		C.TEE_QV_RESULT_TD_RELAUNCH_ADVISED_CONFIG_NEEDED:
-		return true
-	default:
-		return false
-	}
+	return isIntelQVLResultAffirmingValue(uint32(verificationResult), uint32(collateralExpirationStatus))
 }
