@@ -73,9 +73,6 @@ func populateAttestedClaimsFromSGXRawReportData(result *rats.ProcessedAttestatio
 	if len(rawReportData) == 0 {
 		return errors.New("raw-report-data is required for SGX attestation")
 	}
-	if err := rats.PopulateAttestedClaims(result, rawReportData); err == nil {
-		return nil
-	}
 	if err := populateAttestedKeyFromSGXRawReportData(result, rawReportData); err != nil {
 		return fmt.Errorf("extract attested claims from raw-report-data: %w", err)
 	}

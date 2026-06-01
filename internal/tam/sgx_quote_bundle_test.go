@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/kentakayama/AttesTAM/internal/infra/rats"
 	"github.com/stretchr/testify/require"
+	"github.com/veraison/go-cose"
 )
 
 func TestDecodeSGXQuote3TEEPBundle(t *testing.T) {
@@ -53,6 +55,24 @@ func TestVerifySGXQuoteReportDataBindingMismatch(t *testing.T) {
 
 	err = verifySGXQuoteReportDataBinding(decoded.Quote, rawReportData)
 	require.ErrorContains(t, err, "report_data")
+}
+
+func TestPopulateAttestedClaimsFromSGXRawReportData(t *testing.T) {
+	fixture := readSGXQuote3TEEPBundleFixture(t)
+	decoded, err := decodeSGXQuote3TEEPBundle(fixture)
+	require.NoError(t, err)
+
+	result := &rats.ProcessedAttestation{}
+	err = populateAttestedClaimsFromSGXRawReportData(result, decoded.RawReportData)
+	require.NoError(t, err)
+	require.NotNil(t, result.AttestationKey)
+	require.NotEmpty(t, result.AttestationNonce)
+
+	curve, x, y, d := result.AttestationKey.EC2()
+	require.Equal(t, cose.CurveP256, curve)
+	require.Len(t, x, 32)
+	require.Len(t, y, 32)
+	require.Empty(t, d)
 }
 
 func readSGXQuote3TEEPBundleFixture(t *testing.T) []byte {

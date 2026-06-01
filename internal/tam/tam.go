@@ -136,50 +136,20 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 			}
 		} else {
 			// attestation may be requested with challange i.e. the sent message does not contain token
-			attestationResults, err := t.verifyAttestationPayload(incomingMessage)
+			attestationResults, verifiedAgentKID, verifiedSentMessage, err := t.verifyAttestationPayload(body, incomingMessage, agentKID)
 			if err != nil {
 				return nil, err
 			}
 
-			// if attestationResult status is affirming, extract key from attestiaonPayload
 			if !strings.EqualFold(attestationResults.EarStatus, "affirming") {
 				return nil, ErrAttestationFailed
 			}
 
-			if agentKID == nil {
-				// Legacy VERAISON path carries EAT in attestation-payload directly.
-				if attestationResults.AttestationKey == nil {
-					if err := rats.PopulateAttestedClaimsFromSign1(attestationResults, incomingMessage.Options.AttestationPayload); err != nil {
-						t.logger.Printf("failed to extract attested claims: %v", err)
-						return nil, ErrNotAuthenticated
-					}
-				}
-
-				sentMessage = t.searchSentMessageWithChallenge(attestationResults.AttestationNonce)
-				if sentMessage == nil {
-					return nil, ErrNotAuthenticated
-				}
-
-				if attestationResults.AttestationKey == nil {
-					t.logger.Printf("attestation public key missing in payload")
-					return nil, ErrNotAuthenticated
-				}
-				key := attestationResults.AttestationKey
-
-				// verify QueryResponse signature
-				if err := verifyCOSESignature(body, key); err != nil {
-					t.logger.Printf("query-response verification failed: %v", err)
-					return nil, ErrNotAuthenticated
-				}
-
-				// store the public key for future use
-				if err := t.setTEEPAgentKey(key, attestationResults.AttestationUEID); err != nil {
-					t.logger.Printf("failed to store attestation public key: %v", err)
-					return nil, ErrFatal
-				} else {
-					agentKID, _ = key.Thumbprint(crypto.SHA256)
-					t.logger.Printf("stored attestation public key %s, kid %s in system keyring.", util.PrintCOSEKey(key), util.BytesHexMax32(agentKID))
-				}
+			if verifiedSentMessage != nil {
+				sentMessage = verifiedSentMessage
+			}
+			if verifiedAgentKID != nil {
+				agentKID = verifiedAgentKID
 			}
 		}
 
@@ -633,40 +603,91 @@ func (t *TAM) searchSentMessageWithToken(token []byte) *TEEPMessage {
 // sends it to the Verifier, and returns the resulting ProcessedAttestation.
 // If any error occurs during processing, the returned ProcessedAttestation will be nil
 // and an appropriate error will be returned.
-func (t *TAM) verifyAttestationPayload(incoming *TEEPMessage) (*rats.ProcessedAttestation, error) {
+func (t *TAM) verifyAttestationPayload(body []byte, incoming *TEEPMessage, agentKID []byte) (*rats.ProcessedAttestation, []byte, *TEEPMessage, error) {
 	if incoming.Options.AttestationPayload == nil {
-		return nil, ErrAttestationPayloadNotFound
+		return nil, nil, nil, ErrAttestationPayloadNotFound
 	}
 
-	result, err := t.submitAttestationPayload(incoming.Options.AttestationPayloadFormat, incoming.Options.AttestationPayload)
+	format := ""
+	if incoming.Options.AttestationPayloadFormat != nil {
+		format = string(*incoming.Options.AttestationPayloadFormat)
+	}
+
+	result, backend, err := t.submitAttestationPayload(incoming.Options.AttestationPayloadFormat, incoming.Options.AttestationPayload)
 	if err != nil {
 		t.logger.Printf("failed to save attestation payload: %v", err)
-		return nil, err
+		return nil, nil, nil, err
 	}
-	return result, nil
+
+	if !strings.EqualFold(result.EarStatus, "affirming") {
+		return result, nil, nil, nil
+	}
+
+	if backend == rats.VerifierBackendIntelQVL {
+		sgxBundle, err := decodeSGXQuote3TEEPBundle(incoming.Options.AttestationPayload)
+		if err != nil {
+			t.logger.Printf("failed to decode SGX Quote3 TEEP bundle: %v", err)
+			return nil, nil, nil, ErrAttestationFailed
+		}
+		if err := verifySGXQuoteReportDataBinding(sgxBundle.Quote, sgxBundle.RawReportData); err != nil {
+			t.logger.Printf("failed to verify SGX quote report_data binding: %v", err)
+			return nil, nil, nil, ErrAttestationFailed
+		}
+		if err := populateAttestedClaimsFromSGXRawReportData(result, sgxBundle.RawReportData); err != nil {
+			t.logger.Printf("failed to extract SGX attested claims: %v", err)
+			return nil, nil, nil, ErrAttestationFailed
+		}
+	} else if requiresAttestedAgentKey(format) {
+		if err := rats.PopulateAttestedClaimsFromSign1(result, incoming.Options.AttestationPayload); err != nil {
+			t.logger.Printf("failed to extract attested claims: %v", err)
+			return nil, nil, nil, ErrNotAuthenticated
+		}
+	}
+
+	sentMessage := t.searchSentMessageWithChallenge(result.AttestationNonce)
+	if sentMessage == nil {
+		return nil, nil, nil, ErrNotAuthenticated
+	}
+
+	if agentKID != nil {
+		return result, agentKID, sentMessage, nil
+	}
+	if !requiresAttestedAgentKey(format) && backend != rats.VerifierBackendIntelQVL {
+		return nil, nil, nil, ErrNotAuthenticated
+	}
+	if result.AttestationKey == nil {
+		t.logger.Printf("attestation public key missing in payload")
+		return nil, nil, nil, ErrNotAuthenticated
+	}
+	if err := verifyCOSESignature(body, result.AttestationKey); err != nil {
+		t.logger.Printf("query-response verification failed: %v", err)
+		return nil, nil, nil, ErrNotAuthenticated
+	}
+	if err := t.setTEEPAgentKey(result.AttestationKey, result.AttestationUEID); err != nil {
+		t.logger.Printf("failed to store attestation public key: %v", err)
+		return nil, nil, nil, ErrFatal
+	}
+	verifiedAgentKID, _ := result.AttestationKey.Thumbprint(crypto.SHA256)
+	t.logger.Printf("stored attestation public key %s, kid %s in system keyring.", util.PrintCOSEKey(result.AttestationKey), util.BytesHexMax32(verifiedAgentKID))
+	return result, verifiedAgentKID, sentMessage, nil
 }
 
-func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString, data []byte) (*rats.ProcessedAttestation, error) {
+func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString, data []byte) (*rats.ProcessedAttestation, string, error) {
 	verifier, backend, err := t.selectVerifier(attestationPayloadFormat)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if verifier == nil {
-		return nil, ErrVerifierNotConfigured
+		return nil, backend, ErrVerifierNotConfigured
 	}
 	t.logger.Printf("submitting attestation payload to verifier backend %q: %T", backend, verifier)
 
 	verifierPayload := data
-	var sgxBundle *sgxQuote3TEEPBundle
 	if backend == rats.VerifierBackendIntelQVL {
-		sgxBundle, err = decodeSGXQuote3TEEPBundle(data)
+		sgxBundle, err := decodeSGXQuote3TEEPBundle(data)
 		if err != nil {
 			t.logger.Printf("failed to decode SGX Quote3 TEEP bundle: %v", err)
-			return nil, ErrAttestationFailed
-		}
-		if err := verifySGXQuoteReportDataBinding(sgxBundle.Quote, sgxBundle.RawReportData); err != nil {
-			t.logger.Printf("failed to verify SGX quote report_data binding: %v", err)
-			return nil, ErrAttestationFailed
+			return nil, backend, ErrAttestationFailed
 		}
 		verifierPayload = sgxBundle.Quote
 	}
@@ -674,16 +695,15 @@ func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString
 	att, err := verifier.Process(verifierPayload)
 	if err != nil {
 		t.logger.Printf("challenge-response submission failed: %v", err)
-		return nil, ErrAttestationFailed
-	}
-	if backend == rats.VerifierBackendIntelQVL && strings.EqualFold(att.EarStatus, "affirming") {
-		if err := populateAttestedClaimsFromSGXRawReportData(att, sgxBundle.RawReportData); err != nil {
-			t.logger.Printf("failed to extract SGX attested claims: %v", err)
-			return nil, ErrAttestationFailed
-		}
+		return nil, backend, ErrAttestationFailed
 	}
 
-	return att, nil
+	return att, backend, nil
+}
+
+func requiresAttestedAgentKey(format string) bool {
+	lower := strings.ToLower(strings.TrimSpace(format))
+	return strings.HasPrefix(lower, "application/eat")
 }
 
 func (t *TAM) selectVerifier(attestationPayloadFormat *util.DiagString) (rats.IRAVerifier, string, error) {

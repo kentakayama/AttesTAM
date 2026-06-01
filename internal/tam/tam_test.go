@@ -173,6 +173,10 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 		Type: TEEPTypeQueryResponse,
 		Options: TEEPOptions{
 			AttestationPayload: signedEvidence,
+			AttestationPayloadFormat: func() *util.DiagString {
+				format := util.DiagString(`application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`)
+				return &format
+			}(),
 		},
 	}
 	signedQueryResponseWithEvidence, err := queryResponse.COSESign1Sign(agentKey)

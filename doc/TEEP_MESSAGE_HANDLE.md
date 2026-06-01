@@ -148,11 +148,13 @@ sequenceDiagram
     participant TAM as TAM
     participant V as VERAISON
 
-    Agent->>TAM: QueryResponse(attestation-payload, token/challenge)
+    TAM->>Agent: QueryRequest(nonce in challenge)
+    Agent->>TAM: QueryResponse(EAT-based attestation-payload)
+    note over TAM: extract EAT-based attestation-payload
     TAM->>V: Process(attestation-payload)
     V-->>TAM: ProcessedAttestation (EAR status)
     alt EAR status is affirming
-        note over TAM: Local validation:<br/>decode attestation-payload as COSE Sign1<br/>decode EAT claims from Sign1 payload<br/>validate nonce and match sent challenge<br/>extract cnf.key (agent public key)<br/>verify QueryResponse signature with cnf.key<br/>store confirmed agent key
+        note over TAM: Local validation:<br/>decode EAT claims from attestation-payload when needed<br/>validate nonce and match sent challenge<br/>extract cnf.key (agent public key)<br/>verify QueryResponse signature with cnf.key<br/>store confirmed agent key
         TAM-->>Agent: continue protocol (Update or next response)
     else EAR status is not affirming
         TAM-->>Agent: reject authentication path
@@ -182,19 +184,14 @@ Validation layers:
    - stores newly confirmed key.
    - continues normal QueryResponse handling (manifest resolution and Update generation).
 
+For Veraison-routed formats that do not carry a TEEP Agent public key, such as `application/psa-attestation-token`, AttesTAM can still use the verifier result to confirm the challenge only when the QueryResponse was already authenticated by a previously trusted agent key. Those formats cannot establish a new TEEP Agent key because they do not provide `cwt.cnf.key`.
+
 This two-step model avoids trusting attestation output alone: TAM also proves that the same key in EAT actually signed the live QueryResponse bound to TAM-issued freshness.
 
 > [!NOTE]
 > [Key Confirmation Claim of CWT](https://datatracker.ietf.org/doc/rfc8747/) is used by TEEP Agent to prove possession of a key.
 
 ### With Intel SGX DCAP Remote Attestation
-
-```mermaid
-flowchart LR
-    TEEPAgent[TEEP Agent] -- SGX Quote in QueryResponse --> TAM
-    TAM -- SGX Quote --> IntelQVL[Intel QVL Verifier]
-    IntelQVL -- Quote verification result --> TAM
-```
 
 Verifier / Relying Party split in AttesTAM:
 - Verifier responsibility (`Intel QVL verifier` for this path)
@@ -203,17 +200,47 @@ Verifier / Relying Party split in AttesTAM:
 - TAM responsibility as Relying Party
   - interpret TEEP `challenge` as a one-time nonce in this implementation and require the SGX attested material to bind that exact value.
   - verify the AttesTAM-defined `report_data` binding against the TEEP Agent's attested material.
-  - recover the TEEP Agent verifying key from `raw-report-data` / attested claims.
+  - recover the TEEP Agent verifying key from the AttesTAM-defined `raw-report-data` layout.
   - verify that the same recovered key signs the live `QueryResponse`.
   - store that key as trusted only after both the verifier result and the live message signature check succeed.
 
-While SGX Quote format is product-specific, AttesTAM defines how the TEEP Agent's key material and freshness are bound into the Quote.
+```mermaid
+sequenceDiagram
+    participant Agent as TEEP Agent
+    participant TAM as TAM
+    participant V as Integrated Intel QVL verifier
+
+    TAM->>Agent: QueryRequest(nonce in challenge)
+    Agent->>TAM: QueryResponse(teep-evidence-bundle attestation-payload)
+    note over TAM: extract SGX Quote from attestation-payload
+    TAM->>V: Process(SGX Quote)
+    V-->>TAM: ProcessedAttestation (EAR status)
+    alt EAR status is affirming
+        note over TAM: Local validation:<br/>validate nonce and match sent challenge<br/>extract agent public key from raw-report-data<br/>verify QueryResponse signature with that key<br/>store confirmed agent key
+        TAM-->>Agent: continue protocol (Update or next response)
+    else EAR status is not affirming
+        TAM-->>Agent: reject authentication path
+    end
+```
+
+While SGX Quote format is product-specific, AttesTAM defines how the TEEP Agent's key material and freshness are bound into the Quote shown below.
+
+```cddl
+; attestation-payload content for "application/sgx-quote3-teep-bundle"
+
+sgx-quote3-teep-bundle = [
+    quote: bstr ; report_data = SHA-384(raw-report-data content)
+    raw-report-data: bstr ; 32-bytes x || 32-bytes y || TAM's challenge
+]
+```
+
 `report_data` in SGX Quote is opaque to the CPU, so TEEP Agents and TAM define how AttesTAM uses the 64-byte field:
-1. TEEP Agent encodes an EAT raw Evidence with `{eat_nonce: challenge in QueryRequest, cnf: generated TEEP Agent public key}`,
-2. hashes on it with SHA-384 and stores it into `report_data`, and
-3. stores it in `raw-report-data` and the SGX Quote to `attestation-payload` in QueryResponse.
-4. TAM extracts the SGX Quote from `attestation-payload`, verifies the `report_data` binding, and requests Intel QVL to verify the Quote, and
-5. on affirming Attestation Results, TAM uses `raw-report-data` to verify the QueryResponse signature with the attested TEEP Agent public key.
+1. TEEP Agent stores its generated verifying key coordinates as `x || y` in the first 64 bytes of `raw-report-data`,
+2. appends the TAM challenge value to the remaining bytes of `raw-report-data`,
+3. hashes `raw-report-data` with SHA-384 and stores that digest into `report_data`, and
+4. stores `raw-report-data` and the SGX Quote to `attestation-payload` in QueryResponse.
+5. TAM extracts the SGX Quote from `attestation-payload` and requests Intel QVL to verify the Quote, and
+6. on affirming Attestation Results, TAM verifies that Quote `report_data` equals `SHA-384(raw-report-data)`, uses `raw-report-data` to recover the attested TEEP Agent public key, matches the appended nonce to the sent challenge, and verifies the QueryResponse signature with that key.
 
 In other words, AttesTAM narrows the TEEP `challenge` semantics to nonce-style freshness for this SGX flow: the Quote-bound attested material must carry the exact fresh challenge from TAM, and an older reused Evidence object is not accepted.
 
