@@ -656,10 +656,31 @@ func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString
 	}
 	t.logger.Printf("submitting attestation payload to verifier backend %q: %T", backend, verifier)
 
-	att, err := verifier.Process(data)
+	verifierPayload := data
+	var sgxBundle *sgxQuote3TEEPBundle
+	if backend == rats.VerifierBackendIntelQVL {
+		sgxBundle, err = decodeSGXQuote3TEEPBundle(data)
+		if err != nil {
+			t.logger.Printf("failed to decode SGX Quote3 TEEP bundle: %v", err)
+			return nil, ErrAttestationFailed
+		}
+		if err := verifySGXQuoteReportDataBinding(sgxBundle.Quote, sgxBundle.RawReportData); err != nil {
+			t.logger.Printf("failed to verify SGX quote report_data binding: %v", err)
+			return nil, ErrAttestationFailed
+		}
+		verifierPayload = sgxBundle.Quote
+	}
+
+	att, err := verifier.Process(verifierPayload)
 	if err != nil {
 		t.logger.Printf("challenge-response submission failed: %v", err)
 		return nil, ErrAttestationFailed
+	}
+	if backend == rats.VerifierBackendIntelQVL && strings.EqualFold(att.EarStatus, "affirming") {
+		if err := populateAttestedClaimsFromSGXRawReportData(att, sgxBundle.RawReportData); err != nil {
+			t.logger.Printf("failed to extract SGX attested claims: %v", err)
+			return nil, ErrAttestationFailed
+		}
 	}
 
 	return att, nil

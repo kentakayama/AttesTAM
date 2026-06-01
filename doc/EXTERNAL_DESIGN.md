@@ -34,7 +34,7 @@ POST | `/AgentService/GetAgentStatus` | TAM Admin/<br/>Device Admin | `agent-kid
 
 The TAM selects the attestation verifier from the incoming `QueryResponse.attestation-payload-format`.
 
-- `application/sgx-quote3-teep-bundle` uses the local Intel QVL path. The `attestation-payload` is a CBOR array containing the SGX Quote and the TEEP `raw-report-data`. TAM verifies that the SGX Quote `report_data` contains the SHA-256 or SHA-384 digest of `raw-report-data`, then calls Intel DCAP quote verification through `sgx_dcap_quoteverify`.
+- `application/sgx-quote3-teep-bundle` uses the local Intel QVL path. The `attestation-payload` is a CBOR array containing the SGX Quote and the TEEP `raw-report-data`. TAM verifies the AttesTAM-defined rule that SGX Quote `report_data` contains the SHA-384 digest of `raw-report-data`, then passes the Quote bytes to Intel DCAP quote verification through `sgx_dcap_quoteverify`.
 - Other payload formats use the Veraison challenge-response verifier configured by `-challenge-server` / `ATTESTAM_CHALLENGE_SERVER`.
 - If the verifier result is affirming, TAM extracts the attested agent public key and nonce from `raw-report-data` or EAT claims, verifies the signed `QueryResponse`, and stores the agent key for future authenticated TEEP messages.
 

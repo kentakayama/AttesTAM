@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/kentakayama/AttesTAM/internal/config"
 	"github.com/kentakayama/AttesTAM/internal/demo"
 	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
@@ -61,6 +60,20 @@ func (e *MockEATVerifier) Process(data []byte) (*rats.ProcessedAttestation, erro
 		SendUpdate: true,
 	}
 	return &ret, nil
+}
+
+type MockSGXQuoteVerifier struct {
+	t         *testing.T
+	wantQuote []byte
+}
+
+func (v *MockSGXQuoteVerifier) Process(data []byte) (*rats.ProcessedAttestation, error) {
+	require.Equal(v.t, v.wantQuote, data)
+	return &rats.ProcessedAttestation{
+		Backend:    rats.VerifierBackendIntelQVL,
+		EarStatus:  "affirming",
+		SendUpdate: false,
+	}, nil
 }
 
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
@@ -181,9 +194,16 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 
 func TestTAMResolveTEEPMessage_AgentAttestationIntelQVLFixture_OK(t *testing.T) {
 	logger := log.Default()
-	verifier, err := rats.NewIntelQVLVerifier(config.RAConfig{Logger: logger})
-	if err != nil {
-		t.Skipf("intel-qvl verifier unavailable: %v", err)
+	fixturePath := filepath.Join("testdata", "sgx_quote3_teep_bundle.cbor")
+	fixture, err := os.ReadFile(fixturePath)
+	require.NoError(t, err)
+	expectedBundle, err := decodeSGXQuote3TEEPBundle(fixture)
+	require.NoError(t, err)
+	require.NoError(t, verifySGXQuoteReportDataBinding(expectedBundle.Quote, expectedBundle.RawReportData))
+
+	verifier := &MockSGXQuoteVerifier{
+		t:         t,
+		wantQuote: expectedBundle.Quote,
 	}
 
 	tam, err := NewDemoTAM(verifier, logger)
@@ -232,13 +252,9 @@ func TestTAMResolveTEEPMessage_AgentAttestationIntelQVLFixture_OK(t *testing.T) 
 	assert.Nil(t, outgoingQueryRequestWithChallenge.Options.Token)
 	require.NotNil(t, outgoingQueryRequestWithChallenge.Options.Challenge)
 
-	fixturePath := filepath.Join("testdata", "sgx_quote3_teep_bundle.cbor")
-	fixture, err := os.ReadFile(fixturePath)
-	require.NoError(t, err)
-
-	expectedAttestation, err := verifier.Process(fixture)
-	require.NoError(t, err)
+	expectedAttestation := &rats.ProcessedAttestation{EarStatus: "affirming"}
 	require.Equal(t, "affirming", expectedAttestation.EarStatus)
+	require.NoError(t, populateAttestedClaimsFromSGXRawReportData(expectedAttestation, expectedBundle.RawReportData))
 	require.NotNil(t, expectedAttestation.AttestationKey)
 	require.NotEmpty(t, expectedAttestation.AttestationNonce)
 

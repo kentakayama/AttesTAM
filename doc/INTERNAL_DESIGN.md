@@ -101,8 +101,9 @@ sequenceDiagram
         T->>R: select backend from attestation-payload-format
         alt application/sgx-quote3-teep-bundle
             R-->>T: Intel QVL verifier
-            T->>Q: verify quote + report_data binding
-            Q-->>T: DCAP result + attested claims
+            T->>T: verify report_data binding + attested claims
+            T->>Q: verify quote
+            Q-->>T: DCAP result
         else other format
             R-->>T: Veraison verifier
             T->>V: submit attestation payload
@@ -152,25 +153,24 @@ sequenceDiagram
 
     T->>R: format = application/sgx-quote3-teep-bundle
     R-->>T: IntelQVLVerifier
-    T->>I: Process(attestation-payload)
-    I->>I: decode CBOR bundle [quote, raw-report-data]
-    I->>I: hash raw-report-data with SHA-256 or SHA-384
-    I->>I: compare digest with quote report_data
+    T->>T: decode CBOR bundle [quote, raw-report-data]
+    T->>T: hash raw-report-data with SHA-384
+    T->>T: compare digest with quote report_data
+    T->>I: Process(quote)
     I->>D: tee_verify_quote(quote)
     D-->>I: verification_result + collateral_expiration_status
-    I->>I: extract nonce/key from raw-report-data or EAT claims
-    I-->>T: ProcessedAttestation{Backend: intel-qvl, EarStatus, AttestationKey, AttestationNonce}
+    I-->>T: ProcessedAttestation{Backend: intel-qvl, EarStatus}
+    T->>T: extract nonce/key from raw-report-data or EAT claims
     T->>T: match nonce to saved challenge
     T->>T: verify QueryResponse COSE signature with attested key
     T->>DB: store agent key and continue QueryResponse handling
 ```
 
 SGX-specific rules:
-- `decodeIntelQVLAttestationPayload` expects the SGX bundle to contain `Quote` and `RawReportData`. If decoding as a bundle fails, it can treat the payload as a raw quote, but `IntelQVLVerifier.Process` still requires `raw-report-data` for this TEEP path.
-- `verifyIntelQVLQuoteReportData` accepts SHA-256 or SHA-384 binding. The digest of `raw-report-data` must match the SGX Quote `report_data`.
+- TAM expects the SGX bundle to contain `Quote` and `RawReportData`, verifies the AttesTAM-defined SHA-384 `report_data` binding, and submits only the SGX Quote bytes to `IntelQVLVerifier`.
 - Quote `report_data` extraction supports quote versions 3, 4, and version 5 body types 1 through 4.
 - Native DCAP verification is affirming only when collateral is not expired and the QVL result is one of the accepted success or recoverable configuration/out-of-date states.
-- `validateIntelQVLClaims` first tries to parse `raw-report-data` as EAT claims. If that fails, it falls back to the legacy layout where the first 64 bytes are the EC2 public key coordinates and any remaining bytes are the attestation nonce.
+- TAM first tries to parse `raw-report-data` as EAT claims. If that fails, it falls back to the layout where the first 64 bytes are the EC2 public key coordinates and any remaining bytes are the attestation nonce.
 - The `intel-qvl` backend requires the `intel_qvl` build tag, cgo, and the native `sgx_dcap_quoteverify` library. Without that build configuration, selecting this backend returns a configuration error.
 
 ### 3) Admin and TC Developer endpoints

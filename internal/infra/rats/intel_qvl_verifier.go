@@ -73,7 +73,6 @@ static quote3_error_t attestam_qvl_verify_quote(
 import "C"
 
 import (
-	"crypto"
 	"fmt"
 	"log"
 	"time"
@@ -90,32 +89,23 @@ func NewIntelQVLVerifier(cfg config.RAConfig) (IRAVerifier, error) {
 }
 
 func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error) {
-	decoded, err := decodeIntelQVLAttestationPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-	if len(decoded.RawReportData) == 0 {
-		return nil, fmt.Errorf("intel-qvl attestation payload missing raw-report-data")
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("intel-qvl quote is empty")
 	}
 
-	digest, err := verifyIntelQVLQuoteReportData(decoded.Quote, decoded.RawReportData)
-	if err != nil {
-		return nil, err
-	}
-
-	cQuote := C.CBytes(decoded.Quote)
+	cQuote := C.CBytes(payload)
 	defer C.free(cQuote)
 
 	var nativeResult C.attestam_qvl_result_t
 	status := C.attestam_qvl_verify_quote(
 		(*C.uint8_t)(cQuote),
-		C.uint32_t(len(decoded.Quote)),
+		C.uint32_t(len(payload)),
 		C.time_t(time.Now().Unix()),
 		&nativeResult,
 	)
 	if status != C.TEE_SUCCESS {
 		if v.logger != nil {
-			v.logNativeResult(digest, &nativeResult, intelQVLClassificationFailure, resultToEarStatus(false))
+			v.logNativeResult(&nativeResult, intelQVLClassificationFailure, resultToEarStatus(false))
 		}
 		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", uint32(nativeResult.dcap_status))
 	}
@@ -130,49 +120,23 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 		EarStatus:  resultToEarStatus(ok),
 		SendUpdate: false,
 	}
-	if err := validateIntelQVLClaims(decoded.RawReportData, result); err != nil {
-		return nil, err
-	}
 	if v.logger != nil {
-		v.logNativeResult(digest, &nativeResult, classification, result.EarStatus)
+		v.logNativeResult(&nativeResult, classification, result.EarStatus)
 	}
 
 	return result, nil
 }
 
-func (v *IntelQVLVerifier) logNativeResult(digest crypto.Hash, nativeResult *C.attestam_qvl_result_t, classification string, earStatus string) {
-	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s digest=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
+func (v *IntelQVLVerifier) logNativeResult(nativeResult *C.attestam_qvl_result_t, classification string, earStatus string) {
+	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
 		classification,
 		earStatus,
-		digest,
 		uint32(nativeResult.dcap_status),
 		intelQVLVerificationResultName(uint32(nativeResult.verification_result)),
 		uint32(nativeResult.verification_result),
 		uint32(nativeResult.collateral_expiration_status),
 		uint32(nativeResult.supplemental_data_size),
 	)
-}
-
-func verifyIntelQVLQuoteReportData(quote, rawReportData []byte) (crypto.Hash, error) {
-	digests := []crypto.Hash{
-		crypto.SHA256,
-		crypto.SHA384,
-	}
-
-	var lastErr error
-	for _, digest := range digests {
-		expectedReportData, err := buildIntelQVLExpectedReportDataWithDigest(rawReportData, digest)
-		if err != nil {
-			return 0, err
-		}
-		if err := verifyQuoteReportData(quote, expectedReportData); err == nil {
-			return digest, nil
-		} else {
-			lastErr = err
-		}
-	}
-
-	return 0, lastErr
 }
 
 func isIntelQVLResultAffirming(verificationResult C.sgx_ql_qv_result_t, collateralExpirationStatus C.uint32_t) bool {
