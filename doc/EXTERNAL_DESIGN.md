@@ -14,6 +14,8 @@ TCDeveloper([TC Developer]) -- SUIT Manifest --> TAM
 TAM -- Agent Status<br/>SUIT Manifest Overviews --> TAMAdmin([TAM Admin])
 TAM -- Agent Status --> DeviceManager([Device Admin])
 TEEPAgent([TEEP Agent]) <-- TEEP Message --> TAM
+Verifier([External VERAISON<br/>Verifier]) <-- non-SGX<br/>attestation --> TAM
+IntelQVL([Intel DCAP<br/>Quote Verification Library]) <-- SGX Quote<br/>verification --> TAM
 TAM[TAM]
 ```
 
@@ -27,3 +29,15 @@ POST | `/AgentService/GetAgentStatus` | TAM Admin/<br/>Device Admin | `agent-kid
 
 > [!NOTE]
 > Current `/*Service/` endpoints return fixed demo-oriented records. Request-specific filtering and role-based authorization are still TODO.
+
+## Attestation Verification Path
+
+The TAM selects the attestation verifier from the incoming `QueryResponse.attestation-payload-format`.
+
+- `application/sgx-quote3-teep-bundle` uses the local Intel QVL path. The `attestation-payload` is a CBOR array containing the SGX Quote and the TEEP `raw-report-data`. TAM passes the Quote bytes to Intel DCAP quote verification through `sgx_dcap_quoteverify`, and on an affirming result verifies the AttesTAM-defined rule that SGX Quote `report_data` contains the SHA-384 digest of `raw-report-data`.
+- Other payload formats use the Veraison challenge-response verifier configured by `-challenge-server` / `ATTESTAM_CHALLENGE_SERVER`.
+- If the verifier result is affirming for an EAT-based format, TAM extracts the attested nonce and `cnf.key`, verifies the signed `QueryResponse`, and stores the agent key for future authenticated TEEP messages.
+- If the verifier result is affirming for `application/sgx-quote3-teep-bundle`, TAM extracts the attested agent public key and nonce from the AttesTAM-defined `raw-report-data` layout, verifies the signed `QueryResponse`, and stores the agent key.
+- Other Veraison-routed formats may still confirm the challenge, but they cannot establish a new TEEP Agent key unless they carry a bindable public key.
+
+Intel QVL support is available only when AttesTAM is built with the `intel_qvl` build tag and cgo, and the host provides the Intel DCAP quote verification library.

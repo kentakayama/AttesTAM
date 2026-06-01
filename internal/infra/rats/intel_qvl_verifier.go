@@ -11,6 +11,7 @@ package rats
 /*
 #cgo LDFLAGS: -lsgx_dcap_quoteverify
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <sgx_dcap_quoteverify.h>
 
@@ -88,53 +89,56 @@ func NewIntelQVLVerifier(cfg config.RAConfig) (IRAVerifier, error) {
 }
 
 func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error) {
-	decoded, err := decodeIntelQVLAttestationPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-	if len(decoded.RawReportData) == 0 {
-		return nil, fmt.Errorf("intel-qvl attestation payload missing raw-report-data")
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("intel-qvl quote is empty")
 	}
 
-	expectedReportData, err := buildIntelQVLExpectedReportData(decoded.RawReportData)
-	if err != nil {
-		return nil, err
-	}
-	if err := verifyQuoteReportData(decoded.Quote, expectedReportData); err != nil {
-		return nil, err
-	}
-
-	cQuote := C.CBytes(decoded.Quote)
+	cQuote := C.CBytes(payload)
 	defer C.free(cQuote)
 
 	var nativeResult C.attestam_qvl_result_t
 	status := C.attestam_qvl_verify_quote(
 		(*C.uint8_t)(cQuote),
-		C.uint32_t(len(decoded.Quote)),
+		C.uint32_t(len(payload)),
 		C.time_t(time.Now().Unix()),
 		&nativeResult,
 	)
 	if status != C.TEE_SUCCESS {
+		if v.logger != nil {
+			v.logNativeResult(&nativeResult, intelQVLClassificationFailure, resultToEarStatus(false))
+		}
 		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", uint32(nativeResult.dcap_status))
 	}
 
-	ok := nativeResult.verification_result == C.TEE_QV_RESULT_OK && nativeResult.collateral_expiration_status == 0
+	classification := classifyIntelQVLResult(
+		uint32(nativeResult.verification_result),
+		uint32(nativeResult.collateral_expiration_status),
+	)
+	ok := isIntelQVLResultAffirming(nativeResult.verification_result, nativeResult.collateral_expiration_status)
 	result := &ProcessedAttestation{
 		Backend:    VerifierBackendIntelQVL,
 		EarStatus:  resultToEarStatus(ok),
 		SendUpdate: false,
 	}
-	if err := validateIntelQVLClaims(decoded.RawReportData, result); err != nil {
-		return nil, err
-	}
 	if v.logger != nil {
-		v.logger.Printf("Intel QVL verification result: dcap_status=0x%04x verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
-			uint32(nativeResult.dcap_status),
-			uint32(nativeResult.verification_result),
-			uint32(nativeResult.collateral_expiration_status),
-			uint32(nativeResult.supplemental_data_size),
-		)
+		v.logNativeResult(&nativeResult, classification, result.EarStatus)
 	}
 
 	return result, nil
+}
+
+func (v *IntelQVLVerifier) logNativeResult(nativeResult *C.attestam_qvl_result_t, classification string, earStatus string) {
+	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
+		classification,
+		earStatus,
+		uint32(nativeResult.dcap_status),
+		intelQVLVerificationResultName(uint32(nativeResult.verification_result)),
+		uint32(nativeResult.verification_result),
+		uint32(nativeResult.collateral_expiration_status),
+		uint32(nativeResult.supplemental_data_size),
+	)
+}
+
+func isIntelQVLResultAffirming(verificationResult C.sgx_ql_qv_result_t, collateralExpirationStatus C.uint32_t) bool {
+	return isIntelQVLResultAffirmingValue(uint32(verificationResult), uint32(collateralExpirationStatus))
 }

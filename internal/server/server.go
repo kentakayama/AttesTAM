@@ -38,29 +38,22 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, errors.New("tam private key path is required outside insecure demo mode")
 	}
 
-	verifierClient, err := rats.NewVerifier(config.RAConfig{
-		Backend:     cfg.VerifierBackend,
+	raCfg := config.RAConfig{
 		BaseURL:     cfg.ChallengeServerURL,
 		ContentType: cfg.ChallengeContentType,
 		InsecureTLS: cfg.ChallengeInsecureTLS,
 		Timeout:     cfg.ChallengeTimeout,
 		Logger:      logger,
-	})
-	if err != nil {
-		return nil, err
 	}
 
-	if verifierClient != nil {
-		logger.Printf("Verifier backend `%s` configured.", cfg.VerifierBackend)
-	} else {
-		logger.Printf("No verifier client configured. Verifier challenge-response interactions will be disabled.")
-	}
+	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use VERAISON.", rats.AttestationPayloadFormatSGXQuote3TEEP)
 
 	var t *tam.TAM
+	var err error
 	if cfg.InsecureDemoMode {
-		t, err = tam.NewDemoTAM(verifierClient, logger)
+		t, err = tam.NewDemoTAMWithRAConfig(raCfg, logger)
 	} else {
-		t, err = tam.NewTAM(cfg.TAMTEEPPrivateKeyPath, verifierClient, logger)
+		t, err = tam.NewTAMWithRAConfig(cfg.TAMTEEPPrivateKeyPath, raCfg, logger)
 	}
 	if err != nil {
 		return nil, err

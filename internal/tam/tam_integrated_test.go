@@ -180,6 +180,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 		},
 	}
 	signedQueryResponseWithEvidence, err := queryResponse.COSESign1Sign(agentKey)
+	require.Nil(t, err)
 
 	// TEST#5: process QueryResponse with Evidence to return empty
 	responseEvidence, err := tam.ResolveTEEPMessage(signedQueryResponseWithEvidence)
@@ -187,7 +188,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 	assert.Nil(t, responseEvidence)
 	// make sure that the key is trusted while resolving QueryResponse with EAT Cnf claim
 
-	// TEST#3b: confirm stored TEEP Agent's key
+	// TEST#6: confirm stored TEEP Agent's key
 	key, err := tam.getTEEPAgentKey(agentKID)
 	require.Nil(t, err)
 	require.Equal(t, cose.AlgorithmESP256, key.Algorithm)

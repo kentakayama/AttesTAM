@@ -18,7 +18,6 @@ type TAMConfig struct {
 	InsecureDemoMode      bool
 	TAMTEEPPrivateKeyPath string
 	Logger                *log.Logger
-	VerifierBackend       string
 	ChallengeServerURL    string
 	ChallengeContentType  string
 	ChallengeInsecureTLS  bool

@@ -41,6 +41,10 @@ func verifyQuoteReportData(quote []byte, expected []byte) error {
 	return nil
 }
 
+func ExtractQuoteReportData(quote []byte) ([]byte, error) {
+	return extractQuoteReportData(quote)
+}
+
 func extractQuoteReportData(quote []byte) ([]byte, error) {
 	if len(quote) < quoteHeaderVersionSize {
 		return nil, errors.New("quote is too short")

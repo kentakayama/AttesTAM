@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/veraison/eat"
 	"github.com/veraison/go-cose"
 )
@@ -40,6 +41,24 @@ func PopulateAttestedClaimsFromSign1(result *ProcessedAttestation, payload []byt
 		return fmt.Errorf("decode attestation Sign1: %w", err)
 	}
 	return PopulateAttestedClaimsFromEAT(result, sign1.Payload)
+}
+
+func PopulateAttestedClaims(result *ProcessedAttestation, raw []byte) error {
+	if err := PopulateAttestedClaimsFromEAT(result, raw); err == nil {
+		return nil
+	}
+	if err := PopulateAttestedClaimsFromSign1(result, raw); err == nil {
+		return nil
+	}
+
+	var wrapped []byte
+	if err := cbor.Unmarshal(raw, &wrapped); err == nil && len(wrapped) > 0 {
+		if err := PopulateAttestedClaims(result, wrapped); err == nil {
+			return nil
+		}
+	}
+
+	return errors.New("unsupported attested claims encoding")
 }
 
 func attachAttestedClaims(result *ProcessedAttestation, evidence *eat.Eat) error {
