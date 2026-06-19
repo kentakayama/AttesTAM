@@ -17,9 +17,9 @@ RUN go mod download
 
 # Copy the full source tree and build the runtime binaries.
 COPY . .
-RUN GOOS=linux \
+RUN GOOS=linux CGO_ENABLED=0 \
     go build -trimpath -o /out/attestam ./cmd/attestam && \
-    GOOS=linux \
+    GOOS=linux CGO_ENABLED=0 \
     go build -trimpath -o /out/admin-console ./cmd/admin-console
 
 

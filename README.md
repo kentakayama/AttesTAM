@@ -54,14 +54,14 @@ See [USER_MANUAL.md](./doc/USER_MANUAL.md) for details.
 > Outside insecure demo mode, you must provide `-tam-teep-private-key-path` (or `ATTESTAM_TAM_TEEP_PRIVATE_KEY_PATH`).
 > Otherwise, the TAM requires an Remote Attestation Evidence binding a public key. See [teep-wasm-demo](https://github.com/s-miyazawa/teep-wasm-demo) how to configure the Verifier and how the TEEP Agent acts.
 
-### A) Native
+### A) Native without Intel Quote Verification
 
 ```bash
 go run ./cmd/attestam -insecure-demo-mode
 ```
 
 The mock server listens on `localhost:8080` by default and exposes `POST /tam`.
-Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. TAM communicates with a Verifier endpoint configured with `-challenge-server` command line argument (default value is `https://localhost:8443/`), forwarding attestation payloads and logging the decoded Verifier responses. No attestation files are written to disk.
+Send TEEP messages (COSE Sign1) as the request body and inspect logs for response behavior. In this mode, AttesTAM does not use Intel QVL and does not require cgo, Intel DCAP libraries, Intel PCCS, or Node.js. TAM communicates with a Verifier endpoint configured with `-challenge-server` command line argument (default value is `https://localhost:8443/`), forwarding attestation payloads and logging the decoded Verifier responses. No attestation files are written to disk.
 If `-challenge-server` is set to an empty string, verifier-backed attestation is unavailable and requests that require attestation verification return HTTP `503 Service Unavailable`.
 The SQLite state database defaults to `tam_state.db` in the current working directory and can be overridden with `-db-path`.
 Use `go run ./cmd/attestam -h` to see available CLI options.
@@ -76,7 +76,7 @@ go run ./cmd/admin-console --tam-api-base http://127.0.0.1:8080/
 `cmd/admin-console` uses `http://127.0.0.1:8080/` as the default `--tam-api-base` and no longer supports local testvector fallback mode.
 Add `--tam-api-debug` when you want the console to log AttesTAM API requests and responses to stderr. For `Register TC`, the upload body itself is not dumped; the log shows the uploaded filename instead.
 
-### B) Docker
+### B) Docker without Intel Quote Verification (Recommended)
 
 ```bash
 docker build -t attestam .
@@ -95,6 +95,33 @@ This container starts both services:
 - AttesTAM Console on `http://127.0.0.1:9090`
 
 `--net=host` is used so the containerized TAM can reach a verifier running on `https://localhost:8443` on the host. Then open `http://127.0.0.1:9090` in your Web browser.
+
+This is the recommended way to run AttesTAM for normal local evaluation. The default Docker image does not include Intel QVL, Intel DCAP runtime libraries, Intel PCCS, or Node.js.
+
+### C) Intel Quote Verification with Docker (Experimental)
+
+Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries, and starts a local Intel PCCS inside the same container. PCCS is configured without an Intel PCS API key.
+
+Use Docker for this mode. Native setup requires Intel DCAP libraries, PCCS runtime dependencies, and Node.js for PCCS; keeping those dependencies inside the experimental image avoids installing them on the host.
+
+```bash
+docker build -f docker/qvl-pccs.Dockerfile -t attestam-qvl-pccs .
+docker run --rm \
+  --net=host \
+  -e ATTESTAM_ADDR=":8080" \
+  -e ATTESTAM_INSECURE_DEMO_MODE=true \
+  -e ADMIN_CONSOLE_PORT=9090 \
+  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
+  attestam-qvl-pccs
+```
+
+This experimental image starts three processes in one container:
+
+- local Intel PCCS on `https://127.0.0.1:8081`
+- TAM core server on `http://localhost:8080` (`POST /tam`)
+- AttesTAM Console on `http://127.0.0.1:9090`
+
+The QVL/PCCS Dockerfile is intentionally separate from the main Dockerfile so it can be removed when Intel Quote verification moves to the Verifier side.
 
 ## Documentation
 

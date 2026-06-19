@@ -1,6 +1,6 @@
-*.md
-doc/
 tam_state*
-.*/
-Dockerfile
+go1.*.linux-amd64.tar.gz
+.git
+.agents
+.codex
 Makefile
