@@ -91,6 +91,7 @@ ENV ATTESTAM_ADDR=":8080" \
     ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
     ATTESTAM_CHALLENGE_INSECURE_TLS="true" \
     ATTESTAM_CHALLENGE_TIMEOUT="1m0s" \
+    ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR="/var/cache/attestam/intel-qvl-collateral" \
     LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu" \
     ADMIN_CONSOLE_PORT="9090" \
     ADMIN_CONSOLE_TAM_API_BASE="http://127.0.0.1:8080"

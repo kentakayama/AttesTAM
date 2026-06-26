@@ -13,22 +13,24 @@ import (
 
 // Config captures the tunables required to start the TAM mock server.
 type TAMConfig struct {
-	Addr                  string
-	DBPath                string
-	InsecureDemoMode      bool
-	TAMTEEPPrivateKeyPath string
-	Logger                *log.Logger
-	ChallengeServerURL    string
-	ChallengeContentType  string
-	ChallengeInsecureTLS  bool
-	ChallengeTimeout      time.Duration
+	Addr                       string
+	DBPath                     string
+	InsecureDemoMode           bool
+	TAMTEEPPrivateKeyPath      string
+	Logger                     *log.Logger
+	ChallengeServerURL         string
+	ChallengeContentType       string
+	ChallengeInsecureTLS       bool
+	ChallengeTimeout           time.Duration
+	IntelQVLCollateralCacheDir string
 }
 
 type RAConfig struct {
-	Backend     string
-	BaseURL     string
-	ContentType string
-	InsecureTLS bool
-	Timeout     time.Duration
-	Logger      *log.Logger
+	Backend                    string
+	BaseURL                    string
+	ContentType                string
+	InsecureTLS                bool
+	Timeout                    time.Duration
+	Logger                     *log.Logger
+	IntelQVLCollateralCacheDir string
 }

@@ -103,6 +103,7 @@ This is the recommended way to run AttesTAM for normal local evaluation. The def
 Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries, and starts a local Intel PCCS inside the same container. PCCS is configured without an Intel PCS API key.
 
 Use Docker for this mode. Native setup requires Intel DCAP libraries, PCCS runtime dependencies, and Node.js for PCCS; keeping those dependencies inside the experimental image avoids installing them on the host.
+The experimental image also enables `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR=/var/cache/attestam/intel-qvl-collateral`; after a successful QVL verification, AttesTAM stores the opaque QVL collateral buffer there and reuses it on later verifications.
 
 ```bash
 docker build -f docker/qvl-pccs.Dockerfile -t attestam-qvl-pccs .
