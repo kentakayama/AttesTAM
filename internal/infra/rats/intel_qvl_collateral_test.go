@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -30,17 +31,19 @@ func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
 	quote := readSGXQuoteFixture(t)
 	cache, err := newIntelQVLCollateralCache(t.TempDir(), nil)
 	require.NoError(t, err)
+	now := time.Date(2026, time.July, 2, 0, 0, 0, 0, time.UTC)
+	origNow := intelQVLNow
+	intelQVLNow = func() time.Time { return now }
+	t.Cleanup(func() { intelQVLNow = origNow })
 
 	collateral := &intelQVLQuoteCollateral{
 		MajorVersion:          intelQVLPCSAPIVersionMajor,
 		MinorVersion:          intelQVLPCSCRLVersionMinor,
 		PCKCRLIssuerChain:     []byte("pck-crl-issuer"),
-		RootCACRL:             []byte("root-ca-crl"),
-		PCKCRL:                []byte("pck-crl"),
 		TCBInfoIssuerChain:    []byte("tcb-info-issuer"),
-		TCBInfo:               []byte(`{"tcbInfo":{"id":"SGX"}}`),
+		TCBInfo:               []byte(`{"tcbInfo":{"id":"SGX"},"nextUpdate":"2026-07-05T00:00:00Z"}`),
 		QEIdentityIssuerChain: []byte("qe-identity-issuer"),
-		QEIdentity:            []byte(`{"enclaveIdentity":{"id":"QE"}}`),
+		QEIdentity:            []byte(`{"enclaveIdentity":{"id":"QE"},"nextUpdate":"2026-07-06T00:00:00Z"}`),
 	}
 	key, err := cache.Put(quote, collateral)
 	require.NoError(t, err)
@@ -51,6 +54,45 @@ func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, key, gotKey)
 	require.Equal(t, collateral, got)
+}
+
+func TestIntelQVLCollateralCacheGetExpiredTreatsAsMiss(t *testing.T) {
+	quote := readSGXQuoteFixture(t)
+	cache, err := newIntelQVLCollateralCache(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	now := time.Date(2026, time.July, 2, 0, 0, 0, 0, time.UTC)
+	origNow := intelQVLNow
+	intelQVLNow = func() time.Time { return now }
+	t.Cleanup(func() { intelQVLNow = origNow })
+
+	collateral := &intelQVLQuoteCollateral{
+		MajorVersion: intelQVLPCSAPIVersionMajor,
+		MinorVersion: intelQVLPCSCRLVersionMinor,
+		TCBInfo:      []byte(`{"nextUpdate":"2026-07-03T00:00:00Z"}`),
+	}
+	_, err = cache.Put(quote, collateral)
+	require.NoError(t, err)
+
+	intelQVLNow = func() time.Time { return now.Add(48 * time.Hour) }
+	got, ok, _, err := cache.Get(quote)
+	require.NoError(t, err)
+	require.False(t, ok)
+	require.Nil(t, got)
+}
+
+func TestIntelQVLQuoteCollateralExpiryUsesEarlierOfTTLAndNextUpdate(t *testing.T) {
+	now := time.Date(2026, time.July, 2, 0, 0, 0, 0, time.UTC)
+
+	ttlOnly, err := intelQVLQuoteCollateralExpiry(&intelQVLQuoteCollateral{}, now)
+	require.NoError(t, err)
+	require.Equal(t, now.Add(intelQVLCollateralCacheTTL), ttlOnly)
+
+	withEarlierNextUpdate, err := intelQVLQuoteCollateralExpiry(&intelQVLQuoteCollateral{
+		TCBInfo: []byte(`{"nextUpdate":"2026-07-04T12:00:00Z"}`),
+	}, now)
+	require.NoError(t, err)
+	require.Equal(t, time.Date(2026, time.July, 4, 12, 0, 0, 0, time.UTC), withEarlierNextUpdate)
 }
 
 func readSGXQuoteFixture(t *testing.T) []byte {

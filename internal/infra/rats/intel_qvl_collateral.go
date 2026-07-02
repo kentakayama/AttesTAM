@@ -16,10 +16,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
-	intelQVLFMSPCSize = 6
+	intelQVLFMSPCSize          = 6
+	intelQVLCollateralCacheTTL = 7 * 24 * time.Hour
 )
 
 type intelQVLCollateralCache struct {
@@ -27,6 +29,15 @@ type intelQVLCollateralCache struct {
 	logger *log.Logger
 }
 
+type intelQVLCollateralCacheEntry struct {
+	ExpiresAt  time.Time                `json:"expires_at"`
+	Collateral *intelQVLQuoteCollateral `json:"collateral"`
+}
+
+var intelQVLNow = time.Now
+
+// newIntelQVLCollateralCache creates the Verifier-side Endorsement store directory.
+// The cache policy is intentionally owned by AttesTAM rather than QCNL/PCCS.
 func newIntelQVLCollateralCache(dir string, logger *log.Logger) (*intelQVLCollateralCache, error) {
 	if dir == "" {
 		return nil, nil
@@ -37,6 +48,8 @@ func newIntelQVLCollateralCache(dir string, logger *log.Logger) (*intelQVLCollat
 	return &intelQVLCollateralCache{dir: dir, logger: logger}, nil
 }
 
+// Get returns cached collateral only when the cache entry exists and is still valid.
+// Missing or expired entries are treated as cache misses and are not surfaced as errors.
 func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, bool, string, error) {
 	if c == nil {
 		return nil, false, "", nil
@@ -50,11 +63,15 @@ func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, b
 		if len(collateral) == 0 {
 			return nil, false, key, fmt.Errorf("Intel QVL collateral cache file is empty: %s", path)
 		}
-		decoded, err := unmarshalIntelQVLQuoteCollateral(collateral)
+		decoded, err := unmarshalIntelQVLCollateralCacheEntry(collateral)
 		if err != nil {
 			return nil, false, key, fmt.Errorf("decode Intel QVL collateral cache file: %w", err)
 		}
-		return decoded, true, key, nil
+		if !decoded.ValidAt(intelQVLNow().UTC()) {
+			_ = os.Remove(path)
+			return nil, false, key, nil
+		}
+		return decoded.Collateral, true, key, nil
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, key, nil
@@ -62,11 +79,17 @@ func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, b
 	return nil, false, key, fmt.Errorf("read Intel QVL collateral cache file: %w", err)
 }
 
+// Put stores collateral together with the AttesTAM-managed expiration time.
+// The effective expiration is the earlier of "now + 7 days" and the nearest collateral nextUpdate.
 func (c *intelQVLCollateralCache) Put(quote []byte, collateral *intelQVLQuoteCollateral) (string, error) {
 	if c == nil {
 		return "", nil
 	}
-	encoded, err := marshalIntelQVLQuoteCollateral(collateral)
+	entry, err := newIntelQVLCollateralCacheEntry(collateral, intelQVLNow().UTC())
+	if err != nil {
+		return "", err
+	}
+	encoded, err := marshalIntelQVLCollateralCacheEntry(entry)
 	if err != nil {
 		return "", err
 	}
@@ -98,6 +121,7 @@ func (c *intelQVLCollateralCache) Put(quote []byte, collateral *intelQVLQuoteCol
 	return key, nil
 }
 
+// pathForQuote derives the cache filename for the supplied Quote.
 func (c *intelQVLCollateralCache) pathForQuote(quote []byte) (string, string, error) {
 	key, err := intelQVLCollateralCacheKey(quote)
 	if err != nil {
@@ -106,6 +130,9 @@ func (c *intelQVLCollateralCache) pathForQuote(quote []byte) (string, string, er
 	return filepath.Join(c.dir, key+".bin"), key, nil
 }
 
+// intelQVLCollateralCacheKey prefers an FMSPC-derived key so collateral can be reused
+// across Quotes from the same platform family. If FMSPC extraction fails, it falls back
+// to a Quote hash to preserve correctness.
 func intelQVLCollateralCacheKey(quote []byte) (string, error) {
 	if len(quote) == 0 {
 		return "", errors.New("Intel QVL quote is empty")
@@ -116,4 +143,38 @@ func intelQVLCollateralCacheKey(quote []byte) (string, error) {
 	}
 	sum := sha256.Sum256(quote)
 	return "quote-" + hex.EncodeToString(sum[:16]), nil
+}
+
+// ValidAt reports whether the cached collateral entry is still valid at the supplied time.
+func (e *intelQVLCollateralCacheEntry) ValidAt(now time.Time) bool {
+	return e != nil && e.Collateral != nil && !e.ExpiresAt.IsZero() && now.Before(e.ExpiresAt)
+}
+
+// newIntelQVLCollateralCacheEntry computes the cache expiration managed by AttesTAM.
+func newIntelQVLCollateralCacheEntry(collateral *intelQVLQuoteCollateral, now time.Time) (*intelQVLCollateralCacheEntry, error) {
+	if collateral == nil {
+		return nil, errors.New("Intel QVL collateral is nil")
+	}
+	expiresAt, err := intelQVLQuoteCollateralExpiry(collateral, now)
+	if err != nil {
+		return nil, err
+	}
+	return &intelQVLCollateralCacheEntry{
+		ExpiresAt:  expiresAt,
+		Collateral: collateral,
+	}, nil
+}
+
+// intelQVLQuoteCollateralExpiry chooses the earlier of AttesTAM's fixed TTL and
+// the nearest nextUpdate carried by the collateral payloads.
+func intelQVLQuoteCollateralExpiry(collateral *intelQVLQuoteCollateral, now time.Time) (time.Time, error) {
+	candidate := now.Add(intelQVLCollateralCacheTTL)
+	nextUpdate, ok, err := intelQVLQuoteCollateralNextUpdate(collateral)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if ok && nextUpdate.Before(candidate) {
+		candidate = nextUpdate
+	}
+	return candidate, nil
 }

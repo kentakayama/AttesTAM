@@ -41,14 +41,14 @@ func TestIntelQVLVerifierProcess_QuoteFixtureCachesCollateral(t *testing.T) {
 		return &intelQVLQuoteCollateral{
 			MajorVersion: intelQVLPCSAPIVersionMajor,
 			MinorVersion: intelQVLPCSCRLVersionMinor,
-			PCKCRL:       []byte(expectedCollateral),
+			TCBInfo:      []byte(`{"nextUpdate":"2030-01-01T00:00:00Z","opaque":"` + expectedCollateral + `"}`),
 		}, nil
 	}
 	intelQVLQuoteVerifier = func(cQuote unsafe.Pointer, quoteSize int, collateral *intelQVLQuoteCollateral) (uint32, intelQVLNativeResult) {
 		verifyCalls++
 		require.Equal(t, len(quote), quoteSize)
 		require.Equal(t, quote, append([]byte(nil), unsafe.Slice((*byte)(cQuote), quoteSize)...))
-		require.Equal(t, []byte(expectedCollateral), collateral.PCKCRL)
+		require.Contains(t, string(collateral.TCBInfo), expectedCollateral)
 		return 0, intelQVLNativeResult{
 			verificationResult: intelQVLResultOK,
 		}

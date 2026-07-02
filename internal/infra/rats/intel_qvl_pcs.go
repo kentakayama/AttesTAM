@@ -51,6 +51,10 @@ type intelQVLQuoteCollateral struct {
 	QEIdentity            []byte `json:"qe_identity"`
 }
 
+type intelQVLNextUpdateCarrier struct {
+	NextUpdate string `json:"nextUpdate"`
+}
+
 type intelQVLPCSClient struct {
 	baseURL         *url.URL
 	httpClient      *http.Client
@@ -107,7 +111,7 @@ func (c *intelQVLPCSClient) Fetch(quote []byte) (*intelQVLQuoteCollateral, error
 	return &intelQVLQuoteCollateral{
 		MajorVersion:          intelQVLPCSAPIVersionMajor,
 		MinorVersion:          intelQVLPCSCRLVersionMinor,
-		TEEType:               0,
+		TEEType:               0, // 0x00000000: SGX or 0x00000081: TDX
 		PCKCRLIssuerChain:     pckCRLIssuerChain,
 		RootCACRL:             rootCACRL,
 		PCKCRL:                pckCRL,
@@ -259,6 +263,86 @@ func unmarshalIntelQVLQuoteCollateral(data []byte) (*intelQVLQuoteCollateral, er
 		return nil, fmt.Errorf("decode Intel QVL collateral: %w", err)
 	}
 	return &collateral, nil
+}
+
+func marshalIntelQVLCollateralCacheEntry(entry *intelQVLCollateralCacheEntry) ([]byte, error) {
+	if entry == nil {
+		return nil, fmt.Errorf("Intel QVL collateral cache entry is nil")
+	}
+	return json.Marshal(entry)
+}
+
+func unmarshalIntelQVLCollateralCacheEntry(data []byte) (*intelQVLCollateralCacheEntry, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("Intel QVL collateral cache entry is empty")
+	}
+	var entry intelQVLCollateralCacheEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, fmt.Errorf("decode Intel QVL collateral cache entry: %w", err)
+	}
+	return &entry, nil
+}
+
+func intelQVLQuoteCollateralNextUpdate(collateral *intelQVLQuoteCollateral) (time.Time, bool, error) {
+	if collateral == nil {
+		return time.Time{}, false, fmt.Errorf("Intel QVL collateral is nil")
+	}
+
+	var nearest time.Time
+	for _, raw := range [][]byte{collateral.RootCACRL, collateral.PCKCRL} {
+		nextUpdate, ok, err := intelQVLParseCRLNextUpdate(raw)
+		if err != nil {
+			return time.Time{}, false, err
+		}
+		if ok && (nearest.IsZero() || nextUpdate.Before(nearest)) {
+			nearest = nextUpdate
+		}
+	}
+	for _, raw := range [][]byte{collateral.TCBInfo, collateral.QEIdentity} {
+		nextUpdate, ok, err := intelQVLParseJSONNextUpdate(raw)
+		if err != nil {
+			return time.Time{}, false, err
+		}
+		if ok && (nearest.IsZero() || nextUpdate.Before(nearest)) {
+			nearest = nextUpdate
+		}
+	}
+	if nearest.IsZero() {
+		return time.Time{}, false, nil
+	}
+	return nearest, true, nil
+}
+
+func intelQVLParseCRLNextUpdate(raw []byte) (time.Time, bool, error) {
+	if len(raw) == 0 {
+		return time.Time{}, false, nil
+	}
+	crl, err := x509.ParseRevocationList(raw)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("parse CRL nextUpdate: %w", err)
+	}
+	if crl.NextUpdate.IsZero() {
+		return time.Time{}, false, nil
+	}
+	return crl.NextUpdate.UTC(), true, nil
+}
+
+func intelQVLParseJSONNextUpdate(raw []byte) (time.Time, bool, error) {
+	if len(raw) == 0 {
+		return time.Time{}, false, nil
+	}
+	var carrier intelQVLNextUpdateCarrier
+	if err := json.Unmarshal(raw, &carrier); err != nil {
+		return time.Time{}, false, fmt.Errorf("parse JSON nextUpdate: %w", err)
+	}
+	if strings.TrimSpace(carrier.NextUpdate) == "" {
+		return time.Time{}, false, nil
+	}
+	nextUpdate, err := time.Parse(time.RFC3339, carrier.NextUpdate)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("parse nextUpdate timestamp %q: %w", carrier.NextUpdate, err)
+	}
+	return nextUpdate.UTC(), true, nil
 }
 
 func extractIntelQVLQuotePCKCA(quote []byte) (string, error) {
