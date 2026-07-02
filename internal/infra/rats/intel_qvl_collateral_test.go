@@ -14,15 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 )
-
-type testSGXQuote3TEEPBundle struct {
-	_             struct{} `cbor:",toarray"`
-	Quote         []byte
-	RawReportData []byte
-}
 
 func TestIntelQVLCollateralCacheKeyFromFixture(t *testing.T) {
 	quote := readSGXQuoteFixture(t)
@@ -38,7 +31,17 @@ func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
 	cache, err := newIntelQVLCollateralCache(t.TempDir(), nil)
 	require.NoError(t, err)
 
-	collateral := []byte("opaque-qvl-collateral")
+	collateral := &intelQVLQuoteCollateral{
+		MajorVersion:          intelQVLPCSAPIVersionMajor,
+		MinorVersion:          intelQVLPCSCRLVersionMinor,
+		PCKCRLIssuerChain:     []byte("pck-crl-issuer"),
+		RootCACRL:             []byte("root-ca-crl"),
+		PCKCRL:                []byte("pck-crl"),
+		TCBInfoIssuerChain:    []byte("tcb-info-issuer"),
+		TCBInfo:               []byte(`{"tcbInfo":{"id":"SGX"}}`),
+		QEIdentityIssuerChain: []byte("qe-identity-issuer"),
+		QEIdentity:            []byte(`{"enclaveIdentity":{"id":"QE"}}`),
+	}
 	key, err := cache.Put(quote, collateral)
 	require.NoError(t, err)
 	require.NotEmpty(t, key)
@@ -53,10 +56,7 @@ func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
 func readSGXQuoteFixture(t *testing.T) []byte {
 	t.Helper()
 
-	payload, err := os.ReadFile(filepath.Join("testdata", "sgx-quote3-teep-bundle.cbor"))
+	quote, err := os.ReadFile(filepath.Join("testdata", "quote.bin"))
 	require.NoError(t, err)
-	var bundle testSGXQuote3TEEPBundle
-	require.NoError(t, cbor.Unmarshal(payload, &bundle))
-	require.NotEmpty(t, bundle.Quote)
-	return bundle.Quote
+	return quote
 }

@@ -73,7 +73,7 @@ In short:
 
 ### 1. Use Intel QVL, but do not rely on Intel PCCS or Intel QCNL
 
-AttesTAM uses the native Intel DCAP quote verification library through `tee_verify_quote()` in [internal/infra/rats/intel_qvl_verifier.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_verifier.go).
+AttesTAM uses the native Intel DCAP quote verification library through `tee_verify_quote()` in [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go).
 
 However, AttesTAM does not delegate collateral acquisition policy to Intel QPL / QCNL / PCCS at verification time.
 
@@ -313,7 +313,7 @@ Second, implementation visibility:
 
 ### Quote verification entrypoint
 
-- [internal/infra/rats/intel_qvl_verifier.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_verifier.go)
+- [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go)
 
 Responsibilities:
 
@@ -324,7 +324,7 @@ Responsibilities:
 
 ### Intel PCS client
 
-- [internal/infra/rats/intel_qvl_pcs.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_pcs.go)
+- [`internal/infra/rats/intel_qvl_pcs.go`](../internal/infra/rats/intel_qvl_pcs.go)
 
 Responsibilities:
 
@@ -343,9 +343,15 @@ The current implementation fetches:
 - `QE Identity`
 - `QE Identity issuer chain`
 
+Note that Intel's `sgx_ql_qve_collateral_t` does not contain the trusted Root CA certificate itself.
+AttesTAM therefore distinguishes between:
+
+- collateral data that maps naturally to `sgx_ql_qve_collateral_t`
+- trust-anchor material such as the Intel SGX Root CA certificate, which is related but is not stored as a field in that collateral structure
+
 ### Go-managed collateral cache
 
-- [internal/infra/rats/intel_qvl_collateral.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_collateral.go)
+- [`internal/infra/rats/intel_qvl_collateral.go`](../internal/infra/rats/intel_qvl_collateral.go)
 
 Responsibilities:
 
@@ -387,6 +393,78 @@ Here:
 - the Verifier itself decides whether cache is reused
 - the Verifier itself prepares the `sgx_ql_qve_collateral_t`-equivalent input
 - Intel QVL receives an explicit collateral object instead of discovering collateral through QCNL runtime behavior
+
+## Intel DCAP Reference Behavior
+
+This section summarizes reference behavior observed in Intel's open-source DCAP implementation under `confidential-computing.tee.dcap`.
+It is included as implementation background, not as a statement that AttesTAM must follow the same runtime structure.
+
+### What the Intel DCAP code shows
+
+The Intel DCAP source confirms the following points.
+
+1. `sgx_ql_qve_collateral_t` does not carry the trusted Root CA certificate as one of its fields.
+2. In the Intel QPL implementation, `root_ca_crl` is obtained separately after parsing the issuer chain.
+3. In the Intel QVL sample application, the trusted Root CA certificate is supplied explicitly to the certificate and collateral verification routines.
+
+In `QuoteGeneration/qpl/sgx_default_quote_provider.cpp`, the Intel provider path:
+
+- parses `qe_identity_issuer_chain`
+- derives a Root CA CDP URL from that chain
+- calls `sgx_qcnl_get_root_ca_crl(...)`
+- stores the returned CRL in `quote_collateral->root_ca_crl`
+
+This supports the view that the Root CA CRL is part of the collateral object, while the trusted Root CA certificate itself is not.
+
+In `QuoteVerification/QVL/Src/AttestationApp/src/AppCore/AppCore.cpp`, Intel's sample verification app reads:
+
+- `rootCaCrl`
+- `trustedRootCACertificateFile`
+
+It then calls:
+
+- `verifyPCKCertificate(..., rootCaCrl, intermediateCaCrl, trustedRootCACert, ...)`
+- `verifyTCBInfo(..., rootCaCrl, trustedRootCACert, ...)`
+- `verifyQeIdentity(..., rootCaCrl, trustedRootCACert, ...)`
+
+In `QuoteVerification/QVL/Src/AttestationApp/src/AppCore/AttestationLibraryAdapter.cpp`, those values are forwarded into:
+
+- `sgxAttestationVerifyPCKCertificate(...)`
+- `sgxAttestationVerifyTCBInfo(...)`
+- `sgxAttestationVerifyEnclaveIdentity(...)`
+
+This strongly suggests that, in the standalone QVL verification flow, trust in the Intel SGX Root CA is evaluated using a trusted Root CA certificate supplied to the verification routines, rather than being reconstructed only from `sgx_ql_qve_collateral_t`.
+
+### Practical interpretation for Root CA handling
+
+The practical interpretation is:
+
+- `sgx_ql_qve_collateral_t` contains collateral such as `root_ca_crl`, `pck_crl`, `tcb_info`, and `qe_identity`
+- the trust anchor used to validate the relevant certificate chains is a separate input in the Intel verification logic
+- therefore, "the top of the PCK Cert chain must be trusted as Intel SGX Root CA" is not explained by the collateral structure alone
+
+Intel's QVL sample also exposes Root-CA-related failure statuses such as:
+
+- `STATUS_SGX_ROOT_CA_MISSING`
+- `STATUS_SGX_ROOT_CA_INVALID`
+- `STATUS_SGX_ROOT_CA_UNTRUSTED`
+- `STATUS_TRUSTED_ROOT_CA_INVALID`
+- `STATUS_SGX_PCK_CERT_CHAIN_UNTRUSTED`
+- `STATUS_SGX_TCB_SIGNING_CERT_CHAIN_UNTRUSTED`
+
+These status names are consistent with a model in which QVL verification explicitly reasons about Root CA trust, certificate-chain trust, and the trusted Root CA input.
+
+### Why this matters for AttesTAM
+
+This reference behavior is useful for AttesTAM for two reasons.
+
+First, it explains why "fetching the Intel PCS collateral set" is not exactly the same thing as "collecting every trust input involved in verification".
+
+Second, it reinforces the design choice to keep collateral handling explicit in AttesTAM:
+
+- AttesTAM should clearly distinguish collateral fields from trust-anchor material
+- AttesTAM should avoid hidden runtime behavior in QCNL / PCCS / host configuration
+- AttesTAM should make it clear which inputs are passed to Intel verification logic and why
 
 ## Why This Design Is Preferred
 
@@ -438,7 +516,7 @@ In short, the current AttesTAM SGX Quote verification policy is:
 
 ## Related Files
 
-- [internal/infra/rats/intel_qvl_verifier.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_verifier.go)
-- [internal/infra/rats/intel_qvl_pcs.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_pcs.go)
-- [internal/infra/rats/intel_qvl_collateral.go](/home/ken/github.com/kentakayama/AttesTAM/internal/infra/rats/intel_qvl_collateral.go)
-- [internal/tam/tam.go](/home/ken/github.com/kentakayama/AttesTAM/internal/tam/tam.go)
+- [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go)
+- [`internal/infra/rats/intel_qvl_pcs.go`](../internal/infra/rats/intel_qvl_pcs.go)
+- [`internal/infra/rats/intel_qvl_collateral.go`](../internal/infra/rats/intel_qvl_collateral.go)
+- [`internal/tam/tam.go`](../internal/tam/tam.go)

@@ -45,6 +45,8 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		Timeout:                    cfg.ChallengeTimeout,
 		Logger:                     logger,
 		IntelQVLCollateralCacheDir: cfg.IntelQVLCollateralCacheDir,
+		IntelQVLPCSURL:             cfg.IntelQVLPCSURL,
+		IntelQVLSubscriptionKey:    cfg.IntelQVLSubscriptionKey,
 	}
 
 	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use VERAISON.", rats.AttestationPayloadFormatSGXQuote3TEEP)

@@ -71,17 +71,56 @@ static quote3_error_t attestam_qvl_verify_quote(
 	return status;
 }
 
-static quote3_error_t attestam_qvl_get_collateral(
+static quote3_error_t attestam_qvl_verify_quote_with_collateral_fields(
 	const uint8_t *quote,
 	uint32_t quote_size,
-	uint8_t **collateral,
-	uint32_t *collateral_size
+	uint16_t collateral_major_version,
+	uint16_t collateral_minor_version,
+	uint32_t collateral_tee_type,
+	const char *pck_crl_issuer_chain,
+	uint32_t pck_crl_issuer_chain_size,
+	const char *root_ca_crl,
+	uint32_t root_ca_crl_size,
+	const char *pck_crl,
+	uint32_t pck_crl_size,
+	const char *tcb_info_issuer_chain,
+	uint32_t tcb_info_issuer_chain_size,
+	const char *tcb_info,
+	uint32_t tcb_info_size,
+	const char *qe_identity_issuer_chain,
+	uint32_t qe_identity_issuer_chain_size,
+	const char *qe_identity,
+	uint32_t qe_identity_size,
+	const time_t current_time,
+	attestam_qvl_result_t *result
 ) {
-	return tee_qv_get_collateral(quote, quote_size, collateral, collateral_size);
-}
+	sgx_ql_qve_collateral_t collateral;
+	memset(&collateral, 0, sizeof(collateral));
+	collateral.major_version = collateral_major_version;
+	collateral.minor_version = collateral_minor_version;
+	collateral.tee_type = collateral_tee_type;
+	collateral.pck_crl_issuer_chain = (char *)pck_crl_issuer_chain;
+	collateral.pck_crl_issuer_chain_size = pck_crl_issuer_chain_size;
+	collateral.root_ca_crl = (char *)root_ca_crl;
+	collateral.root_ca_crl_size = root_ca_crl_size;
+	collateral.pck_crl = (char *)pck_crl;
+	collateral.pck_crl_size = pck_crl_size;
+	collateral.tcb_info_issuer_chain = (char *)tcb_info_issuer_chain;
+	collateral.tcb_info_issuer_chain_size = tcb_info_issuer_chain_size;
+	collateral.tcb_info = (char *)tcb_info;
+	collateral.tcb_info_size = tcb_info_size;
+	collateral.qe_identity_issuer_chain = (char *)qe_identity_issuer_chain;
+	collateral.qe_identity_issuer_chain_size = qe_identity_issuer_chain_size;
+	collateral.qe_identity = (char *)qe_identity;
+	collateral.qe_identity_size = qe_identity_size;
 
-static quote3_error_t attestam_qvl_free_collateral(uint8_t *collateral) {
-	return tee_qv_free_collateral(collateral);
+	return attestam_qvl_verify_quote(
+		quote,
+		quote_size,
+		(const uint8_t *)&collateral,
+		current_time,
+		result
+	);
 }
 
 static quote3_error_t attestam_qvl_get_fmspc(
@@ -104,9 +143,22 @@ import (
 	"github.com/kentakayama/AttesTAM/internal/config"
 )
 
+type intelQVLNativeResult struct {
+	collateralExpirationStatus uint32
+	verificationResult         uint32
+	supplementalDataSize       uint32
+	dcapStatus                 uint32
+}
+
+var (
+	intelQVLQuoteVerifier         = verifyIntelQVLQuote
+	intelQVLQuoteCollateralGetter = getIntelQVLQuoteCollateral
+)
+
 type IntelQVLVerifier struct {
 	logger          *log.Logger
 	collateralCache *intelQVLCollateralCache
+	pcsClient       *intelQVLPCSClient
 }
 
 func NewIntelQVLVerifier(cfg config.RAConfig) (IRAVerifier, error) {
@@ -114,9 +166,14 @@ func NewIntelQVLVerifier(cfg config.RAConfig) (IRAVerifier, error) {
 	if err != nil {
 		return nil, err
 	}
+	pcsClient, err := newIntelQVLPCSClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &IntelQVLVerifier{
 		logger:          cfg.Logger,
 		collateralCache: cache,
+		pcsClient:       pcsClient,
 	}, nil
 }
 
@@ -134,34 +191,34 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	}
 	if v.logger != nil && v.collateralCache != nil {
 		if cacheHit {
-			v.logger.Printf("Intel QVL collateral cache hit: key=%s size=%d", cacheKey, len(collateral))
+			v.logger.Printf("Intel QVL collateral cache hit: key=%s", cacheKey)
 		} else {
 			v.logger.Printf("Intel QVL collateral cache miss: key=%s", cacheKey)
 		}
 	}
 
-	status, nativeResult := verifyIntelQVLQuote(cQuote, len(payload), collateral)
-	if status != C.TEE_SUCCESS {
+	status, nativeResult := intelQVLQuoteVerifier(cQuote, len(payload), collateral)
+	if status != uint32(C.TEE_SUCCESS) {
 		if v.logger != nil {
 			v.logNativeResult(&nativeResult, intelQVLClassificationFailure, resultToEarStatus(false))
 		}
-		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", uint32(nativeResult.dcap_status))
+		return nil, fmt.Errorf("tee_verify_quote failed: 0x%04x", nativeResult.dcapStatus)
 	}
-	if v.collateralCache != nil && !cacheHit && len(collateral) > 0 {
+	if v.collateralCache != nil && !cacheHit && collateral != nil {
 		if key, err := v.collateralCache.Put(payload, collateral); err != nil {
 			if v.logger != nil {
 				v.logger.Printf("failed to store Intel QVL collateral cache: %v", err)
 			}
 		} else if v.logger != nil {
-			v.logger.Printf("stored Intel QVL collateral cache: key=%s size=%d", key, len(collateral))
+			v.logger.Printf("stored Intel QVL collateral cache: key=%s", key)
 		}
 	}
 
 	classification := classifyIntelQVLResult(
-		uint32(nativeResult.verification_result),
-		uint32(nativeResult.collateral_expiration_status),
+		nativeResult.verificationResult,
+		nativeResult.collateralExpirationStatus,
 	)
-	ok := isIntelQVLResultAffirming(nativeResult.verification_result, nativeResult.collateral_expiration_status)
+	ok := isIntelQVLResultAffirmingValue(nativeResult.verificationResult, nativeResult.collateralExpirationStatus)
 	result := &ProcessedAttestation{
 		Backend:    VerifierBackendIntelQVL,
 		EarStatus:  resultToEarStatus(ok),
@@ -174,55 +231,93 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	return result, nil
 }
 
-func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) ([]byte, bool, string, error) {
-	if v.collateralCache == nil {
-		return nil, false, "", nil
+func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) (*intelQVLQuoteCollateral, bool, string, error) {
+	if v.collateralCache != nil {
+		collateral, cacheHit, cacheKey, err := v.collateralCache.Get(quote)
+		if err != nil || cacheHit {
+			return collateral, cacheHit, cacheKey, err
+		}
+		collateral, err = intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
+		if err != nil {
+			return nil, false, cacheKey, err
+		}
+		return collateral, false, cacheKey, nil
 	}
-	collateral, cacheHit, cacheKey, err := v.collateralCache.Get(quote)
-	if err != nil || cacheHit {
-		return collateral, cacheHit, cacheKey, err
-	}
-	collateral, err = getIntelQVLQuoteCollateral(cQuote, len(quote))
+	collateral, err := intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
 	if err != nil {
-		return nil, false, cacheKey, err
+		return nil, false, "", err
 	}
-	return collateral, false, cacheKey, nil
+	return collateral, false, "", nil
 }
 
-func verifyIntelQVLQuote(cQuote unsafe.Pointer, quoteSize int, collateral []byte) (C.quote3_error_t, C.attestam_qvl_result_t) {
+func verifyIntelQVLQuote(cQuote unsafe.Pointer, quoteSize int, collateral *intelQVLQuoteCollateral) (uint32, intelQVLNativeResult) {
 	var nativeResult C.attestam_qvl_result_t
-	var cCollateral unsafe.Pointer
-	if len(collateral) > 0 {
-		cCollateral = C.CBytes(collateral)
-		defer C.free(cCollateral)
+	if collateral == nil {
+		return uint32(C.TEE_ERROR_INVALID_PARAMETER), intelQVLNativeResult{
+			dcapStatus: uint32(C.TEE_ERROR_INVALID_PARAMETER),
+		}
 	}
-	status := C.attestam_qvl_verify_quote(
+	var (
+		cPCKCRLIssuerChain     unsafe.Pointer
+		cRootCACRL             unsafe.Pointer
+		cPCKCRL                unsafe.Pointer
+		cTCBInfoIssuerChain    unsafe.Pointer
+		cTCBInfo               unsafe.Pointer
+		cQEIdentityIssuerChain unsafe.Pointer
+		cQEIdentity            unsafe.Pointer
+	)
+	if collateral != nil {
+		cPCKCRLIssuerChain = cBytesOrNil(collateral.PCKCRLIssuerChain)
+		defer C.free(cPCKCRLIssuerChain)
+		cRootCACRL = cBytesOrNil(collateral.RootCACRL)
+		defer C.free(cRootCACRL)
+		cPCKCRL = cBytesOrNil(collateral.PCKCRL)
+		defer C.free(cPCKCRL)
+		cTCBInfoIssuerChain = cBytesOrNil(collateral.TCBInfoIssuerChain)
+		defer C.free(cTCBInfoIssuerChain)
+		cTCBInfo = cBytesOrNil(collateral.TCBInfo)
+		defer C.free(cTCBInfo)
+		cQEIdentityIssuerChain = cBytesOrNil(collateral.QEIdentityIssuerChain)
+		defer C.free(cQEIdentityIssuerChain)
+		cQEIdentity = cBytesOrNil(collateral.QEIdentity)
+		defer C.free(cQEIdentity)
+	}
+	status := C.attestam_qvl_verify_quote_with_collateral_fields(
 		(*C.uint8_t)(cQuote),
 		C.uint32_t(quoteSize),
-		(*C.uint8_t)(cCollateral),
+		C.uint16_t(collateral.MajorVersion),
+		C.uint16_t(collateral.MinorVersion),
+		C.uint32_t(collateral.TEEType),
+		(*C.char)(cPCKCRLIssuerChain),
+		C.uint32_t(len(collateral.PCKCRLIssuerChain)),
+		(*C.char)(cRootCACRL),
+		C.uint32_t(len(collateral.RootCACRL)),
+		(*C.char)(cPCKCRL),
+		C.uint32_t(len(collateral.PCKCRL)),
+		(*C.char)(cTCBInfoIssuerChain),
+		C.uint32_t(len(collateral.TCBInfoIssuerChain)),
+		(*C.char)(cTCBInfo),
+		C.uint32_t(len(collateral.TCBInfo)),
+		(*C.char)(cQEIdentityIssuerChain),
+		C.uint32_t(len(collateral.QEIdentityIssuerChain)),
+		(*C.char)(cQEIdentity),
+		C.uint32_t(len(collateral.QEIdentity)),
 		C.time_t(time.Now().Unix()),
 		&nativeResult,
 	)
-	return status, nativeResult
+	return uint32(status), intelQVLNativeResult{
+		collateralExpirationStatus: uint32(nativeResult.collateral_expiration_status),
+		verificationResult:         uint32(nativeResult.verification_result),
+		supplementalDataSize:       uint32(nativeResult.supplemental_data_size),
+		dcapStatus:                 uint32(nativeResult.dcap_status),
+	}
 }
 
-func getIntelQVLQuoteCollateral(cQuote unsafe.Pointer, quoteSize int) ([]byte, error) {
-	var cCollateral *C.uint8_t
-	var cCollateralSize C.uint32_t
-	status := C.attestam_qvl_get_collateral(
-		(*C.uint8_t)(cQuote),
-		C.uint32_t(quoteSize),
-		&cCollateral,
-		&cCollateralSize,
-	)
-	if status != C.TEE_SUCCESS {
-		return nil, fmt.Errorf("tee_qv_get_collateral failed: 0x%04x", uint32(status))
+func getIntelQVLQuoteCollateral(pcsClient *intelQVLPCSClient, quote []byte, cQuote unsafe.Pointer, quoteSize int) (*intelQVLQuoteCollateral, error) {
+	if pcsClient == nil {
+		return nil, fmt.Errorf("Intel PCS client is not configured")
 	}
-	if cCollateral == nil || cCollateralSize == 0 {
-		return nil, fmt.Errorf("tee_qv_get_collateral returned empty collateral")
-	}
-	defer C.attestam_qvl_free_collateral(cCollateral)
-	return C.GoBytes(unsafe.Pointer(cCollateral), C.int(cCollateralSize)), nil
+	return pcsClient.Fetch(quote)
 }
 
 func extractIntelQVLFMSPC(quote []byte) ([]byte, error) {
@@ -245,18 +340,25 @@ func extractIntelQVLFMSPC(quote []byte) ([]byte, error) {
 	return fmspc, nil
 }
 
-func (v *IntelQVLVerifier) logNativeResult(nativeResult *C.attestam_qvl_result_t, classification string, earStatus string) {
+func (v *IntelQVLVerifier) logNativeResult(nativeResult *intelQVLNativeResult, classification string, earStatus string) {
 	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
 		classification,
 		earStatus,
-		uint32(nativeResult.dcap_status),
-		intelQVLVerificationResultName(uint32(nativeResult.verification_result)),
-		uint32(nativeResult.verification_result),
-		uint32(nativeResult.collateral_expiration_status),
-		uint32(nativeResult.supplemental_data_size),
+		nativeResult.dcapStatus,
+		intelQVLVerificationResultName(nativeResult.verificationResult),
+		nativeResult.verificationResult,
+		nativeResult.collateralExpirationStatus,
+		nativeResult.supplementalDataSize,
 	)
 }
 
 func isIntelQVLResultAffirming(verificationResult C.sgx_ql_qv_result_t, collateralExpirationStatus C.uint32_t) bool {
 	return isIntelQVLResultAffirmingValue(uint32(verificationResult), uint32(collateralExpirationStatus))
+}
+
+func cBytesOrNil(data []byte) unsafe.Pointer {
+	if len(data) == 0 {
+		return nil
+	}
+	return C.CBytes(data)
 }

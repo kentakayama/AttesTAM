@@ -37,7 +37,7 @@ func newIntelQVLCollateralCache(dir string, logger *log.Logger) (*intelQVLCollat
 	return &intelQVLCollateralCache{dir: dir, logger: logger}, nil
 }
 
-func (c *intelQVLCollateralCache) Get(quote []byte) ([]byte, bool, string, error) {
+func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, bool, string, error) {
 	if c == nil {
 		return nil, false, "", nil
 	}
@@ -50,7 +50,11 @@ func (c *intelQVLCollateralCache) Get(quote []byte) ([]byte, bool, string, error
 		if len(collateral) == 0 {
 			return nil, false, key, fmt.Errorf("Intel QVL collateral cache file is empty: %s", path)
 		}
-		return collateral, true, key, nil
+		decoded, err := unmarshalIntelQVLQuoteCollateral(collateral)
+		if err != nil {
+			return nil, false, key, fmt.Errorf("decode Intel QVL collateral cache file: %w", err)
+		}
+		return decoded, true, key, nil
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, key, nil
@@ -58,12 +62,13 @@ func (c *intelQVLCollateralCache) Get(quote []byte) ([]byte, bool, string, error
 	return nil, false, key, fmt.Errorf("read Intel QVL collateral cache file: %w", err)
 }
 
-func (c *intelQVLCollateralCache) Put(quote []byte, collateral []byte) (string, error) {
+func (c *intelQVLCollateralCache) Put(quote []byte, collateral *intelQVLQuoteCollateral) (string, error) {
 	if c == nil {
 		return "", nil
 	}
-	if len(collateral) == 0 {
-		return "", errors.New("Intel QVL collateral is empty")
+	encoded, err := marshalIntelQVLQuoteCollateral(collateral)
+	if err != nil {
+		return "", err
 	}
 	path, key, err := c.pathForQuote(quote)
 	if err != nil {
@@ -76,7 +81,7 @@ func (c *intelQVLCollateralCache) Put(quote []byte, collateral []byte) (string, 
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
 
-	if _, err := tmp.Write(collateral); err != nil {
+	if _, err := tmp.Write(encoded); err != nil {
 		tmp.Close()
 		return "", fmt.Errorf("write Intel QVL collateral cache temp file: %w", err)
 	}

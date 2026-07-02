@@ -30,6 +30,8 @@ const (
 	envChallengeInsecureTLS       = "ATTESTAM_CHALLENGE_INSECURE_TLS"
 	envChallengeTimeout           = "ATTESTAM_CHALLENGE_TIMEOUT"
 	envIntelQVLCollateralCacheDir = "ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR"
+	envIntelQVLPCSURL             = "ATTESTAM_INTEL_QVL_PCS_URL"
+	envIntelQVLSubscriptionKey    = "ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY"
 )
 
 func main() {
@@ -43,6 +45,8 @@ func main() {
 		challengeInsecureTLS       = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")
 		challengeTimeout           = flag.Duration("challenge-timeout", time.Minute, "timeout for verifier challenge-response interactions")
 		intelQVLCollateralCacheDir = flag.String("intel-qvl-collateral-cache-dir", "", "directory for Intel QVL quote collateral cache. If empty, Intel QVL uses the default QPL collateral path.")
+		intelQVLPCSURL             = flag.String("intel-qvl-pcs-url", "https://api.trustedservices.intel.com/sgx/certification/v4", "base URL for Intel PCS collateral retrieval used by Intel QVL quote verification")
+		intelQVLSubscriptionKey    = flag.String("intel-qvl-subscription-key", "", "optional Intel PCS subscription key for Intel QVL collateral retrieval")
 	)
 	flag.Parse()
 
@@ -57,6 +61,8 @@ func main() {
 	challengeInsecureTLSVal := boolFromEnv(logger, envChallengeInsecureTLS, *challengeInsecureTLS)
 	challengeTimeoutVal := durationFromEnv(logger, envChallengeTimeout, *challengeTimeout)
 	intelQVLCollateralCacheDirVal := stringFromEnv(logger, envIntelQVLCollateralCacheDir, *intelQVLCollateralCacheDir)
+	intelQVLPCSURLVal := stringFromEnv(logger, envIntelQVLPCSURL, *intelQVLPCSURL)
+	intelQVLSubscriptionKeyVal := stringFromEnv(logger, envIntelQVLSubscriptionKey, *intelQVLSubscriptionKey)
 
 	cfg := config.TAMConfig{
 		Addr:                       addrVal,
@@ -69,6 +75,8 @@ func main() {
 		ChallengeInsecureTLS:       challengeInsecureTLSVal,
 		ChallengeTimeout:           challengeTimeoutVal,
 		IntelQVLCollateralCacheDir: intelQVLCollateralCacheDirVal,
+		IntelQVLPCSURL:             intelQVLPCSURLVal,
+		IntelQVLSubscriptionKey:    intelQVLSubscriptionKeyVal,
 	}
 
 	srv, err := server.New(cfg)
