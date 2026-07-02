@@ -1,0 +1,40 @@
+   .---------.   .---------------.       .--------.       .----------------------.       .-------------.
+  |           | |    Intel as     |     |          |     |   Target Environment   |     |               |
+  | Intel as  | | Reference Value |     | Verifier |     | Developer as Reference |     | Relying Party |
+  | Endorser  | |    Provider     |     |  Owner   |     |   Value Provider for   |     |    Owner      |
+  |           | |     for TCB     |     |          |     |   Target Environment   |     |               |
+   '-+-----+-'   '-+-------------'       '---+----'       '----+-----------------'       '----+--------'
+     |     |       |                         |                 |                              |
+     |     |       |                         |                 |                              |
+     |     |       | *TCB Info               | Appraisal       | TE Identity                  | Appraisal
+     |     | *CRL  | *QE Identity            | Policy for      | *MRENCLAVE                   | Policy for
+     |      '-----.|                         | Evidence        | *MRSIGNER                    | Attestation
+     |             |                         |                 |                              | Results
+     |             | Collateral              |                 |   .-------------------------'
+     |             |                         v                 |  |
+     |           .-)-------------------------------.           |  |
+     |           | |         *SGX Root CA Cert --. |           |  |
+     |           | |    .--------------------.    ||           |  |
+     |           |  '-->|                    |<--' |           |  |
+     |           |      |     Intel QVL      |     +--.        |  |
+     |           |  .-->|                    |     |   |       |  |
+     |           | |    '--------------------'     |   |       |  |
+     |           | |          Verifier             |   |       |  |
+     |           '-)-------------------------------'   |       |  |
+     |             |                                   |       |  |
+     |             | SGX Quote                         |       |  |
+     |             | w/ PCK Cert          Attestation  |       |  |
+     | *PCK Cert    '-----.                   Results  |       |  |
+     v                     |                           v       v  v
+.--------------------------)---------.              .-----------------.
+|   .-----.   Attester     |         |              |  Relying Party  |
+|   | PCE |                |         |              |                 |
+|   '--+--'                |         |              '-----------------'
+|      | sign on    .------+-------. |
+|      v ECDSA AK   | TEEP Agent & | |
+|   .-----.         | Wasm Runtime | |
+|   | QE  +-------->+  in Enclave  | |
+|   '-----' Quote   '--------------' |
+|  Attesting            Target       |
+| Environment         Environment    |
+'------------------------------------'

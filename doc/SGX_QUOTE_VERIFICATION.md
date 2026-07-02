@@ -3,6 +3,9 @@
 ## Purpose
 This document describes the current AttesTAM implementation policy for Intel SGX Quote verification.
 
+AttesTAM is primarily a Relying Party in RFC 9334 terms.
+However, in the current implementation, AttesTAM also embeds the Verifier-side functionality needed to verify Intel SGX Quotes.
+
 ## Terminology
 
 ### Intel / SGX Terms and RFC 9334 RATS Terms
@@ -16,7 +19,10 @@ The rough correspondence is as follows.
 | `REPORT` content in the Quote | Evidence content | This is the core attestation payload about the Attester's state. |
 | QE signature over the Quote contents | Part of Evidence | It is part of how the Evidence is carried and authenticated in the Intel SGX attestation format. |
 | PCK Cert chain embedded in the Quote | Endorsement material | It is vendor-originated material used by the Verifier to validate the Quote signature chain. |
-| Collateral fetched for Quote verification | Endorsements | This includes vendor-originated supporting data used to appraise the Quote. |
+| CRLs fetched for Quote verification | Endorsement material | They are vendor-originated revocation statements used by the Verifier when appraising the Quote and its certification path. |
+| `TCB Info` and `QE Identity` | Reference Values delivered as Intel-signed collateral | They are compared against Quote-derived values, while also being vendor-originated signed inputs delivered through the Intel collateral path. |
+| SGX Root CA certificate | Verifier trust-anchor material | Conceptually it is a Verifier-side trust anchor, even when an implementation such as Intel QVL carries it internally. |
+| Collateral fetched for Quote verification | Intel-supplied verification input | In practice this groups the CRLs, `TCB Info`, and `QE Identity` that AttesTAM fetches and passes into Intel QVL. |
 | Intel PCS | Endorser | Intel PCS is the source from which the Verifier obtains Intel-generated endorsement data. |
 | AttesTAM Intel QVL path | Verifier | AttesTAM acts as the Verifier in RFC 9334 terms. |
 
@@ -30,12 +36,17 @@ In the current AttesTAM design, that means:
 
 The fetched collateral includes items such as:
 
-- Root CA certificate material for the PCK trust chain
 - CRLs relevant to PCK / TCB verification
 - TCB Info
 - QE Identity
 
-For Intel SGX, it is useful to think of the PCK Cert chain together with the fetched collateral as the full vendor-side Endorsement set used by the Verifier to appraise the Quote.
+For Intel SGX, it is useful to think of the PCK Cert chain together with the fetched collateral as the Intel-supplied verification input used by the Verifier to appraise the Quote.
+
+More precisely in RFC 9334 terms:
+
+- the PCK Cert chain and CRLs are best understood as Endorsement material
+- `TCB Info` and `QE Identity` are best understood as Reference Values, even though AttesTAM obtains them as Intel-signed collateral
+- the SGX Root CA certificate is best understood as Verifier trust-anchor material, even if an implementation detail places it inside Intel QVL
 
 ## Implementation Policy
 
@@ -226,6 +237,9 @@ Here, "local cached collateral" refers to the QCNL-managed host-local cache, whi
 
 The current AttesTAM model is intentionally different.
 
+In this document, AttesTAM is viewed primarily as the Relying Party.
+At the same time, the current implementation embeds the Verifier-side SGX Quote verification path inside AttesTAM, so the following data flow focuses on that internal Verifier function.
+
 For collateral management:
 
 ```text
@@ -250,6 +264,13 @@ This model removes Intel QCNL and Intel PCCS from the normal collateral control 
 AttesTAM also intentionally avoids the common `tee_verify_quote(quote, NULL)` pattern.
 
 The reason is that AttesTAM wants collateral management to be directly controlled by the Verifier-side Endorsement store, rather than indirectly discovered through QCNL configuration, QCNL local cache, PCCS behavior, or PCS routing chosen outside the Verifier code.
+
+As shown in the data flow below, this internal Verifier function does **NOT** by itself appraise Target Environment identity values such as `MRENCLAVE` and `MRSIGNER` from the SGX Quote.
+That appraisal usually depends on Relying Party-specific policy, so in AttesTAM it belongs conceptually above the Intel QVL-based Quote verification step.
+
+![](./img/sgx-data-flow.svg)
+
+Refer [Conceptual Data Flow of RATS Architecture](https://datatracker.ietf.org/doc/html/rfc9334#figure-1).
 
 ### Current AttesTAM sequence
 
@@ -399,60 +420,24 @@ Here:
 This section summarizes reference behavior observed in Intel's open-source DCAP implementation under `confidential-computing.tee.dcap`.
 It is included as implementation background, not as a statement that AttesTAM must follow the same runtime structure.
 
-### What the Intel DCAP code shows
+### What the Quote Verification code shows
 
-The Intel DCAP source confirms the following points.
+The main verification flow can be understood at the following level.
 
-1. `sgx_ql_qve_collateral_t` does not carry the trusted Root CA certificate as one of its fields.
-2. In the Intel QPL implementation, `root_ca_crl` is obtained separately after parsing the issuer chain.
-3. In the Intel QVL sample application, the trusted Root CA certificate is supplied explicitly to the certificate and collateral verification routines.
+1. `tee_verify_quote()` accepts the Quote together with a collateral structure of type `sgx_ql_qve_collateral_t`.
+2. In AttesTAM, that collateral is prepared in Go and converted into the C structure in [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go).
+3. The collateral structure contains items such as `pck_crl`, `root_ca_crl`, `tcb_info`, and `qe_identity`, together with their issuer chains.
+4. The trusted Intel SGX Root CA certificate itself is not a field of `sgx_ql_qve_collateral_t`.
+5. For the normal SGX `tee_verify_quote()` path, Intel QVL does not simply trust the Root CA certificate embedded in the Quote's PCK certificate chain. It checks that certificate against a pinned Intel Root public key.
 
-In `QuoteGeneration/qpl/sgx_default_quote_provider.cpp`, the Intel provider path:
+So the rough trust model is:
 
-- parses `qe_identity_issuer_chain`
-- derives a Root CA CDP URL from that chain
-- calls `sgx_qcnl_get_root_ca_crl(...)`
-- stores the returned CRL in `quote_collateral->root_ca_crl`
+- the Verifier supplies the Quote and collateral to `tee_verify_quote()`
+- the collateral carries revocation and TCB-related material, but not the trusted SGX Root CA certificate as a field
+- Intel QVL verifies the Quote's certificate chain against a pinned Intel Root public key before accepting that chain as trustworthy
 
-This supports the view that the Root CA CRL is part of the collateral object, while the trusted Root CA certificate itself is not.
-
-In `QuoteVerification/QVL/Src/AttestationApp/src/AppCore/AppCore.cpp`, Intel's sample verification app reads:
-
-- `rootCaCrl`
-- `trustedRootCACertificateFile`
-
-It then calls:
-
-- `verifyPCKCertificate(..., rootCaCrl, intermediateCaCrl, trustedRootCACert, ...)`
-- `verifyTCBInfo(..., rootCaCrl, trustedRootCACert, ...)`
-- `verifyQeIdentity(..., rootCaCrl, trustedRootCACert, ...)`
-
-In `QuoteVerification/QVL/Src/AttestationApp/src/AppCore/AttestationLibraryAdapter.cpp`, those values are forwarded into:
-
-- `sgxAttestationVerifyPCKCertificate(...)`
-- `sgxAttestationVerifyTCBInfo(...)`
-- `sgxAttestationVerifyEnclaveIdentity(...)`
-
-This strongly suggests that, in the standalone QVL verification flow, trust in the Intel SGX Root CA is evaluated using a trusted Root CA certificate supplied to the verification routines, rather than being reconstructed only from `sgx_ql_qve_collateral_t`.
-
-### Practical interpretation for Root CA handling
-
-The practical interpretation is:
-
-- `sgx_ql_qve_collateral_t` contains collateral such as `root_ca_crl`, `pck_crl`, `tcb_info`, and `qe_identity`
-- the trust anchor used to validate the relevant certificate chains is a separate input in the Intel verification logic
-- therefore, "the top of the PCK Cert chain must be trusted as Intel SGX Root CA" is not explained by the collateral structure alone
-
-Intel's QVL sample also exposes Root-CA-related failure statuses such as:
-
-- `STATUS_SGX_ROOT_CA_MISSING`
-- `STATUS_SGX_ROOT_CA_INVALID`
-- `STATUS_SGX_ROOT_CA_UNTRUSTED`
-- `STATUS_TRUSTED_ROOT_CA_INVALID`
-- `STATUS_SGX_PCK_CERT_CHAIN_UNTRUSTED`
-- `STATUS_SGX_TCB_SIGNING_CERT_CHAIN_UNTRUSTED`
-
-These status names are consistent with a model in which QVL verification explicitly reasons about Root CA trust, certificate-chain trust, and the trusted Root CA input.
+The pinned public key appears in Intel's DCAP source as `INTEL_ROOT_PUB_KEY` in [`ae/QvE/qve/qve.cpp`](https://github.com/intel/confidential-computing.tee.dcap/blob/main/ae/QvE/qve/qve.cpp).
+The source file path looks QvE-specific, but this source is shared with the QVL software path as well.
 
 ### Why this matters for AttesTAM
 
