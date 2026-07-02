@@ -266,22 +266,21 @@ func verifyIntelQVLQuote(cQuote unsafe.Pointer, quoteSize int, collateral *intel
 		cQEIdentityIssuerChain unsafe.Pointer
 		cQEIdentity            unsafe.Pointer
 	)
-	if collateral != nil {
-		cPCKCRLIssuerChain = cBytesOrNil(collateral.PCKCRLIssuerChain)
-		defer C.free(cPCKCRLIssuerChain)
-		cRootCACRL = cBytesOrNil(collateral.RootCACRL)
-		defer C.free(cRootCACRL)
-		cPCKCRL = cBytesOrNil(collateral.PCKCRL)
-		defer C.free(cPCKCRL)
-		cTCBInfoIssuerChain = cBytesOrNil(collateral.TCBInfoIssuerChain)
-		defer C.free(cTCBInfoIssuerChain)
-		cTCBInfo = cBytesOrNil(collateral.TCBInfo)
-		defer C.free(cTCBInfo)
-		cQEIdentityIssuerChain = cBytesOrNil(collateral.QEIdentityIssuerChain)
-		defer C.free(cQEIdentityIssuerChain)
-		cQEIdentity = cBytesOrNil(collateral.QEIdentity)
-		defer C.free(cQEIdentity)
-	}
+	cPCKCRLIssuerChain = cBytesOrNil(collateral.PCKCRLIssuerChain)
+	defer C.free(cPCKCRLIssuerChain)
+	cRootCACRL = cBytesOrNil(collateral.RootCACRL)
+	defer C.free(cRootCACRL)
+	cPCKCRL = cBytesOrNil(collateral.PCKCRL)
+	defer C.free(cPCKCRL)
+	cTCBInfoIssuerChain = cBytesOrNil(collateral.TCBInfoIssuerChain)
+	defer C.free(cTCBInfoIssuerChain)
+	cTCBInfo = cBytesOrNil(collateral.TCBInfo)
+	defer C.free(cTCBInfo)
+	cQEIdentityIssuerChain = cBytesOrNil(collateral.QEIdentityIssuerChain)
+	defer C.free(cQEIdentityIssuerChain)
+	cQEIdentity = cBytesOrNil(collateral.QEIdentity)
+	defer C.free(cQEIdentity)
+
 	status := C.attestam_qvl_verify_quote_with_collateral_fields(
 		(*C.uint8_t)(cQuote),
 		C.uint32_t(quoteSize),
