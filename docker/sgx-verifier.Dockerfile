@@ -20,8 +20,7 @@ RUN apt-get update && \
     echo "${INTEL_SGX_APT_REPOSITORY}" > /etc/apt/sources.list.d/intel-sgx.list && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      libsgx-dcap-quote-verify-dev \
-      libsgx-dcap-default-qpl-dev && \
+      libsgx-dcap-quote-verify-dev && \
     curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
     rm -rf /var/lib/apt/lists/*
 
@@ -43,47 +42,27 @@ FROM ubuntu:22.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG INTEL_SGX_APT_REPOSITORY="deb [trusted=yes arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu jammy main"
-ARG NODE_MAJOR=22
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 WORKDIR /app
 
-# Install runtime Intel DCAP quote verification libraries and a local PCCS.
+# Install runtime Intel DCAP quote verification libraries only.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl openssl && \
-    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
+    apt-get install -y --no-install-recommends ca-certificates && \
     echo "${INTEL_SGX_APT_REPOSITORY}" > /etc/apt/sources.list.d/intel-sgx.list && \
     apt-get update && \
-    printf '#!/bin/sh\nexit 0\n' > /bin/systemctl && \
-    chmod +x /bin/systemctl && \
-    mkdir -p /run/systemd/system && \
     apt-get install -y --no-install-recommends \
-      libsgx-dcap-quote-verify \
-      libsgx-dcap-default-qpl \
-      sgx-dcap-pccs && \
-    rm -f /bin/systemctl && \
-    rmdir /run/systemd/system /run/systemd 2>/dev/null || true && \
+      libsgx-dcap-quote-verify && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binaries and runtime resources.
 COPY --from=build /out/attestam ./attestam
 COPY --from=build /out/admin-console ./admin-console
-COPY docker/sgx_default_qcnl.conf /etc/sgx_default_qcnl.conf
-COPY docker/pccs_default.json /opt/intel/sgx-dcap-pccs/config/default.json
 COPY cmd/admin-console/templates ./templates
 COPY cmd/admin-console/static ./static
 
-RUN cd /opt/intel/sgx-dcap-pccs && \
-    npm ci --omit=dev --engine-strict && \
-    mkdir -p /opt/intel/sgx-dcap-pccs/ssl_key && \
-    openssl req -x509 -newkey rsa:2048 -nodes \
-      -keyout /opt/intel/sgx-dcap-pccs/ssl_key/private.pem \
-      -out /opt/intel/sgx-dcap-pccs/ssl_key/file.crt \
-      -days 3650 \
-      -subj "/CN=127.0.0.1" && \
-    chown -R pccs:pccs /opt/intel/sgx-dcap-pccs
+RUN mkdir -p /var/cache/attestam/intel-qvl-collateral
 
 # Default configuration based on the CLI flags defined in cmd/attestam/main.go.
 ENV ATTESTAM_ADDR=":8080" \
@@ -100,11 +79,9 @@ EXPOSE 8080 9090
 
 ENTRYPOINT ["/bin/bash", "-c", "\
 set -eu; \
-cd /opt/intel/sgx-dcap-pccs; NODE_ENV=production runuser -u pccs -- node pccs_server.js & \
-pccs_pid=$!; \
 cd /app; \
 ./attestam & \
 tam_pid=$!; \
-trap 'kill \"$tam_pid\" \"$pccs_pid\" 2>/dev/null || true; wait \"$tam_pid\" \"$pccs_pid\" 2>/dev/null || true' INT TERM EXIT; \
+trap 'kill \"$tam_pid\" 2>/dev/null || true; wait \"$tam_pid\" 2>/dev/null || true' INT TERM EXIT; \
 exec ./admin-console -port \"${ADMIN_CONSOLE_PORT}\" -tam-api-base \"${ADMIN_CONSOLE_TAM_API_BASE}\" \
 "]
