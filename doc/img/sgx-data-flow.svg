@@ -192,14 +192,9 @@ polygon.arrowhead, .triangle { fill: var(--aasvg-b); stroke: none; }
 <text x="124" y="532">on</text>
 <text x="96" y="548">ECDSA</text>
 <text x="132" y="548">AK</text>
-<text x="196" y="548">TEEP</text>
-<text x="240" y="548">Agent</text>
-<text x="272" y="548">&amp;</text>
-<text x="196" y="564">Wasm</text>
-<text x="248" y="564">Runtime</text>
+<text x="208" y="564">Enclave</text>
+<text x="256" y="564">App</text>
 <text x="60" y="580">QE</text>
-<text x="196" y="580">in</text>
-<text x="240" y="580">Enclave</text>
 <text x="120" y="596">Quote</text>
 <text x="64" y="612">Attesting</text>
 <text x="220" y="612">Target</text>

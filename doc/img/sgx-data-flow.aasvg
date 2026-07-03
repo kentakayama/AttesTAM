@@ -31,9 +31,9 @@
 |   | PCE |                |         |              |                 |
 |   '--+--'                |         |              '-----------------'
 |      | sign on    .------+-------. |
-|      v ECDSA AK   | TEEP Agent & | |
-|   .-----.         | Wasm Runtime | |
-|   | QE  +-------->+  in Enclave  | |
+|      v ECDSA AK   |              | |
+|   .-----.         | Enclave App  | |
+|   | QE  +-------->+              | |
 |   '-----' Quote   '--------------' |
 |  Attesting            Target       |
 | Environment         Environment    |
