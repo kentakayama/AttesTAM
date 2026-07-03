@@ -1,19 +1,18 @@
-   .---------.   .---------------.       .--------.       .----------------------.       .-------------.
-  |           | |    Intel as     |     |          |     |   Target Environment   |     |               |
-  | Intel as  | | Reference Value |     | Verifier |     | Developer as Reference |     | Relying Party |
-  | Endorser  | |    Provider     |     |  Owner   |     |   Value Provider for   |     |    Owner      |
-  |           | |     for TCB     |     |          |     |   Target Environment   |     |               |
-   '-+-----+-'   '-+-------------'       '---+----'       '----+-----------------'       '----+--------'
-     |     |       |                         |                 |                              |
-     |     |       |                         |                 |                              |
-     |     |       | *TCB Info               | Appraisal       | TE Identity                  | Appraisal
-     |     | *CRL  | *QE Identity            | Policy for      | *MRENCLAVE                   | Policy for
-     |      '-----.|                         | Evidence        | *MRSIGNER                    | Attestation
-     |             |                         |                 |                              | Results
-     |             | Collateral              |                 |   .-------------------------'
-     |             |                         v                 |  |
+   .---------.   .---------------.       .--------.       .------------------.       .-------------.
+  |           | |    Intel as     |     |          |     |  Reference Value   |     |               |
+  | Intel as  | | Reference Value |     | Verifier |     |    Provider for    |     | Relying Party |
+  | Endorser  | |    Provider     |     |  Owner   |     | Target Environment |     |    Owner      |
+  |           | |     for TCB     |     |          |     |                    |     |               |
+   '-+-----+-'   '-+-------------'       '---+----'       '----+-------------'       '----+--------'
+     |     |       | *TCB Info               |                 |                          |
+     |     | *CRL  | *QE Identity            | Appraisal       | TE Identity              | Appraisl
+     |     v       v                         | Policy for      | *MRENCLAVE               | Policy for
+     |   .-----------.                       | Evidence        | *MRSIGNER                | Attestation
+     |   | Intel PCS |                       |                 |                          | Results
+     |   '---------+-'                       |                 |   .---------------------'
+     |             | Collateral              v                 |  |
      |           .-)-------------------------------.           |  |
-     |           | |         *SGX Root CA Cert --. |           |  |
+     |           | |  SGX Root CA trust anchor --. |           |  |
      |           | |    .--------------------.    ||           |  |
      |           |  '-->|                    |<--' |           |  |
      |           |      |     Intel QVL      |     +--.        |  |
@@ -21,10 +20,10 @@
      |           | |    '--------------------'     |   |       |  |
      |           | |          Verifier             |   |       |  |
      |           '-)-------------------------------'   |       |  |
-     |             |                                   |       |  |
-     |             | SGX Quote                         |       |  |
-     |             | w/ PCK Cert          Attestation  |       |  |
-     | *PCK Cert    '-----.                   Results  |       |  |
+     |             | SGX Quote w/                      |       |  |
+     |             | PCK Cert chain                    |       |  |
+     |              '-----.               Attestation  |       |  |
+     | PCK Cert chain      |                  Results  |       |  |
      v                     |                           v       v  v
 .--------------------------)---------.              .-----------------.
 |   .-----.   Attester     |         |              |  Relying Party  |

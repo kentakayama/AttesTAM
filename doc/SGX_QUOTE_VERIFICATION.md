@@ -3,7 +3,7 @@
 ## Purpose
 This document describes the current AttesTAM implementation policy for Intel SGX Quote verification.
 
-AttesTAM is primarily a Relying Party in [RFC 9334](https://datatracker.ietf.org/doc/rfc9334/) Rats Architecture terms.
+AttesTAM is primarily a Relying Party in [RFC 9334](https://datatracker.ietf.org/doc/rfc9334/) RATS Architecture terms.
 However, in the current implementation, AttesTAM also embeds the Verifier-side functionality needed to verify Intel SGX Quotes.
 
 ## Terminology
@@ -29,40 +29,41 @@ For Intel SGX Quote verification, the Verifier receives a Quote as Evidence, the
 
 ## Implementation Policy
 
-AttesTAM currently adopts the following design priorities.
+The AttesTAM-embedded Verifier only covers the scope of core SGX Quote verification:
 
-1. The AttesTAM-embedded Verifier uses Intel QVL, but does not use Intel PCCS or Intel QCNL as required runtime components.
-2. The Verifier manages collateral in its own Endorsement store, fetched from Intel PCS.
-3. The Verifier does **not** appraise the Target Environment by itself.
+1. verifying the integrity and authenticity of the Evidence
+2. verifying the validity of the Quote with respect to Intel-supplied collateral
+3. producing a verification result from that Evidence-and-collateral check
+
+Thus, the Verifier does **not** appraise the Target Environment by itself; that appraisal is left to the Relying Party or another Verifier.
+
+Additionally, the Verifier fully manages collateral in its own Endorsement store for simplicity, avoiding reliance on the more complex Intel QPL / QCNL / PCCS stack (see [Architecture Comparison](#architecture-comparison)).
 
 These points are intentional design choices, not incidental implementation details.
 
-## Data Flow
+## SGX Quote Verification Flow
 
-The internal Verifier first treats the Quote as the primary input object.
-From that Quote, it derives identifiers such as `FMSPC` and the PCK CA type, and uses them to determine which Intel PCS collateral set is relevant to this Quote.
+### Conceptual Data Flow
 
-In that sense, the trust and data flow are organized as follows:
+As shown in the data flow below (cf. [Conceptual Data Flow of RATS Architecture](https://datatracker.ietf.org/doc/html/rfc9334#figure-1)), the Verifier receives an SGX Quote with a PCK Cert chain and obtains the corresponding collateral ultimately from Intel PCS.
 
-- the Quote provides the key material used to identify the required collateral set
-- Intel PCS is treated as the upstream source of that collateral
-- Intel QVL verifies the Quote using the collateral that the Verifier selected for that Quote
+![Data Flow of SGX Quote Verification of this Verifier](./img/sgx-data-flow.svg)
 
-For the current AttesTAM model, this can be summarized as:
+Note that the SGX Root CA trust anchor looks like an input to Intel QVL, but in practice its public key is pinned in Intel QVL source code (`INTEL_ROOT_PUB_KEY` in [`ae/QvE/qve/qve.cpp`](https://github.com/intel/confidential-computing.tee.dcap/blob/main/ae/QvE/qve/qve.cpp)).
 
-```text
-Quote -> Verifier key extraction -> Intel PCS collateral selection
-Verifier -> Intel QVL
-```
+### Implementation Flow
 
-As shown in the data flow below, this internal Verifier function does **NOT** by itself appraise Target Environment identity values such as `MRENCLAVE` and `MRSIGNER` from the SGX Quote.
-That appraisal usually depends on Relying Party-specific policy, so in AttesTAM it belongs conceptually above the Intel QVL-based Quote verification step.
+The sequence diagram below shows the concrete verification path owned by the Verifier.
+It derives identifiers such as `FMSPC` and the PCK CA type, uses `FMSPC` to determine the Endorsement store lookup key, checks the Endorsement store first, and only queries Intel PCS when suitable collateral is not already cached.
+The Verifier stores fetched collateral back into its own Endorsement store before passing it to Intel QVL.
 
-![](./img/sgx-data-flow.svg)
+The Verifier verifies the Quote with the Intel QVL function `tee_verify_quote(quote, collateral)` to produce Attestation Results.
 
-Refer [Conceptual Data Flow of RATS Architecture](https://datatracker.ietf.org/doc/html/rfc9334#figure-1).
+This Verifier currently does not apply an explicit Appraisal Policy to Target Environment identity values in the Evidence.
+Instead, it only verifies the authenticity, integrity, and validity of the SGX Quote.
 
-### Sequence Diagram
+The Verifier does **NOT** by itself appraise Target Environment identity values taken from the SGX Quote, such as `MRENCLAVE`, `MRSIGNER`, the Target Environment security version number (`ISV_SVN`), or the application-specific field `REPORT_DATA`.
+Such appraisal usually depends on Relying Party-specific policy, so in AttesTAM it belongs conceptually above the Intel QVL-based Quote verification step.
 
 ```mermaid
 sequenceDiagram
@@ -71,10 +72,11 @@ sequenceDiagram
     participant I as Intel PCS
     participant Q as Intel QVL
 
+    V->>V: extract FMSPC and PCK CA type from Quote
     V->>E: lookup collateral for Quote-derived FMSPC
     alt endorsement cache hit
         E-->>V: cached collateral
-    else endorsement cache miss
+    else endorsement cache miss or stale collateral
         V->>I: fetch collateral directly
         I-->>V: collateral
         V->>E: store collateral
@@ -82,8 +84,6 @@ sequenceDiagram
     V->>Q: tee_verify_quote(quote, collateral)
     Q-->>V: verification result
 ```
-
-In this sequence, the Verifier first decides which collateral is relevant for the Quote, then owns the Endorsement store lookup, the Intel PCS fetch decision, and the final collateral object passed into Intel QVL.
 
 ## Main Design Intent
 
@@ -105,7 +105,8 @@ AttesTAM uses the native Intel DCAP quote verification library (QVL) through `te
 However, AttesTAM does not delegate collateral acquisition policy to Intel QPL / QCNL / PCCS at verification time.
 The implementation policy is:
 
-- use Intel QVL for the verification primitive itself
+- use Intel QVL for the core SGX Quote verification logic that this Verifier is responsible for
+- do not use Intel QPL as the runtime provider layer for collateral resolution
 - do not use Intel QCNL for collateral retrieval policy
 - do not use Intel PCCS as the normal collateral-management component
 - keep collateral lookup, fetch, cache, and reuse decisions in AttesTAM Go code
@@ -118,51 +119,48 @@ In practice:
 - The collateral fetch path, cache lookup path, and reuse policy are all decided in Go code in the AttesTAM process.
 - AttesTAM intentionally does not call `tee_verify_quote()` with `collateral = NULL`, because the Verifier-side Endorsement store is meant to directly control collateral selection and reuse.
 
-This means the verifier path is intentionally split as follows:
+This means that the verification path is intentionally split as follows:
 
 - Native verification logic: Intel QVL / `tee_verify_quote()`
-- Collateral retrieval, cache control, and reuse policy: AttesTAM Go code
+- Collateral retrieval, cache control, and reuse policy: Verifier's Endorsement store
 
 This choice is intended to keep collateral lifecycle control in the AttesTAM Verifier implementation.
-For the more common Intel deployment model using QCNL/PCCS and for the detailed comparison with that model, see [Architecture Comparison](#architecture-comparison).
+For the more common Intel deployment model using QPL / QCNL / PCCS, see [Common Intel DCAP deployment model](#common-intel-dcap-deployment-model).
+For why AttesTAM considers that structure too complex to leave outside the Verifier code, see [Why the difference matters](#why-the-difference-matters).
 
-### 2. Derive FMSPC from the Quote, then use Go-managed cache and Intel PCS
+### 2. Derive FMSPC from the Quote, then use Endorsement store and Intel PCS
 
 AttesTAM derives the FMSPC from the externally supplied Quote and uses that value as the main key for collateral lookup.
+The Endorsement store sits between Quote parsing and Intel PCS access as a Verifier-managed cache for that collateral.
 
 The current flow is:
 
 1. The TEEP Agent sends an SGX Quote.
 2. AttesTAM extracts `FMSPC` from the Quote.
-3. AttesTAM derives the collateral cache key from that Quote, preferring an FMSPC-based key.
-4. AttesTAM checks the Go-managed collateral cache.
+3. AttesTAM derives the Endorsement store key from that Quote, using `FMSPC`.
+4. AttesTAM checks the Endorsement store.
 5. If cached collateral is available, AttesTAM uses it for verification.
 6. If cached collateral is missing, or if the cached collateral is no longer acceptable for use, AttesTAM fetches collateral from Intel PCS.
-7. The fetched collateral is stored in the Go-managed cache.
+7. The fetched collateral is stored in the Endorsement store.
 8. AttesTAM calls `tee_verify_quote()` with the Quote and the explicitly prepared collateral.
 
-The key point is that collateral management is owned by the TAM, not by Intel PCCS and not implicitly by the QVL library.
-
-> [!NOTE]
-> The intended policy is "cache hit and still usable -> reuse" and "cache miss or stale collateral -> refetch from Intel PCS".
-> The current implementation already uses the Go-managed cache and Intel PCS fetch path, and it always passes explicit collateral to `tee_verify_quote()`.
-> If cache freshness rules evolve further, that logic should remain in AttesTAM Go code rather than being delegated to Intel PCCS or QCNL runtime retrieval.
+The key point is that collateral management is owned by the Verifier, not by Intel PCCS and not implicitly by the QVL library.
 
 ## Architecture Comparison
 
 ### Trade-off Summary
 
-The current AttesTAM policy is not presented as universally better than using Intel QCNL/PCCS.
+The current AttesTAM policy is not presented as universally better than using Intel QPL/QCNL/PCCS.
 The goal is to make the trade-offs explicit.
 
-| Viewpoint | Use Intel QCNL/PCCS | Current AttesTAM policy |
+| Viewpoint | Use Intel QPL/QCNL/PCCS | Current AttesTAM policy |
 | ---- | ---- | ---- |
 | Maintenance ownership | More of the collateral retrieval and cache behavior is maintained by Intel-provided components. | AttesTAM must maintain its own Go implementation for collateral retrieval, cache handling, and policy decisions. |
 | Configuration flexibility | Intel-specific configuration can support multiple deployment patterns through files such as `/etc/sgx_default_qcnl.conf`. | Behavior is concentrated in one implementation path, which reduces hidden branches and can make environment setup easier to understand. |
 | Operational simplicity | A standard Intel-style deployment may fit environments already using QCNL/PCCS. | Fewer Intel-specific runtime components are required in the normal Verifier path. |
 | Visibility from Verifier code | Collateral source selection and cache behavior can be harder to see because they may be externalized into QCNL/PCCS configuration and runtime behavior. | Collateral source selection, cache lookup, and reuse policy are visible in the Verifier implementation. |
 | Scaling collateral management | PCCS can act as a shared service and shared cache across multiple Verifier hosts. | The Verifier can apply an AttesTAM-specific Endorsement store policy, but distributed/shared cache strategy must be designed and maintained by AttesTAM. |
-| Local host behavior | QCNL/QPL can use host-local cache and host-local policy such as `local_cache_only`. | The Verifier directly controls host-local collateral behavior instead of inheriting QCNL policy. |
+| Local host behavior | QPL/QCNL can use host-local cache and host-local policy such as `local_cache_only`. | The Verifier directly controls host-local collateral behavior instead of inheriting QCNL policy. |
 | Runtime adaptability | Intel components may support different routing and caching topologies without changing Verifier code. | Fewer moving parts can make runtime behavior easier to reason about, but new topologies usually require code changes or explicit AttesTAM design work. |
 | Verification input control | Convenient when the Verifier is comfortable delegating collateral management to Intel's runtime stack. | Better fit when the Verifier wants to directly control which collateral is fetched, cached, reused, and passed to Intel QVL. |
 
@@ -177,6 +175,7 @@ A common deployment model is:
 
 - Verifier
 - Intel QVL
+- Intel QPL
 - Intel QCNL
 - Intel PCCS
 - Intel PCS
@@ -185,9 +184,10 @@ In that model:
 
 - the Verifier calls Intel QVL APIs
 - the Verifier commonly passes `collateral = NULL` to `tee_verify_quote()`
-- Intel QVL or its surrounding Intel provider stack relies on QCNL/QPL behavior
+- Intel QVL commonly relies on QPL as the provider layer around collateral resolution
+- QPL commonly relies on QCNL for configuration, cache handling, and network retrieval
 - QCNL behavior is influenced by `/etc/sgx_default_qcnl.conf`
-- QCNL/QPL can maintain a local cache on the Verifier host
+- QPL/QCNL can maintain a local cache on the Verifier host
 - QCNL may obtain collateral through PCCS
 - Intel PCCS, commonly deployed as Intel's Node.js reference service, can also maintain its own shared cache
 - PCCS may in turn obtain or proxy data from Intel PCS
@@ -195,54 +195,57 @@ In that model:
 That structure can be summarized as:
 
 ```text
-Verifier -> Intel QVL -> Intel QCNL -> Intel PCCS -> Intel PCS
+Verifier -> Intel QVL -> Intel QPL -> Intel QCNL -> Intel PCCS -> Intel PCS
 ```
+
+Here:
+
+- QVL is the core verification library
+- QPL is the provider layer used around QVL for collateral-related plumbing
+- QCNL is the configuration / local-cache / network-retrieval layer commonly used underneath QPL
+- PCCS is a shared service-side cache and proxy
+- PCS is the Intel upstream source of collateral
 
 When `tee_verify_quote()` is called with `collateral = NULL`, the practical behavior is commonly understood as:
 
 - the Verifier asks Intel QVL to verify the Quote without explicitly supplying collateral
 - Intel's surrounding provider stack becomes responsible for deciding how collateral is found
-- QCNL/QPL consults its own runtime configuration
-- QCNL/QPL may use local cache, local-cache-only mode, retry rules, PCCS, or direct collateral service settings
+- QPL/QCNL consults its own runtime configuration
+- QPL/QCNL may use local cache, local-cache-only mode, retry rules, PCCS, or direct collateral service settings
 - Intel QVL verifies the Quote using collateral that was resolved through that external path
 
 That means the verification input path is no longer fully described by the Verifier code alone.
 
-### Typical `collateral = NULL` sequence
+### Typical `collateral = NULL` flow
+
+The flowchart below shows the same situation as a decision flow rather than a call sequence.
+The important point is that, once the Verifier passes `collateral = NULL`, collateral selection and retrieval policy are no longer decided by the Verifier code itself, but by Intel runtime components and their configuration.
 
 ```mermaid
-sequenceDiagram
-    participant V as Verifier
-    participant Q as Intel QVL
-    participant N as Intel QCNL/QPL
-    participant S as Intel PCCS
-    participant I as Intel PCS
-
-    V->>Q: tee_verify_quote(quote, NULL)
-    Q->>N: resolve collateral
-    N->>N: read qcnl config and cache policy
-    alt cache hit
-        N-->>Q: local cached collateral
-    else cache miss
-        alt collateral path via PCCS
-            N->>S: request collateral
-            alt PCCS shared cache hit
-                S-->>N: shared cached collateral
-            else PCCS shared cache miss
-                S->>I: request upstream collateral
-                I-->>S: collateral
-                S-->>N: collateral
-            end
-        else direct collateral service
-            N->>I: request collateral
-            I-->>N: collateral
-        end
-        N-->>Q: resolved collateral
-    end
-    Q-->>V: verification result
+flowchart TD
+    A["Verifier: call tee_verify_quote(quote, NULL)"]
+    A --> B[Intel QVL: delegate collateral resolution to Intel QPL]
+    B --> C[Intel QPL: request collateral to Intel QCNL]
+    C --> D[Intel QCNL: read runtime configuration such as /etc/sgx_default_qcnl.conf]
+    D --> E{Intel QCNL: is local cache allowed and sufficient?}
+    E -- Yes --> F[Intel QCNL: use local cached collateral]
+    E -- No --> G{Intel QCNL: route via Intel PCCS or direct Intel PCS?}
+    G -- Via Intel PCCS --> H{Intel PCCS: shared cache hit?}
+    H -- Yes --> I[Intel PCCS: return shared cached collateral]
+    H -- No --> J[Intel PCCS: request upstream collateral from Intel PCS]
+    J --> K[Intel PCS: return collateral]
+    K --> L[Intel PCCS: return collateral to Intel QCNL]
+    G -- Direct Intel PCS --> M[Intel QCNL: request collateral from Intel PCS]
+    M --> N[Intel PCS: return collateral]
+    F --> O[Intel QVL: verify Quote with externally resolved collateral]
+    I --> O
+    L --> O
+    N --> O
+    O --> P[Verifier: receive verification result]
 ```
 
-In this sequence, the Verifier sees the Quote and the final result, but the collateral selection and retrieval policy are mostly externalized into the Intel stack and its configuration.
+In this flow, the Verifier sees the Quote and the final result, but the collateral selection and retrieval policy are mostly externalized into the Intel stack and its configuration.
+The complexity is not only that policy exists outside the Verifier; it is also that multiple Intel-specific layers participate in resolution before QVL receives the collateral used for verification.
 
 Here, "local cached collateral" refers to the QCNL-managed host-local cache, while "shared cached collateral" refers to the PCCS-side cache held by the PCCS service.
 
@@ -252,11 +255,13 @@ The difference is not only packaging. It changes who owns the verification input
 
 In the common Intel stack:
 
+- Intel QVL still contains the core SGX Quote verification logic
+- QPL/QCNL/PCCS add provider, retrieval, cache, and configuration layers around that core logic
 - collateral source selection is largely delegated to the Intel retrieval stack
 - runtime behavior can depend on QCNL configuration
-- the Verifier host may need QCNL/QPL-related components and configuration in addition to Intel QVL
+- the Verifier host may need QPL/QCNL-related components and configuration in addition to Intel QVL
 - the Verifier host may also need PCCS deployment or access to a PCCS service
-- QCNL/QPL can keep host-local cache files
+- QPL/QCNL can keep host-local cache files
 - PCCS can keep a service-side shared cache
 - collateral cache behavior, retry policy, local-cache-only mode, and service routing can be controlled outside the Verifier code
 - the actual endorsement inputs used by Intel QVL can become harder to inspect from the Verifier implementation itself
@@ -321,138 +326,19 @@ AttesTAM therefore distinguishes between:
 - collateral data that maps naturally to `sgx_ql_qve_collateral_t`
 - trust-anchor material such as the Intel SGX Root CA certificate, which is related but is not stored as a field in that collateral structure
 
-### Go-managed collateral cache
+### Endorsement store
 
 - [`internal/infra/rats/intel_qvl_collateral.go`](../internal/infra/rats/intel_qvl_collateral.go)
 
 Responsibilities:
 
 - derive the cache key from the Quote
-- persist collateral in a Go-controlled cache directory
+- persist collateral in a Verifier-controlled Endorsement store directory
 - reload cached collateral for later verification
 
-The cache prefers an FMSPC-based key. If FMSPC extraction fails, it falls back to a Quote hash based key.
+The cache key is derived from `FMSPC`, so collateral is reused across Quotes from the same platform family.
+Each cache entry also carries an AttesTAM-managed expiration time.
+The effective expiration is the earlier of:
 
-## Verification Flow
-
-```mermaid
-sequenceDiagram
-    participant A as TEEP Agent
-    participant T as Verifier
-    participant C as Endorsement store
-    participant P as Intel PCS
-    participant Q as Intel QVL
-
-    A->>T: SGX Quote
-    T->>T: extract FMSPC and PCK CA from Quote
-    T->>C: lookup collateral
-    alt cache hit
-        C-->>T: cached collateral
-    else cache miss
-        T->>P: fetch collateral by FMSPC / PCK CA
-        P-->>T: collateral set
-        T->>C: store collateral
-    end
-    T->>Q: tee_verify_quote(quote, collateral)
-    Q-->>T: verification result
-```
-
-This sequence is intentionally different from the common `tee_verify_quote(quote, NULL)` path.
-
-Here:
-
-- the Verifier itself selects the collateral source
-- the Verifier itself decides whether cache is reused
-- the Verifier itself prepares the `sgx_ql_qve_collateral_t`-equivalent input
-- Intel QVL receives an explicit collateral object instead of discovering collateral through QCNL runtime behavior
-
-## Intel DCAP Reference Behavior
-
-This section summarizes reference behavior observed in Intel's open-source DCAP implementation under `confidential-computing.tee.dcap`.
-It is included as implementation background, not as a statement that AttesTAM must follow the same runtime structure.
-
-### What the Quote Verification code shows
-
-The main verification flow can be understood at the following level.
-
-1. `tee_verify_quote()` accepts the Quote together with a collateral structure of type `sgx_ql_qve_collateral_t`.
-2. In AttesTAM, that collateral is prepared in Go and converted into the C structure in [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go).
-3. The collateral structure contains items such as `pck_crl`, `root_ca_crl`, `tcb_info`, and `qe_identity`, together with their issuer chains.
-4. The trusted Intel SGX Root CA certificate itself is not a field of `sgx_ql_qve_collateral_t`.
-5. For the normal SGX `tee_verify_quote()` path, Intel QVL does not simply trust the Root CA certificate embedded in the Quote's PCK certificate chain. It checks that certificate against a pinned Intel Root public key.
-
-So the rough trust model is:
-
-- the Verifier supplies the Quote and collateral to `tee_verify_quote()`
-- the collateral carries revocation and TCB-related material, but not the trusted SGX Root CA certificate as a field
-- Intel QVL verifies the Quote's certificate chain against a pinned Intel Root public key before accepting that chain as trustworthy
-
-The pinned public key appears in Intel's DCAP source as `INTEL_ROOT_PUB_KEY` in [`ae/QvE/qve/qve.cpp`](https://github.com/intel/confidential-computing.tee.dcap/blob/main/ae/QvE/qve/qve.cpp).
-The source file path looks QvE-specific, but this source is shared with the QVL software path as well.
-
-### Why this matters for AttesTAM
-
-This reference behavior is useful for AttesTAM for two reasons.
-
-First, it explains why "fetching the Intel PCS collateral set" is not exactly the same thing as "collecting every trust input involved in verification".
-
-Second, it reinforces the design choice to keep collateral handling explicit in AttesTAM:
-
-- AttesTAM should clearly distinguish collateral fields from trust-anchor material
-- AttesTAM should avoid hidden runtime behavior in QCNL / PCCS / host configuration
-- AttesTAM should make it clear which inputs are passed to Intel verification logic and why
-
-## Why This Design Is Preferred
-
-### Explicit collateral boundary
-
-AttesTAM wants the verification boundary to be explicit:
-
-- the Quote comes from the TEEP Agent
-- the collateral comes from the TAM-controlled path
-- Intel QVL verifies only against the collateral that the TAM provides
-
-This makes the source of verification inputs easier to reason about and easier to test.
-
-### Avoid a PCCS runtime dependency
-
-AttesTAM does not want SGX Quote verification to require a separately deployed PCCS instance as part of the normal TAM runtime.
-
-By keeping collateral retrieval in Go code:
-
-- deployment is simpler
-- collateral behavior is easier to inspect
-- cache policy is controlled in AttesTAM code
-- tests can validate collateral selection logic without requiring a live PCCS
-
-### Preserve Intel verification semantics
-
-AttesTAM still uses Intel QVL for the actual Quote verification decision.
-
-This design does not replace Intel’s verification logic. It replaces only the collateral acquisition path.
-
-## Non-Goals
-
-The current implementation is not trying to:
-
-- make Intel PCCS part of the required AttesTAM runtime
-- rely on `sgx_ql_get_quote_verification_collateral()` or QCNL runtime retrieval during Quote verification
-- hide collateral source selection inside the Intel library stack
-
-## Operational Summary
-
-In short, the current AttesTAM SGX Quote verification policy is:
-
-- use Intel QVL for Quote verification
-- do not require Intel PCCS
-- extract `FMSPC` from the Quote in Go
-- manage collateral lookup and caching in Go
-- fetch collateral from Intel PCS when the cache is missing the required entry
-- always pass explicit collateral into `tee_verify_quote()`
-
-## Related Files
-
-- [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go)
-- [`internal/infra/rats/intel_qvl_pcs.go`](../internal/infra/rats/intel_qvl_pcs.go)
-- [`internal/infra/rats/intel_qvl_collateral.go`](../internal/infra/rats/intel_qvl_collateral.go)
-- [`internal/tam/tam.go`](../internal/tam/tam.go)
+- `now + 7 days`
+- the nearest `nextUpdate` value carried by the cached collateral
