@@ -98,7 +98,7 @@ That embedded Verifier is responsible for:
 That embedded Verifier is **not** responsible, by itself, for appraising Target Environment identity values such as `MRENCLAVE` and `MRSIGNER`.
 Those checks usually depend on Relying Party-specific policy, so in AttesTAM they belong conceptually above the Intel QVL-based Quote verification step.
 
-### 1. Use Intel QVL, but do not rely on Intel PCCS or Intel QCNL
+### 1. Use Intel QVL, but do not rely on Intel QPL / QCNL / PCCS
 
 AttesTAM uses the native Intel DCAP quote verification library (QVL) through `tee_verify_quote()` in [`internal/infra/rats/intel_qvl_verifier.go`](../internal/infra/rats/intel_qvl_verifier.go).
 
