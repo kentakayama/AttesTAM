@@ -6,6 +6,13 @@ This document describes the current AttesTAM implementation policy for Intel SGX
 AttesTAM is primarily a Relying Party in [RFC 9334](https://datatracker.ietf.org/doc/rfc9334/) RATS Architecture terms.
 However, in the current implementation, AttesTAM also embeds the Verifier-side functionality needed to verify Intel SGX Quotes.
 
+Readers can use this document in different ways depending on their interests.
+For terminology and the SGX-to-RATS mapping, start with [Terminology](#terminology).
+For the high-level design direction and the resulting constraints, read [Design Policy](#design-policy) and [Limitations](#limitations).
+For the external behavior of the verification path, read [SGX Quote Verification Flow](#sgx-quote-verification-flow).
+For the detailed motivation behind the design, read [Main Design Intent](#main-design-intent) and [Architecture Comparison](#architecture-comparison).
+For code-oriented details, continue to [Current Implementation Structure](#current-implementation-structure).
+
 ## Terminology
 
 ### Intel SGX Terms and RFC 9334 RATS Terms
@@ -27,7 +34,7 @@ The rough correspondence is as follows.
 
 For Intel SGX Quote verification, the Verifier receives a Quote as Evidence, then uses Quote-derived information such as `FMSPC` (Family-Model-Stepping-Platform-CustomSKU) as a key to obtain Endorsements from the Intel PCS.
 
-## Implementation Policy
+## Design Policy
 
 The AttesTAM-embedded Verifier only covers the scope of core SGX Quote verification:
 
@@ -40,6 +47,17 @@ Thus, the Verifier does **not** appraise the Target Environment by itself; that 
 Additionally, the Verifier fully manages collateral in its own Endorsement store for simplicity, avoiding reliance on the more complex Intel QPL / QCNL / PCCS stack (see [Architecture Comparison](#architecture-comparison)).
 
 These points are intentional design choices, not incidental implementation details.
+
+## Limitations
+
+- This implementation does not aim to support every SGX Quote format.
+  The current Intel QVL verification path is effectively limited to the DCAP ECDSA Quote formats for which collateral extraction and PCK certificate chain handling are implemented, currently Quote version 3 and Quote version 4.
+- Endorsements are not received in a CoRIM-based format.
+  Instead, AttesTAM uses Intel's native collateral structure and passes data shaped for `sgx_ql_qve_collateral_t` into Intel QVL.
+- AttesTAM does not proactively cache the latest collateral for every possible `FMSPC`.
+  As a result, first-time verification for a given `FMSPC` can be slower, and verification latency can become unstable when Intel PCS access is slow or unavailable.
+- Target Environment appraisal is intentionally left outside this implementation.
+  In particular, appraisal of Target Environment-related values such as `MRENCLAVE`, `MRSIGNER`, `ISV_SVN`, and application-specific `REPORT_DATA` remains the responsibility of the Relying Party or a higher-layer Verifier policy.
 
 ## SGX Quote Verification Flow
 
