@@ -9,7 +9,6 @@
 package rats
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -130,19 +129,20 @@ func (c *intelQVLCollateralCache) pathForQuote(quote []byte) (string, string, er
 	return filepath.Join(c.dir, key+".bin"), key, nil
 }
 
-// intelQVLCollateralCacheKey prefers an FMSPC-derived key so collateral can be reused
-// across Quotes from the same platform family. If FMSPC extraction fails, it falls back
-// to a Quote hash to preserve correctness.
+// intelQVLCollateralCacheKey uses an FMSPC-derived key so collateral can be reused
+// across Quotes from the same platform family.
 func intelQVLCollateralCacheKey(quote []byte) (string, error) {
 	if len(quote) == 0 {
 		return "", errors.New("Intel QVL quote is empty")
 	}
 	fmspc, err := extractIntelQVLFMSPC(quote)
-	if err == nil && len(fmspc) == intelQVLFMSPCSize {
-		return "fmspc-" + hex.EncodeToString(fmspc), nil
+	if err != nil {
+		return "", fmt.Errorf("extract FMSPC for Intel QVL collateral cache key: %w", err)
 	}
-	sum := sha256.Sum256(quote)
-	return "quote-" + hex.EncodeToString(sum[:16]), nil
+	if len(fmspc) != intelQVLFMSPCSize {
+		return "", fmt.Errorf("unexpected FMSPC size for Intel QVL collateral cache key: got %d", len(fmspc))
+	}
+	return "fmspc-" + hex.EncodeToString(fmspc), nil
 }
 
 // ValidAt reports whether the cached collateral entry is still valid at the supplied time.
