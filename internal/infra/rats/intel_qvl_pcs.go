@@ -11,7 +11,6 @@ package rats
 import (
 	"crypto/x509"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -141,8 +140,12 @@ func (c *intelQVLPCSClient) fetchPCKCRL(ca string) ([]byte, []byte, error) {
 }
 
 func (c *intelQVLPCSClient) fetchTCBInfo(fmspc []byte) ([]byte, []byte, error) {
+	fmspcQueryValue, err := intelQVLFMSPCQueryValue(fmspc)
+	if err != nil {
+		return nil, nil, err
+	}
 	body, header, err := c.get("tcb", url.Values{
-		"fmspc": []string{strings.ToUpper(hex.EncodeToString(fmspc))},
+		"fmspc": []string{fmspcQueryValue},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetch TCB Info: %w", err)
@@ -220,10 +223,9 @@ func (c *intelQVLPCSClient) logFetchResult(rawURL string, resp *http.Response, b
 	if c.logger == nil {
 		return
 	}
-	c.logger.Printf("DEBUG Intel QVL PCS fetch result: url=%s status=%s headers=%v body_len=%d body=%q",
+	c.logger.Printf("DEBUG Intel QVL PCS fetch result: url=%s status=%s body_len=%d body=%.30q",
 		rawURL,
 		resp.Status,
-		resp.Header,
 		len(body),
 		body,
 	)

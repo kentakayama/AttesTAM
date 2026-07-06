@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -41,6 +40,8 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 	quote := readIntelQVLQuoteFixture(t)
 	fmspc, err := extractIntelQVLFMSPC(quote)
 	require.NoError(t, err)
+	fmspcQueryValue, err := intelQVLFMSPCQueryValue(fmspc)
+	require.NoError(t, err)
 	pckCA, err := extractIntelQVLQuotePCKCA(quote)
 	require.NoError(t, err)
 
@@ -60,7 +61,7 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 			w.Header().Set(intelQVLPCSHeaderPCKCRL, url.QueryEscape(string(issuerChain)))
 			_, _ = w.Write([]byte{0x01, 0x02, 0x03})
 		case "/sgx/certification/v4/tcb":
-			require.Equal(t, strings.ToUpper(hexEncode(fmspc)), r.URL.Query().Get("fmspc"))
+			require.Equal(t, fmspcQueryValue, r.URL.Query().Get("fmspc"))
 			w.Header().Set(intelQVLPCSHeaderTCBInfo, url.QueryEscape(string(issuerChain)))
 			_, _ = w.Write([]byte(`{"tcbInfo":{"id":"SGX"}}`))
 		case "/sgx/certification/v4/qe/identity":
@@ -160,14 +161,4 @@ func makeTestIssuerChainPEM(t *testing.T, mutateRoot func(*x509.Certificate)) []
 	out = append(out, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: intermediateDER})...)
 	out = append(out, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: rootDER})...)
 	return out
-}
-
-func hexEncode(data []byte) string {
-	const hexdigits = "0123456789abcdef"
-	out := make([]byte, len(data)*2)
-	for i, b := range data {
-		out[i*2] = hexdigits[b>>4]
-		out[i*2+1] = hexdigits[b&0x0f]
-	}
-	return string(out)
 }

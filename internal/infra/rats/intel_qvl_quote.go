@@ -9,8 +9,10 @@ package rats
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -28,6 +30,7 @@ const (
 	sgxQuote5BodyLenOff        = 44
 	sgxReportDataOffsetInBody  = 320
 	sgxReportDataOffsetInQuote = 368
+	intelQVLFMSPCSize          = 6
 )
 
 func verifyQuoteReportData(quote []byte, expected []byte) error {
@@ -90,4 +93,32 @@ func copyQuoteReportData(in []byte) []byte {
 	out := make([]byte, len(in))
 	copy(out, in)
 	return out
+}
+
+func extractIntelQVLFMSPC(quote []byte) ([]byte, error) {
+	if len(quote) == 0 {
+		return nil, fmt.Errorf("Intel QVL quote is empty")
+	}
+	fmspc, err := extractIntelQVLFMSPCNative(quote)
+	if err != nil {
+		return nil, err
+	}
+	if len(fmspc) != intelQVLFMSPCSize {
+		return nil, fmt.Errorf("unexpected Intel QVL FMSPC size: got %d", len(fmspc))
+	}
+	return fmspc, nil
+}
+
+func intelQVLFMSPCQueryValue(fmspc []byte) (string, error) {
+	if len(fmspc) != intelQVLFMSPCSize {
+		return "", fmt.Errorf("unexpected Intel QVL FMSPC size: got %d", len(fmspc))
+	}
+	return strings.ToUpper(hex.EncodeToString(fmspc)), nil
+}
+
+func intelQVLFMSPCCacheKeyValue(fmspc []byte) (string, error) {
+	if len(fmspc) != intelQVLFMSPCSize {
+		return "", fmt.Errorf("unexpected Intel QVL FMSPC size: got %d", len(fmspc))
+	}
+	return strings.ToLower(hex.EncodeToString(fmspc)), nil
 }

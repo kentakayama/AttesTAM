@@ -44,7 +44,7 @@ func main() {
 		challengeContentType       = flag.String("challenge-content-type", `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`, "Content-Type for attestation payload submission")
 		challengeInsecureTLS       = flag.Bool("challenge-insecure-tls", true, "skip TLS verification when contacting the verifier")
 		challengeTimeout           = flag.Duration("challenge-timeout", time.Minute, "timeout for verifier challenge-response interactions")
-		intelQVLCollateralCacheDir = flag.String("intel-qvl-collateral-cache-dir", "", "directory for Intel QVL quote collateral cache. If empty, Intel QVL uses the default QPL collateral path.")
+		intelQVLCollateralCacheDir = flag.String("intel-qvl-collateral-cache-dir", "./", "directory for Intel QVL quote collateral cache. If empty, AttesTAM's Intel QVL collateral cache is disabled.")
 		intelQVLPCSURL             = flag.String("intel-qvl-pcs-url", "https://api.trustedservices.intel.com/sgx/certification/v4", "base URL for Intel PCS collateral retrieval used by Intel QVL quote verification")
 		intelQVLSubscriptionKey    = flag.String("intel-qvl-subscription-key", "", "optional Intel PCS subscription key for Intel QVL collateral retrieval")
 	)

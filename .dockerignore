@@ -2,6 +2,7 @@ Makefile
 doc
 *.md
 tam_state*
+*.bin
 
 *.sh
 *.tar.gz

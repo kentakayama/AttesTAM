@@ -57,3 +57,15 @@ func TestVerifyQuoteReportDataMismatch(t *testing.T) {
 	err = verifyQuoteReportData(quote, expected)
 	require.ErrorContains(t, err, "report_data mismatch")
 }
+
+func TestIntelQVLFMSPCFormatting(t *testing.T) {
+	fmspc := []byte{0x00, 0x60, 0x6a, 0x00, 0x00, 0x00}
+
+	queryValue, err := intelQVLFMSPCQueryValue(fmspc)
+	require.NoError(t, err)
+	require.Equal(t, "00606A000000", queryValue)
+
+	cacheKeyValue, err := intelQVLFMSPCCacheKeyValue(fmspc)
+	require.NoError(t, err)
+	require.Equal(t, "00606a000000", cacheKeyValue)
+}

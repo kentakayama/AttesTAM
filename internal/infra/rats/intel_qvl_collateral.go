@@ -9,7 +9,6 @@
 package rats
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -19,7 +18,6 @@ import (
 )
 
 const (
-	intelQVLFMSPCSize          = 6
 	intelQVLCollateralCacheTTL = 7 * 24 * time.Hour
 )
 
@@ -139,10 +137,15 @@ func intelQVLCollateralCacheKey(quote []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("extract FMSPC for Intel QVL collateral cache key: %w", err)
 	}
-	if len(fmspc) != intelQVLFMSPCSize {
-		return "", fmt.Errorf("unexpected FMSPC size for Intel QVL collateral cache key: got %d", len(fmspc))
+	fmspcKeyValue, err := intelQVLFMSPCCacheKeyValue(fmspc)
+	if err != nil {
+		return "", fmt.Errorf("format FMSPC for Intel QVL collateral cache key: %w", err)
 	}
-	return "fmspc-" + hex.EncodeToString(fmspc), nil
+	pckCA, err := extractIntelQVLQuotePCKCA(quote)
+	if err != nil {
+		return "", fmt.Errorf("extract PCK CA for Intel QVL collateral cache key: %w", err)
+	}
+	return "fmspc-" + fmspcKeyValue + "-pckca-" + pckCA, nil
 }
 
 // ValidAt reports whether the cached collateral entry is still valid at the supplied time.

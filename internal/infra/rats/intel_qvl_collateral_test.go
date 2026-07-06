@@ -20,11 +20,14 @@ import (
 
 func TestIntelQVLCollateralCacheKeyFromFixture(t *testing.T) {
 	quote := readSGXQuoteFixture(t)
+	pckCA, err := extractIntelQVLQuotePCKCA(quote)
+	require.NoError(t, err)
 
 	key, err := intelQVLCollateralCacheKey(quote)
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(key, "fmspc-"), "cache key = %q", key)
-	require.Len(t, strings.TrimPrefix(key, "fmspc-"), intelQVLFMSPCSize*2)
+	require.Contains(t, key, "-pckca-"+pckCA)
+	require.Len(t, strings.TrimSuffix(strings.TrimPrefix(key, "fmspc-"), "-pckca-"+pckCA), intelQVLFMSPCSize*2)
 }
 
 func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
