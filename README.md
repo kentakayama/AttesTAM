@@ -96,6 +96,17 @@ This container starts both services:
 
 `--net=host` is used so the containerized TAM can reach a verifier running on `https://localhost:8443` on the host. Then open `http://127.0.0.1:9090` in your Web browser.
 
+### C) Intel Quote Verification with Docker (Experimental)
+
+Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries. The docker host MUST start a local Intel PCCS instance, accessed with `https://127.0.0.1:8081/sgx/certification/v4/` in the container (you may configure it with `docker/sgx_default_qcnl.conf`).
+
+Use Docker for this mode. Native setup requires Intel DCAP libraries; keeping those dependencies inside the experimental image avoids installing them on the host.
+
+```bash
+docker build -f docker/qvl-qcnl.Dockerfile -t attestam-qvl-qcnl .
+docker run --rm --net=host -e ATTESTAM_INSECURE_DEMO_MODE=true attestam-qvl-qcnl
+```
+
 ## Documentation
 
 - [User Manual](./doc/USER_MANUAL.md)

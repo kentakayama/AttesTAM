@@ -1,6 +1,5 @@
 *.md
 doc/
 tam_state*
-.*/
 Dockerfile
 Makefile
