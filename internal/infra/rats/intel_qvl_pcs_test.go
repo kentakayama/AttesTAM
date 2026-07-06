@@ -9,11 +9,13 @@
 package rats
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"log"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +91,32 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 	require.Equal(t, rootCRLBody, collateral.RootCACRL)
 	require.Equal(t, []byte(`{"tcbInfo":{"id":"SGX"}}`), collateral.TCBInfo)
 	require.Equal(t, []byte(`{"enclaveIdentity":{"id":"QE"}}`), collateral.QEIdentity)
+}
+
+func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
+	var logBuf bytes.Buffer
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"result":"ok"}`))
+	}))
+	defer server.Close()
+
+	client, err := newIntelQVLPCSClient(config.RAConfig{
+		IntelQVLPCSURL: server.URL,
+		Logger:         log.New(&logBuf, "", 0),
+	})
+	require.NoError(t, err)
+
+	body, header, err := client.get("tcb", url.Values{"fmspc": []string{"001122334455"}})
+	require.NoError(t, err)
+	require.Equal(t, []byte(`{"result":"ok"}`), body)
+	require.Equal(t, "application/json", header.Get("Content-Type"))
+
+	logged := logBuf.String()
+	require.Contains(t, logged, "DEBUG Intel QVL PCS fetch result")
+	require.Contains(t, logged, server.URL+"/tcb?fmspc=001122334455")
+	require.Contains(t, logged, "status=200 OK")
+	require.Contains(t, logged, `body="{\"result\":\"ok\"}"`)
 }
 
 func makeTestIssuerChainPEM(t *testing.T, mutateRoot func(*x509.Certificate)) []byte {

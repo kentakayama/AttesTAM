@@ -16,6 +16,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -59,6 +60,7 @@ type intelQVLPCSClient struct {
 	baseURL         *url.URL
 	httpClient      *http.Client
 	subscriptionKey string
+	logger          *log.Logger
 }
 
 func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
@@ -78,6 +80,7 @@ func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
 		baseURL:         parsed,
 		httpClient:      client,
 		subscriptionKey: strings.TrimSpace(cfg.IntelQVLSubscriptionKey),
+		logger:          cfg.Logger,
 	}, nil
 }
 
@@ -206,10 +209,24 @@ func (c *intelQVLPCSClient) getAbsolute(rawURL string) ([]byte, http.Header, err
 	if err != nil {
 		return nil, nil, err
 	}
+	c.logFetchResult(rawURL, resp, body)
 	if resp.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("GET %s returned %s: %s", rawURL, resp.Status, strings.TrimSpace(string(body)))
 	}
 	return body, resp.Header.Clone(), nil
+}
+
+func (c *intelQVLPCSClient) logFetchResult(rawURL string, resp *http.Response, body []byte) {
+	if c.logger == nil {
+		return
+	}
+	c.logger.Printf("DEBUG Intel QVL PCS fetch result: url=%s status=%s headers=%v body_len=%d body=%q",
+		rawURL,
+		resp.Status,
+		resp.Header,
+		len(body),
+		body,
+	)
 }
 
 func decodeIntelPCSHeader(value string) ([]byte, error) {
