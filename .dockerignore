@@ -1,4 +1,5 @@
 Makefile
+Dockerfile
 doc
 *.md
 tam_state*
