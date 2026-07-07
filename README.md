@@ -80,13 +80,7 @@ Add `--tam-api-debug` when you want the console to log AttesTAM API requests and
 
 ```bash
 docker build -t attestam .
-docker run --rm \
-  --net=host \
-  -e ATTESTAM_ADDR=":8080" \
-  -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ADMIN_CONSOLE_PORT=9090 \
-  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  attestam
+docker run --rm --net=host -e ATTESTAM_INSECURE_DEMO_MODE=true attestam
 ```
 
 This container starts both services:
@@ -96,33 +90,18 @@ This container starts both services:
 
 `--net=host` is used so the containerized TAM can reach a verifier running on `https://localhost:8443` on the host. Then open `http://127.0.0.1:9090` in your Web browser.
 
-This is the recommended way to run AttesTAM for normal local evaluation. The default Docker image does not include Intel QVL, Intel DCAP runtime libraries, Intel PCCS, or Node.js.
+This is the recommended way to run AttesTAM for normal local evaluation.
 
 ### C) Intel Quote Verification with Docker (Experimental)
 
-Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries, and starts a local Intel PCCS inside the same container. PCCS is configured without an Intel PCS API key.
+Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries.
 
-Use Docker for this mode. Native setup requires Intel DCAP libraries, PCCS runtime dependencies, and Node.js for PCCS; keeping those dependencies inside the experimental image avoids installing them on the host.
-The experimental image also enables `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR=/var/cache/attestam/intel-qvl-collateral`; after a successful QVL verification, AttesTAM stores the opaque QVL collateral buffer there and reuses it on later verifications.
+You can configure Intel PCS URL with `ATTESTAM_INTEL_QVL_PCS_URL`, API key with `ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY` and the collateral (Endorsements) cache directory with `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR`.
 
 ```bash
-docker build -f docker/qvl-pccs.Dockerfile -t attestam-qvl-pccs .
-docker run --rm \
-  --net=host \
-  -e ATTESTAM_ADDR=":8080" \
-  -e ATTESTAM_INSECURE_DEMO_MODE=true \
-  -e ADMIN_CONSOLE_PORT=9090 \
-  -e ADMIN_CONSOLE_TAM_API_BASE=http://127.0.0.1:8080 \
-  attestam-qvl-pccs
+docker build -f docker/sgx-verifier.Dockerfile -t attestam-sgx .
+docker run --rm --net=host -e ATTESTAM_INSECURE_DEMO_MODE=true attestam-sgx
 ```
-
-This experimental image starts three processes in one container:
-
-- local Intel PCCS on `https://127.0.0.1:8081`
-- TAM core server on `http://localhost:8080` (`POST /tam`)
-- AttesTAM Console on `http://127.0.0.1:9090`
-
-The QVL/PCCS Dockerfile is intentionally separate from the main Dockerfile so it can be removed when Intel Quote verification moves to the Verifier side.
 
 ## Documentation
 
