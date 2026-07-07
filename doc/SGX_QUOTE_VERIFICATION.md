@@ -89,10 +89,12 @@ Such appraisal usually depends on Relying Party-specific policy, so in AttesTAM 
 
 ```mermaid
 sequenceDiagram
-    participant V as Verifier
-    participant E@{"type": "database"} as Endorsement store
-    participant I as Intel PCS
+    box Verifier
     participant Q as Intel QVL
+    participant V as Verifier endpoint
+    participant E@{"type": "database"} as Endorsement store
+    end
+    participant I as Intel PCS
 
     V->>V: extract FMSPC and PCK CA type from Quote
     V->>E: lookup collateral for Quote-derived FMSPC and PCK CA type
