@@ -31,6 +31,7 @@ const (
 	envChallengeTimeout           = "ATTESTAM_CHALLENGE_TIMEOUT"
 	envIntelQVLCollateralCacheDir = "ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR"
 	envIntelQVLPCSURL             = "ATTESTAM_INTEL_QVL_PCS_URL"
+	envIntelQVLPCSInsecureTLS     = "ATTESTAM_INTEL_QVL_PCS_INSECURE_TLS"
 	envIntelQVLSubscriptionKey    = "ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY"
 )
 
@@ -46,6 +47,7 @@ func main() {
 		challengeTimeout           = flag.Duration("challenge-timeout", time.Minute, "timeout for verifier challenge-response interactions")
 		intelQVLCollateralCacheDir = flag.String("intel-qvl-collateral-cache-dir", "./", "directory for Intel QVL quote collateral cache. If empty, AttesTAM's Intel QVL collateral cache is disabled.")
 		intelQVLPCSURL             = flag.String("intel-qvl-pcs-url", "https://api.trustedservices.intel.com/sgx/certification/v4", "base URL for Intel PCS collateral retrieval used by Intel QVL quote verification")
+		intelQVLPCSInsecureTLS     = flag.Bool("intel-qvl-pcs-insecure-tls", false, "skip TLS verification when retrieving Intel QVL collateral from PCS/PCCS")
 		intelQVLSubscriptionKey    = flag.String("intel-qvl-subscription-key", "", "optional Intel PCS subscription key for Intel QVL collateral retrieval")
 	)
 	flag.Parse()
@@ -62,6 +64,7 @@ func main() {
 	challengeTimeoutVal := durationFromEnv(logger, envChallengeTimeout, *challengeTimeout)
 	intelQVLCollateralCacheDirVal := stringFromEnv(logger, envIntelQVLCollateralCacheDir, *intelQVLCollateralCacheDir)
 	intelQVLPCSURLVal := stringFromEnv(logger, envIntelQVLPCSURL, *intelQVLPCSURL)
+	intelQVLPCSInsecureTLSVal := boolFromEnv(logger, envIntelQVLPCSInsecureTLS, *intelQVLPCSInsecureTLS)
 	intelQVLSubscriptionKeyVal := stringFromEnv(logger, envIntelQVLSubscriptionKey, *intelQVLSubscriptionKey)
 
 	cfg := config.TAMConfig{
@@ -76,6 +79,7 @@ func main() {
 		ChallengeTimeout:           challengeTimeoutVal,
 		IntelQVLCollateralCacheDir: intelQVLCollateralCacheDirVal,
 		IntelQVLPCSURL:             intelQVLPCSURLVal,
+		IntelQVLPCSInsecureTLS:     intelQVLPCSInsecureTLSVal,
 		IntelQVLSubscriptionKey:    intelQVLSubscriptionKeyVal,
 	}
 

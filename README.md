@@ -96,7 +96,11 @@ This is the recommended way to run AttesTAM for normal local evaluation.
 
 Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries.
 
-You can configure Intel PCS URL with `ATTESTAM_INTEL_QVL_PCS_URL`, API key with `ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY` and the collateral (Endorsements) cache directory with `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR`.
+You can configure Intel PCS/PCCS URL with `ATTESTAM_INTEL_QVL_PCS_URL` (default: `https://api.trustedservices.intel.com/sgx/certification/v4`), whether checking TLS certificate with `ATTESTAM_INTEL_QVL_PCS_INSECURE_TLS` (default: `false`), Intel PCS API key with `ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY` (default: `""`) and the collateral (Endorsements) cache directory with `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR` (default: `./`).
+The configured PCS/PCCS service must expose the Intel SGX certification v4-compatible collateral endpoints used by AttesTAM, including PCCS API v3.1-style `/crl?uri=...` when using PCCS for Root CA CRL retrieval.
+
+> [!NOTE]
+> If you want to use Intel PCCS as a shared collateral cache in front of Intel PCS, run with `-e ATTESTAM_INTEL_QVL_PCS_URL="https://localhost:8081/sgx/certification/v4" -e ATTESTAM_INTEL_QVL_PCS_INSECURE_TLS=true`.
 
 ```bash
 docker build -f docker/sgx-verifier.Dockerfile -t attestam-sgx .

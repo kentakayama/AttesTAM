@@ -9,6 +9,7 @@
 package rats
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
@@ -71,7 +72,14 @@ func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse Intel PCS URL: %w", err)
 	}
-	client := &http.Client{Timeout: cfg.Timeout}
+	transport := &http.Transport{}
+	if parsed.Scheme == "https" {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.IntelQVLPCSInsecureTLS}
+	}
+	client := &http.Client{
+		Timeout:   cfg.Timeout,
+		Transport: transport,
+	}
 	if client.Timeout == 0 {
 		client.Timeout = intelQVLPCSDefaultTimeout
 	}
@@ -177,7 +185,7 @@ func (c *intelQVLPCSClient) fetchRootCACRL(issuerChain []byte) ([]byte, error) {
 	if len(rootCert.CRLDistributionPoints) == 0 {
 		return nil, fmt.Errorf("root CA certificate CRL distribution point missing")
 	}
-	body, _, err := c.getAbsolute(rootCert.CRLDistributionPoints[0])
+	body, _, err := c.getAbsolute(c.rootCACRLURL(rootCert.CRLDistributionPoints[0]))
 	if err != nil {
 		return nil, fmt.Errorf("fetch root CA CRL: %w", err)
 	}
@@ -185,6 +193,29 @@ func (c *intelQVLPCSClient) fetchRootCACRL(issuerChain []byte) ([]byte, error) {
 		return block.Bytes, nil
 	}
 	return body, nil
+}
+
+func (c *intelQVLPCSClient) rootCACRLURL(cdpURL string) string {
+	if isIntelQVLIntelPCSURL(c.baseURL) {
+		return cdpURL
+	}
+	// Match Intel QCNL's PCCS path: pass the Root CA CRL Distribution Point
+	// to PCCS instead of fetching it directly. This supports deployments where
+	// the verifier cannot reach Intel services and PCCS is its only Intel-facing
+	// egress point.
+	// https://github.com/intel/confidential-computing.tee.dcap/blob/fe55537da3b9c93e178fe475d469287c2c2f1691/QuoteGeneration/qcnl/certification_service.cpp#L331-L348
+	u := *c.baseURL
+	u.Path = path.Join(c.baseURL.Path, "crl")
+	u.RawQuery = url.Values{"uri": []string{cdpURL}}.Encode()
+	return u.String()
+}
+
+func isIntelQVLIntelPCSURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "trustedservices.intel.com" || strings.HasSuffix(host, ".trustedservices.intel.com")
 }
 
 func (c *intelQVLPCSClient) get(endpoint string, query url.Values) ([]byte, http.Header, error) {

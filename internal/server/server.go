@@ -46,6 +46,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		Logger:                     logger,
 		IntelQVLCollateralCacheDir: cfg.IntelQVLCollateralCacheDir,
 		IntelQVLPCSURL:             cfg.IntelQVLPCSURL,
+		IntelQVLPCSInsecureTLS:     cfg.IntelQVLPCSInsecureTLS,
 		IntelQVLSubscriptionKey:    cfg.IntelQVLSubscriptionKey,
 	}
 

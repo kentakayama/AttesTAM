@@ -24,6 +24,7 @@ type TAMConfig struct {
 	ChallengeTimeout           time.Duration
 	IntelQVLCollateralCacheDir string
 	IntelQVLPCSURL             string
+	IntelQVLPCSInsecureTLS     bool
 	IntelQVLSubscriptionKey    string
 }
 
@@ -36,5 +37,6 @@ type RAConfig struct {
 	Logger                     *log.Logger
 	IntelQVLCollateralCacheDir string
 	IntelQVLPCSURL             string
+	IntelQVLPCSInsecureTLS     bool
 	IntelQVLSubscriptionKey    string
 }

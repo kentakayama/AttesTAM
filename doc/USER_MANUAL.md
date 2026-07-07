@@ -123,6 +123,13 @@ The AttesTAM server (`cmd/attestam`) accepts CLI flags (also configurable by env
 | `-challenge-content-type` | `ATTESTAM_CHALLENGE_CONTENT_TYPE` | `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"` | `Content-Type` used when posting attestation payloads to the verifier. |
 | `-challenge-insecure-tls` | `ATTESTAM_CHALLENGE_INSECURE_TLS` | `true` | Skip TLS verification when contacting the verifier. Set `false` for stricter environments. |
 | `-challenge-timeout` | `ATTESTAM_CHALLENGE_TIMEOUT` | `1m` | Timeout for verifier challenge-response interactions. |
+| `-intel-qvl-collateral-cache-dir` | `ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR` | `./` | Directory for the Intel QVL collateral cache. If empty, AttesTAM's Intel QVL collateral cache is disabled. |
+| `-intel-qvl-pcs-url` | `ATTESTAM_INTEL_QVL_PCS_URL` | `https://api.trustedservices.intel.com/sgx/certification/v4` | Base URL for Intel PCS/PCCS collateral retrieval used by Intel QVL quote verification. |
+| `-intel-qvl-pcs-insecure-tls` | `ATTESTAM_INTEL_QVL_PCS_INSECURE_TLS` | `false` | Skip TLS verification when retrieving Intel QVL collateral from PCS/PCCS. Intended only for temporary local testing with self-signed endpoints. |
+| `-intel-qvl-subscription-key` | `ATTESTAM_INTEL_QVL_SUBSCRIPTION_KEY` | (empty) | Optional Intel PCS subscription key for Intel QVL collateral retrieval. |
+
+The Intel QVL path expects an Intel SGX certification v4-compatible PCS/PCCS base URL.
+When using PCCS, Root CA CRL retrieval uses the PCCS API v3.1-style `/crl?uri=...` endpoint.
 
 > [!WARNING]
 > The insecure demo TAM private key is public and is embedded only for explicit demo/test flows.
