@@ -53,7 +53,8 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/root.crl":
+		case "/sgx/certification/v4/crl":
+			require.Equal(t, rootCRLURL, r.URL.Query().Get("uri"))
 			_, _ = w.Write(rootCRLBody)
 		case "/sgx/certification/v4/pckcrl":
 			require.Equal(t, pckCA, r.URL.Query().Get("ca"))
@@ -73,14 +74,14 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	rootCRLURL = server.URL + "/root.crl"
+	rootCRLURL = "https://certificates.trustedservices.intel.com/IntelSGXRootCA.der"
 	issuerChain = makeTestIssuerChainPEM(t, func(cert *x509.Certificate) {
 		cert.CRLDistributionPoints = []string{rootCRLURL}
 	})
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL: server.URL + "/sgx/certification/v4",
-		Timeout:        5 * time.Second,
+		IntelCollateralServiceURL: server.URL + "/sgx/certification/v4",
+		Timeout:                   5 * time.Second,
 	})
 	require.NoError(t, err)
 
@@ -103,8 +104,8 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 	defer server.Close()
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL: server.URL,
-		Logger:         log.New(&logBuf, "", 0),
+		IntelCollateralServiceURL: server.URL,
+		Logger:                    log.New(&logBuf, "", 0),
 	})
 	require.NoError(t, err)
 
@@ -114,10 +115,82 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 	require.Equal(t, "application/json", header.Get("Content-Type"))
 
 	logged := logBuf.String()
-	require.Contains(t, logged, "DEBUG Intel QVL PCS fetch result")
+	require.Contains(t, logged, "DEBUG Intel collateral service fetch result")
 	require.Contains(t, logged, server.URL+"/tcb?fmspc=001122334455")
 	require.Contains(t, logged, "status=200 OK")
 	require.Contains(t, logged, `body="{\"result\":\"ok\"}"`)
+}
+
+func TestIntelQVLPCSClientRootCACRLURL(t *testing.T) {
+	const cdpURL = "https://certificates.trustedservices.intel.com/IntelSGXRootCA.der"
+
+	tests := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{
+			name:    "Intel PCS uses CRL distribution point directly",
+			baseURL: "https://api.trustedservices.intel.com/sgx/certification/v4",
+			want:    cdpURL,
+		},
+		{
+			name:    "Intel PCS subdomain uses CRL distribution point directly",
+			baseURL: "https://validation.api.trustedservices.intel.com/sgx/certification/v4",
+			want:    cdpURL,
+		},
+		{
+			name:    "PCCS uses crl endpoint with CDP URI query",
+			baseURL: "https://localhost:8081/sgx/certification/v4",
+			want:    "https://localhost:8081/sgx/certification/v4/crl?uri=https%3A%2F%2Fcertificates.trustedservices.intel.com%2FIntelSGXRootCA.der",
+		},
+		{
+			name:    "PCCS base URL with trailing slash uses crl endpoint",
+			baseURL: "https://pccs.example.test/sgx/certification/v4/",
+			want:    "https://pccs.example.test/sgx/certification/v4/crl?uri=https%3A%2F%2Fcertificates.trustedservices.intel.com%2FIntelSGXRootCA.der",
+		},
+		{
+			name:    "Host suffix must be a real Intel trustedservices subdomain",
+			baseURL: "https://fake-trustedservices.intel.com.example.test/sgx/certification/v4",
+			want:    "https://fake-trustedservices.intel.com.example.test/sgx/certification/v4/crl?uri=https%3A%2F%2Fcertificates.trustedservices.intel.com%2FIntelSGXRootCA.der",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := newIntelQVLPCSClient(config.RAConfig{
+				IntelCollateralServiceURL: tt.baseURL,
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, tt.want, client.rootCACRLURL(cdpURL))
+		})
+	}
+}
+
+func TestIntelQVLPCSClientInsecureTLSAllowsSelfSignedHTTPS(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"result":"ok"}`))
+	}))
+	defer server.Close()
+
+	secureClient, err := newIntelQVLPCSClient(config.RAConfig{
+		IntelCollateralServiceURL: server.URL,
+	})
+	require.NoError(t, err)
+
+	_, _, err = secureClient.get("tcb", nil)
+	require.Error(t, err)
+
+	insecureClient, err := newIntelQVLPCSClient(config.RAConfig{
+		IntelCollateralServiceURL:  server.URL,
+		IntelCollateralInsecureTLS: true,
+	})
+	require.NoError(t, err)
+
+	body, _, err := insecureClient.get("tcb", nil)
+	require.NoError(t, err)
+	require.Equal(t, []byte(`{"result":"ok"}`), body)
 }
 
 func makeTestIssuerChainPEM(t *testing.T, mutateRoot func(*x509.Certificate)) []byte {

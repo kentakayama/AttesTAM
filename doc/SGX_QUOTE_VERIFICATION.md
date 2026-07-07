@@ -32,7 +32,7 @@ The rough correspondence is as follows.
 | SGX Root CA Certificate | trust anchor | Certifies Intel's collateral and the PCK Cert chain, and is pinned in Intel QVL. |
 | Intel PCS | Endorser | Intel PCS is the source from which the Verifier obtains Intel-generated Endorsements (collateral). |
 
-For Intel SGX Quote verification, the Verifier receives a Quote as Evidence, then uses Quote-derived information such as `FMSPC` (Family-Model-Stepping-Platform-CustomSKU) as a key to obtain Endorsements from the Intel PCS.
+For Intel SGX Quote verification, the Verifier receives a Quote as Evidence, then uses Quote-derived information such as `FMSPC` (Family-Model-Stepping-Platform-CustomSKU) and the PCK CA type as a key to obtain Endorsements from Intel PCS or a configured PCCS-compatible service.
 
 ## Design Policy
 
@@ -52,10 +52,14 @@ These points are intentional design choices, not incidental implementation detai
 
 - This implementation does not aim to support every SGX Quote format.
   The current Intel QVL verification path is effectively limited to the DCAP ECDSA Quote formats for which collateral extraction and PCK certificate chain handling are implemented, currently Quote version 3 and Quote version 4.
+- This implementation does not aim to support every Intel PCS/PCCS API shape.
+  The current Intel QVL collateral fetch path expects the Intel SGX certification v4 API shape and PCCS API v3.1-compatible collateral responses.
+  In particular, PCCS use expects `/pckcrl`, `/tcb`, `/qe/identity`, and `/crl?uri=...` under the configured base URL.
+  Older PCCS API v3.0-style Root CA CRL retrieval such as `/rootcacrl`, hex-encoded CRL responses, and TDX collateral retrieval are outside the current scope.
 - Endorsements are not received in a CoRIM-based format.
   Instead, AttesTAM uses Intel's native collateral structure and passes data shaped for `sgx_ql_qve_collateral_t` into Intel QVL.
-- AttesTAM does not proactively cache the latest collateral for every possible `FMSPC`.
-  As a result, first-time verification for a given `FMSPC` can be slower, and verification latency can become unstable when Intel PCS access is slow or unavailable.
+- AttesTAM does not proactively cache the latest collateral for every possible `FMSPC` and PCK CA type.
+  As a result, first-time verification for a given collateral key can be slower, and verification latency can become unstable when Intel PCS/PCCS access is slow or unavailable.
 - Target Environment appraisal is intentionally left outside this implementation.
   In particular, appraisal of Target Environment-related values such as `MRENCLAVE`, `MRSIGNER`, `ISV_SVN`, and application-specific `REPORT_DATA` remains the responsibility of the Relying Party or a higher-layer Verifier policy.
 
@@ -72,7 +76,7 @@ Note that the SGX Root CA trust anchor looks like an input to Intel QVL, but in 
 ### Implementation Flow
 
 The sequence diagram below shows the concrete verification path owned by the Verifier.
-It derives identifiers such as `FMSPC` and the PCK CA type, uses `FMSPC` to determine the Endorsement store lookup key, checks the Endorsement store first, and only queries Intel PCS when suitable collateral is not already cached.
+It derives identifiers such as `FMSPC` and the PCK CA type, uses those values to determine the Endorsement store lookup key, checks the Endorsement store first, and only queries Intel PCS/PCCS when suitable collateral is not already cached.
 The Verifier stores fetched collateral back into its own Endorsement store before passing it to Intel QVL.
 
 The Verifier verifies the Quote with the Intel QVL function `tee_verify_quote(quote, collateral)` to produce Attestation Results.
@@ -91,7 +95,7 @@ sequenceDiagram
     participant Q as Intel QVL
 
     V->>V: extract FMSPC and PCK CA type from Quote
-    V->>E: lookup collateral for Quote-derived FMSPC
+    V->>E: lookup collateral for Quote-derived FMSPC and PCK CA type
     alt endorsement cache hit
         E-->>V: cached collateral
     else endorsement cache miss or stale collateral
@@ -146,19 +150,19 @@ This choice is intended to keep collateral lifecycle control in the AttesTAM Ver
 For the more common Intel deployment model using QPL / QCNL / PCCS, see [Common Intel DCAP deployment model](#common-intel-dcap-deployment-model).
 For why AttesTAM considers that structure too complex to leave outside the Verifier code, see [Why the difference matters](#why-the-difference-matters).
 
-### 2. Derive FMSPC from the Quote, then use Endorsement store and Intel PCS
+### 2. Derive collateral lookup inputs from the Quote, then use Endorsement store and Intel PCS/PCCS
 
-AttesTAM derives the FMSPC from the externally supplied Quote and uses that value as the main key for collateral lookup.
-The Endorsement store sits between Quote parsing and Intel PCS access as a Verifier-managed cache for that collateral.
+AttesTAM derives the FMSPC and the PCK CA type from the externally supplied Quote and uses those values as the main key for collateral lookup.
+The Endorsement store sits between Quote parsing and Intel PCS/PCCS access as a Verifier-managed cache for that collateral.
 
 The current flow is:
 
 1. The TEEP Agent sends an SGX Quote.
-2. AttesTAM extracts `FMSPC` from the Quote.
-3. AttesTAM derives the Endorsement store key from that Quote, using `FMSPC`.
+2. AttesTAM extracts `FMSPC` and the PCK CA type from the Quote.
+3. AttesTAM derives the Endorsement store key from that Quote, using `FMSPC` and PCK CA type.
 4. AttesTAM checks the Endorsement store.
 5. If cached collateral is available, AttesTAM uses it for verification.
-6. If cached collateral is missing, or if the cached collateral is no longer acceptable for use, AttesTAM fetches collateral from Intel PCS.
+6. If cached collateral is missing, or if the cached collateral is no longer acceptable for use, AttesTAM fetches collateral from Intel PCS or a configured PCCS-compatible base URL.
 7. The fetched collateral is stored in the Endorsement store.
 8. AttesTAM calls `tee_verify_quote()` with the Quote and the explicitly prepared collateral.
 
@@ -317,7 +321,7 @@ Responsibilities:
 - call `tee_verify_quote()` with explicit collateral
 - interpret the Intel QVL result and map it into AttesTAM verifier output
 
-### Intel PCS client
+### Intel PCS/PCCS client
 
 - [`internal/infra/rats/intel_qvl_pcs.go`](../internal/infra/rats/intel_qvl_pcs.go)
 
@@ -325,7 +329,7 @@ Responsibilities:
 
 - extract `FMSPC` from the Quote
 - extract the PCK CA identity from the Quote certification data
-- call Intel PCS endpoints needed for `sgx_ql_qve_collateral_t`
+- call Intel PCS/PCCS endpoints needed for `sgx_ql_qve_collateral_t`
 - construct the collateral object passed into Intel QVL
 
 The current implementation fetches:
@@ -337,6 +341,11 @@ The current implementation fetches:
 - `TCB Info issuer chain`
 - `QE Identity`
 - `QE Identity issuer chain`
+
+For Root CA CRL retrieval, AttesTAM reads the CRL Distribution Point from the Root CA certificate in the fetched issuer chain.
+When the configured collateral base URL is Intel PCS (`trustedservices.intel.com`), AttesTAM follows that CRL Distribution Point directly.
+When the configured base URL appears to be PCCS, AttesTAM follows Intel QCNL's PCCS API v3.1 style and requests `{base}/crl?uri=<CRL Distribution Point>`.
+PCCS cache population behavior, such as `CachingFillMode=LAZY`, is owned by the PCCS service and is not controlled by AttesTAM.
 
 Note that Intel's `sgx_ql_qve_collateral_t` does not contain the trusted Root CA certificate itself.
 AttesTAM therefore distinguishes between:
@@ -354,7 +363,7 @@ Responsibilities:
 - persist collateral in a Verifier-controlled Endorsement store directory
 - reload cached collateral for later verification
 
-The cache key is derived from `FMSPC`, so collateral is reused across Quotes from the same platform family.
+The cache key is derived from `FMSPC` and PCK CA type, so collateral is reused across Quotes from the same platform family and CA type.
 Each cache entry also carries an AttesTAM-managed expiration time.
 The effective expiration is the earlier of:
 
