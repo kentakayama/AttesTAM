@@ -39,15 +39,15 @@ func New(cfg config.TAMConfig) (*Server, error) {
 	}
 
 	raCfg := config.RAConfig{
-		BaseURL:                    cfg.ChallengeServerURL,
-		ContentType:                cfg.ChallengeContentType,
-		InsecureTLS:                cfg.ChallengeInsecureTLS,
-		Timeout:                    cfg.ChallengeTimeout,
-		Logger:                     logger,
-		IntelQVLCollateralCacheDir: cfg.IntelQVLCollateralCacheDir,
-		IntelQVLPCSURL:             cfg.IntelQVLPCSURL,
-		IntelQVLPCSInsecureTLS:     cfg.IntelQVLPCSInsecureTLS,
-		IntelQVLSubscriptionKey:    cfg.IntelQVLSubscriptionKey,
+		BaseURL:                        cfg.ChallengeServerURL,
+		ContentType:                    cfg.ChallengeContentType,
+		InsecureTLS:                    cfg.ChallengeInsecureTLS,
+		Timeout:                        cfg.ChallengeTimeout,
+		Logger:                         logger,
+		IntelCollateralCacheDir:        cfg.IntelCollateralCacheDir,
+		IntelCollateralServiceURL:      cfg.IntelCollateralServiceURL,
+		IntelCollateralInsecureTLS:     cfg.IntelCollateralInsecureTLS,
+		IntelCollateralSubscriptionKey: cfg.IntelCollateralSubscriptionKey,
 	}
 
 	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use VERAISON.", rats.AttestationPayloadFormatSGXQuote3TEEP)

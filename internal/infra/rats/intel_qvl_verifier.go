@@ -154,7 +154,7 @@ type IntelQVLVerifier struct {
 }
 
 func NewIntelQVLVerifier(cfg config.RAConfig) (IRAVerifier, error) {
-	cache, err := newIntelQVLCollateralCache(cfg.IntelQVLCollateralCacheDir, cfg.Logger)
+	cache, err := newIntelQVLCollateralCache(cfg.IntelCollateralCacheDir, cfg.Logger)
 	if err != nil {
 		return nil, err
 	}

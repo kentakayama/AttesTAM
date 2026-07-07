@@ -62,7 +62,7 @@ COPY --from=build /out/admin-console ./admin-console
 COPY cmd/admin-console/templates ./templates
 COPY cmd/admin-console/static ./static
 
-RUN mkdir -p /var/cache/attestam/intel-qvl-collateral
+RUN mkdir -p /var/cache/attestam/intel-collateral
 
 # Default configuration based on the CLI flags defined in cmd/attestam/main.go.
 ENV ATTESTAM_ADDR=":8080" \
@@ -70,7 +70,7 @@ ENV ATTESTAM_ADDR=":8080" \
     ATTESTAM_CHALLENGE_CONTENT_TYPE='application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"' \
     ATTESTAM_CHALLENGE_INSECURE_TLS="true" \
     ATTESTAM_CHALLENGE_TIMEOUT="1m0s" \
-    ATTESTAM_INTEL_QVL_COLLATERAL_CACHE_DIR="/var/cache/attestam/intel-qvl-collateral" \
+    ATTESTAM_INTEL_COLLATERAL_CACHE_DIR="/var/cache/attestam/intel-collateral" \
     ADMIN_CONSOLE_PORT="9090" \
     ADMIN_CONSOLE_TAM_API_BASE="http://127.0.0.1:8080"
 

@@ -80,8 +80,8 @@ func TestIntelQVLPCSClientFetch(t *testing.T) {
 	})
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL: server.URL + "/sgx/certification/v4",
-		Timeout:        5 * time.Second,
+		IntelCollateralServiceURL: server.URL + "/sgx/certification/v4",
+		Timeout:                   5 * time.Second,
 	})
 	require.NoError(t, err)
 
@@ -104,8 +104,8 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 	defer server.Close()
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL: server.URL,
-		Logger:         log.New(&logBuf, "", 0),
+		IntelCollateralServiceURL: server.URL,
+		Logger:                    log.New(&logBuf, "", 0),
 	})
 	require.NoError(t, err)
 
@@ -115,7 +115,7 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 	require.Equal(t, "application/json", header.Get("Content-Type"))
 
 	logged := logBuf.String()
-	require.Contains(t, logged, "DEBUG Intel QVL PCS fetch result")
+	require.Contains(t, logged, "DEBUG Intel collateral service fetch result")
 	require.Contains(t, logged, server.URL+"/tcb?fmspc=001122334455")
 	require.Contains(t, logged, "status=200 OK")
 	require.Contains(t, logged, `body="{\"result\":\"ok\"}"`)
@@ -159,7 +159,7 @@ func TestIntelQVLPCSClientRootCACRLURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := newIntelQVLPCSClient(config.RAConfig{
-				IntelQVLPCSURL: tt.baseURL,
+				IntelCollateralServiceURL: tt.baseURL,
 			})
 			require.NoError(t, err)
 
@@ -175,7 +175,7 @@ func TestIntelQVLPCSClientInsecureTLSAllowsSelfSignedHTTPS(t *testing.T) {
 	defer server.Close()
 
 	secureClient, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL: server.URL,
+		IntelCollateralServiceURL: server.URL,
 	})
 	require.NoError(t, err)
 
@@ -183,8 +183,8 @@ func TestIntelQVLPCSClientInsecureTLSAllowsSelfSignedHTTPS(t *testing.T) {
 	require.Error(t, err)
 
 	insecureClient, err := newIntelQVLPCSClient(config.RAConfig{
-		IntelQVLPCSURL:         server.URL,
-		IntelQVLPCSInsecureTLS: true,
+		IntelCollateralServiceURL:  server.URL,
+		IntelCollateralInsecureTLS: true,
 	})
 	require.NoError(t, err)
 
