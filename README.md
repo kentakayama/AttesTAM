@@ -96,16 +96,18 @@ This is the recommended way to run AttesTAM for normal local evaluation.
 
 Intel Quote verification is currently an experimental AttesTAM-local path. It builds AttesTAM with cgo and the `intel_qvl` build tag, installs Intel DCAP quote verification libraries.
 
-You can configure the Intel collateral service URL with `ATTESTAM_INTEL_COLLATERAL_SERVICE_URL` (default: `https://api.trustedservices.intel.com/sgx/certification/v4`), whether checking TLS certificate with `ATTESTAM_INTEL_COLLATERAL_SERVICE_INSECURE_TLS` (default: `false`), Intel PCS subscription key with `ATTESTAM_INTEL_COLLATERAL_SUBSCRIPTION_KEY` (default: `""`) and the collateral (Endorsements) cache directory with `ATTESTAM_INTEL_COLLATERAL_CACHE_DIR` (default: `./`).
-The configured PCS/PCCS service must expose the Intel SGX certification v4-compatible collateral endpoints used by AttesTAM, including PCCS API v3.1-style `/crl?uri=...` when using PCCS for Root CA CRL retrieval.
-
-> [!NOTE]
-> If you want to use Intel PCCS as a shared collateral cache in front of Intel PCS, run with `-e ATTESTAM_INTEL_COLLATERAL_SERVICE_URL="https://localhost:8081/sgx/certification/v4" -e ATTESTAM_INTEL_COLLATERAL_SERVICE_INSECURE_TLS=true`.
-
 ```bash
 docker build -f docker/sgx-verifier.Dockerfile -t attestam-sgx .
 docker run --rm --net=host -e ATTESTAM_INSECURE_DEMO_MODE=true attestam-sgx
 ```
+
+By default, AttesTAM retrieves Intel collateral directly from Intel PCS at `https://api.trustedservices.intel.com/sgx/certification/v4`.
+For that default path, configure `ATTESTAM_INTEL_COLLATERAL_SUBSCRIPTION_KEY` if your Intel PCS use requires a subscription key, and use `ATTESTAM_INTEL_COLLATERAL_CACHE_DIR` to choose where AttesTAM stores fetched collateral.
+
+> [!NOTE]
+> To use Intel PCCS instead, point `ATTESTAM_INTEL_COLLATERAL_SERVICE_URL` at the PCCS SGX certification v4 base URL, for example `https://localhost:8081/sgx/certification/v4`.
+> The PCCS endpoint must expose the Intel SGX certification v4-compatible collateral APIs used by AttesTAM, including PCCS API v3.1-style `/crl?uri=...` for Root CA CRL retrieval.
+> If the PCCS HTTPS certificate is not trusted by the container or host OS, set `ATTESTAM_INTEL_COLLATERAL_SERVICE_INSECURE_TLS=true` for local testing.
 
 ## Documentation
 
