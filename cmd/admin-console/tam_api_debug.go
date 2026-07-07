@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -48,11 +47,11 @@ func (t tamAPILoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	if err != nil {
 		return nil, fmt.Errorf("read request body for debug logging: %w", err)
 	}
-	log.Printf("TAM API request:\n%s", formatHTTPMessage(req.Method, req.URL.String(), req.Header, reqBody, redactedBodyPlaceholder(req)))
+	appLogger.Debug("TAM API request", "message", formatHTTPMessage(req.Method, req.URL.String(), req.Header, reqBody, redactedBodyPlaceholder(req)))
 
 	resp, err := next.RoundTrip(req)
 	if err != nil {
-		log.Printf("TAM API response error: method=%s url=%s err=%v", req.Method, req.URL.String(), err)
+		appLogger.Debug("TAM API response error", "method", req.Method, "url", req.URL.String(), "err", err)
 		return nil, err
 	}
 
@@ -60,7 +59,7 @@ func (t tamAPILoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	if err != nil {
 		return nil, fmt.Errorf("read response body for debug logging: %w", err)
 	}
-	log.Printf("TAM API response:\nstatus=%s\n%s", resp.Status, formatHTTPMessage("", "", resp.Header, respBody, ""))
+	appLogger.Debug("TAM API response", "status", resp.Status, "message", formatHTTPMessage("", "", resp.Header, respBody, ""))
 
 	return resp, nil
 }

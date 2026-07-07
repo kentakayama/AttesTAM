@@ -12,7 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -131,7 +131,7 @@ func TrustedAgentKeyKID() ([]byte, error) {
 	return kid, nil
 }
 
-func SeedEntities(ctx context.Context, db *sql.DB, logger *log.Logger) (*SeedRefs, error) {
+func SeedEntities(ctx context.Context, db *sql.DB, logger *slog.Logger) (*SeedRefs, error) {
 	entityRepo := sqlite.NewEntityRepository(db)
 	keyRepo := sqlite.NewManifestSigningKeyRepository(db)
 
@@ -186,7 +186,7 @@ func SeedEntities(ctx context.Context, db *sql.DB, logger *log.Logger) (*SeedRef
 	}
 
 	if logger != nil {
-		logger.Printf("Demo entities are ready.")
+		logger.Debug("demo entities are ready")
 	}
 
 	return &SeedRefs{
@@ -197,7 +197,7 @@ func SeedEntities(ctx context.Context, db *sql.DB, logger *log.Logger) (*SeedRef
 	}, nil
 }
 
-func SeedHelloTextManifest(ctx context.Context, db *sql.DB, signingKeyID int64, logger *log.Logger) error {
+func SeedHelloTextManifest(ctx context.Context, db *sql.DB, signingKeyID int64, logger *slog.Logger) error {
 	manifestRepo := sqlite.NewSuitManifestRepository(db)
 	m, err := manifestRepo.FindLatestByTrustedComponentID(ctx, TrustedComponentHelloText)
 	if err != nil {
@@ -218,12 +218,12 @@ func SeedHelloTextManifest(ctx context.Context, db *sql.DB, signingKeyID int64, 
 	}
 
 	if logger != nil {
-		logger.Printf("Demo hello.txt manifest is ready.")
+		logger.Debug("demo hello.txt manifest is ready")
 	}
 	return nil
 }
 
-func SeedAgentScenario(ctx context.Context, db *sql.DB, deviceAdminID int64, logger *log.Logger, withStatus bool) error {
+func SeedAgentScenario(ctx context.Context, db *sql.DB, deviceAdminID int64, logger *slog.Logger, withStatus bool) error {
 	now := time.Now().UTC().Truncate(time.Second)
 	deviceRepo := sqlite.NewDeviceRepository(db)
 	device, err := deviceRepo.FindByUEID(ctx, DefaultDeviceUEID)
@@ -281,7 +281,7 @@ func SeedAgentScenario(ctx context.Context, db *sql.DB, deviceAdminID int64, log
 	}
 
 	if logger != nil {
-		logger.Printf("Demo agent status is ready.")
+		logger.Debug("demo agent status is ready")
 	}
 	return nil
 }

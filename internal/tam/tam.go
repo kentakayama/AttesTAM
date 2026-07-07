@@ -14,7 +14,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -36,12 +36,12 @@ type TAM struct {
 	verifier        rats.IRAVerifier
 	resolveVerifier verifierResolver
 	tamKey          *cose.Key
-	logger          *log.Logger
+	logger          *slog.Logger
 	db              *sql.DB         // Database connection for TAM state
 	ctx             context.Context // Background context for database operations
 }
 
-func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *slog.Logger) (*TAM, error) {
 	if tamPrivateKeyPath == "" {
 		return nil, errors.New("tam private key path is required")
 	}
@@ -53,11 +53,11 @@ func NewTAM(tamPrivateKeyPath string, verifier rats.IRAVerifier, logger *log.Log
 	return NewTAMFromKeyBytes(keyBytes, verifier, logger)
 }
 
-func NewTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+func NewTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, logger *slog.Logger) (*TAM, error) {
 	return newTAMFromKeyBytes(keyBytes, verifier, nil, logger)
 }
 
-func NewTAMWithRAConfig(tamPrivateKeyPath string, raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+func NewTAMWithRAConfig(tamPrivateKeyPath string, raCfg config.RAConfig, logger *slog.Logger) (*TAM, error) {
 	if tamPrivateKeyPath == "" {
 		return nil, errors.New("tam private key path is required")
 	}
@@ -69,18 +69,21 @@ func NewTAMWithRAConfig(tamPrivateKeyPath string, raCfg config.RAConfig, logger 
 	return NewTAMFromKeyBytesWithRAConfig(keyBytes, raCfg, logger)
 }
 
-func NewTAMFromKeyBytesWithRAConfig(keyBytes []byte, raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+func NewTAMFromKeyBytesWithRAConfig(keyBytes []byte, raCfg config.RAConfig, logger *slog.Logger) (*TAM, error) {
 	return newTAMFromKeyBytes(keyBytes, nil, newVerifierResolver(raCfg), logger)
 }
 
-func newTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, resolver verifierResolver, logger *log.Logger) (*TAM, error) {
+func newTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, resolver verifierResolver, logger *slog.Logger) (*TAM, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	var key cose.Key
 	err := cbor.Unmarshal(keyBytes, &key)
 	if err != nil {
 		return nil, errors.New("failed to load TAM's private key")
 	}
 	kid, _ := key.Thumbprint(crypto.SHA256)
-	logger.Printf("TAM's Key = %s, kid = %s", util.PrintCOSEKey(&key), util.BytesHexMax32(kid))
+	logger.Debug("loaded TAM key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid))
 
 	return &TAM{
 		verifier:        verifier,
@@ -90,16 +93,16 @@ func newTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, resolver ver
 	}, nil
 }
 
-func NewDemoTAM(verifier rats.IRAVerifier, logger *log.Logger) (*TAM, error) {
+func NewDemoTAM(verifier rats.IRAVerifier, logger *slog.Logger) (*TAM, error) {
 	if logger != nil {
-		logger.Printf("[WARNING] Using public insecure demo TAM private key. This must not be used outside demo or tests.")
+		logger.Warn("using public insecure demo TAM private key; this must not be used outside demo or tests")
 	}
 	return NewTAMFromKeyBytes(demo.DemoTAMPrivateKeyCBOR, verifier, logger)
 }
 
-func NewDemoTAMWithRAConfig(raCfg config.RAConfig, logger *log.Logger) (*TAM, error) {
+func NewDemoTAMWithRAConfig(raCfg config.RAConfig, logger *slog.Logger) (*TAM, error) {
 	if logger != nil {
-		logger.Printf("[WARNING] Using public insecure demo TAM private key. This must not be used outside demo or tests.")
+		logger.Warn("using public insecure demo TAM private key; this must not be used outside demo or tests")
 	}
 	return NewTAMFromKeyBytesWithRAConfig(demo.DemoTAMPrivateKeyCBOR, raCfg, logger)
 }
@@ -108,7 +111,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	var response []byte
 	if len(body) == 0 {
 		// empty body means session creation, return QueryRequest
-		t.logger.Printf("received empty message. return QueryRequest with token.")
+		t.logger.Info("received empty TEEP message; returning QueryRequest with token")
 		return t.generateQueryRequest()
 	}
 
@@ -124,7 +127,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	// case 1) TAM sent QueryRequest with challenge & request-attestation
 	// case 2) someone created malformed TEEP Protocol messages
 
-	t.logger.Printf("received %s.", incomingMessage.CBORDiagString(0))
+	t.logger.Info("received TEEP message", "message", incomingMessage.CBORDiagString(0))
 
 	switch incomingMessage.Type {
 	case TEEPTypeQueryResponse:
@@ -175,18 +178,18 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 		for i := 0; i < len(incomingMessage.Options.SUITReports); i++ {
 			var report suit.Report
 			if err := cbor.Unmarshal(incomingMessage.Options.SUITReports[i], &report); err != nil {
-				t.logger.Printf("failed to Unmarshal SUIT Report: %v", err)
+				t.logger.Error("failed to unmarshal SUIT Report", "err", err)
 				continue
 			}
 			if report.Reference.Digest.DigestAlg != cose.AlgorithmSHA256 ||
 				len(report.Reference.Digest.DigestBytes) != crypto.SHA256.Size() {
 				// malformed
-				t.logger.Printf("digest of a SUIT Report is malformed: %v", report.Reference.Digest)
+				t.logger.Debug("digest of a SUIT Report is malformed", "digest", report.Reference.Digest)
 				continue
 			}
 			manifestDigest, err := cbor.Marshal(report.Reference.Digest)
 			if err != nil {
-				t.logger.Printf("failed to encode a SUIT_Digest in SUIT_Report: %v", err)
+				t.logger.Error("failed to encode a SUIT_Digest in SUIT_Report", "err", err)
 			}
 			if (report.Result.True != nil && *report.Result.True == true) ||
 				(report.Result.DetailedResult != nil && report.Result.DetailedResult.ResultReason == suit.ReportReasonOK) {
@@ -209,18 +212,18 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 		for i := 0; i < len(incomingMessage.Options.SUITReports); i++ {
 			var report suit.Report
 			if err := cbor.Unmarshal(incomingMessage.Options.SUITReports[i], &report); err != nil {
-				t.logger.Printf("failed to Unmarshal SUIT Report: %v", err)
+				t.logger.Error("failed to unmarshal SUIT Report", "err", err)
 				continue
 			}
 			if report.Reference.Digest.DigestAlg != cose.AlgorithmSHA256 ||
 				len(report.Reference.Digest.DigestBytes) != crypto.SHA256.Size() {
 				// malformed
-				t.logger.Printf("digest of a SUIT Report is malformed: %v", report.Reference.Digest)
+				t.logger.Debug("digest of a SUIT Report is malformed", "digest", report.Reference.Digest)
 				continue
 			}
 			manifestDigest, err := cbor.Marshal(report.Reference.Digest)
 			if err != nil {
-				t.logger.Printf("failed to encode a SUIT_Digest in SUIT_Report: %v", err)
+				t.logger.Error("failed to encode a SUIT_Digest in SUIT_Report", "err", err)
 			}
 			if (report.Result.True != nil && *report.Result.True == true) ||
 				(report.Result.DetailedResult != nil && report.Result.DetailedResult.ResultReason == suit.ReportReasonOK) {
@@ -279,7 +282,7 @@ func (t *TAM) generateQueryRequest() ([]byte, error) {
 		return nil, ErrFatal
 	}
 
-	t.logger.Printf("token is saved: %s\n", hex.EncodeToString(token))
+	t.logger.Debug("token is saved", "token", hex.EncodeToString(token))
 	return response, nil
 }
 
@@ -322,7 +325,7 @@ func (t *TAM) generateQueryRequestWithAttestation() ([]byte, error) {
 		return nil, ErrFatal
 	}
 
-	t.logger.Printf("challenge is saved: %s\n", hex.EncodeToString(challenge))
+	t.logger.Debug("challenge is saved", "challenge", hex.EncodeToString(challenge))
 	return response, nil
 }
 
@@ -367,7 +370,7 @@ func (t *TAM) tryAuthenticateTeepMessage(raw []byte) (*TEEPMessage, []byte, erro
 	}
 	message, kid, err := t.checkSignatureWithKID(sign1)
 	if err != nil {
-		t.logger.Print(err)
+		t.logger.Debug("failed to authenticate TEEP Message", "err", err)
 		return message, nil, err
 	}
 	return message, kid, nil
@@ -492,7 +495,7 @@ func (t *TAM) searchSentMessageWithChallenge(challenge []byte) *TEEPMessage {
 	}
 	challengeRepo := sqlite.NewChallengeRepository(t.db)
 	if err := challengeRepo.MarkConsumed(t.ctx, challenge); err != nil {
-		t.logger.Printf("failed to consume challenge %s: %v", hex.EncodeToString(challenge), err)
+		t.logger.Error("failed to consume challenge", "challenge", hex.EncodeToString(challenge), "err", err)
 		return nil
 	}
 
@@ -546,7 +549,7 @@ func (t *TAM) searchSentMessageWithToken(token []byte) *TEEPMessage {
 	}
 	tokenRepo := sqlite.NewTokenRepository(t.db)
 	if err := tokenRepo.MarkConsumed(t.ctx, token); err != nil {
-		t.logger.Printf("failed to consume token %s: %v", hex.EncodeToString(token), err)
+		t.logger.Error("failed to consume token", "token", hex.EncodeToString(token), "err", err)
 		return nil
 	}
 
@@ -615,7 +618,7 @@ func (t *TAM) verifyAttestationPayload(body []byte, incoming *TEEPMessage, agent
 
 	result, backend, err := t.submitAttestationPayload(incoming.Options.AttestationPayloadFormat, incoming.Options.AttestationPayload)
 	if err != nil {
-		t.logger.Printf("failed to save attestation payload: %v", err)
+		t.logger.Error("failed to save attestation payload", "err", err)
 		return nil, nil, nil, err
 	}
 
@@ -626,20 +629,20 @@ func (t *TAM) verifyAttestationPayload(body []byte, incoming *TEEPMessage, agent
 	if backend == rats.VerifierBackendIntelQVL {
 		sgxBundle, err := decodeSGXQuote3TEEPBundle(incoming.Options.AttestationPayload)
 		if err != nil {
-			t.logger.Printf("failed to decode SGX Quote3 TEEP bundle: %v", err)
+			t.logger.Error("failed to decode SGX Quote3 TEEP bundle", "err", err)
 			return nil, nil, nil, ErrAttestationFailed
 		}
 		if err := verifySGXQuoteReportDataBinding(sgxBundle.Quote, sgxBundle.RawReportData); err != nil {
-			t.logger.Printf("failed to verify SGX quote report_data binding: %v", err)
+			t.logger.Error("failed to verify SGX quote report_data binding", "err", err)
 			return nil, nil, nil, ErrAttestationFailed
 		}
 		if err := populateAttestedClaimsFromSGXRawReportData(result, sgxBundle.RawReportData); err != nil {
-			t.logger.Printf("failed to extract SGX attested claims: %v", err)
+			t.logger.Error("failed to extract SGX attested claims", "err", err)
 			return nil, nil, nil, ErrAttestationFailed
 		}
 	} else if requiresAttestedAgentKey(format) {
 		if err := rats.PopulateAttestedClaimsFromSign1(result, incoming.Options.AttestationPayload); err != nil {
-			t.logger.Printf("failed to extract attested claims: %v", err)
+			t.logger.Error("failed to extract attested claims", "err", err)
 			return nil, nil, nil, ErrNotAuthenticated
 		}
 	}
@@ -656,19 +659,19 @@ func (t *TAM) verifyAttestationPayload(body []byte, incoming *TEEPMessage, agent
 		return nil, nil, nil, ErrNotAuthenticated
 	}
 	if result.AttestationKey == nil {
-		t.logger.Printf("attestation public key missing in payload")
+		t.logger.Error("attestation public key missing in payload")
 		return nil, nil, nil, ErrNotAuthenticated
 	}
 	if err := verifyCOSESignature(body, result.AttestationKey); err != nil {
-		t.logger.Printf("query-response verification failed: %v", err)
+		t.logger.Error("query-response verification failed", "err", err)
 		return nil, nil, nil, ErrNotAuthenticated
 	}
 	if err := t.setTEEPAgentKey(result.AttestationKey, result.AttestationUEID); err != nil {
-		t.logger.Printf("failed to store attestation public key: %v", err)
+		t.logger.Error("failed to store attestation public key", "err", err)
 		return nil, nil, nil, ErrFatal
 	}
 	verifiedAgentKID, _ := result.AttestationKey.Thumbprint(crypto.SHA256)
-	t.logger.Printf("stored attestation public key %s, kid %s in system keyring.", util.PrintCOSEKey(result.AttestationKey), util.BytesHexMax32(verifiedAgentKID))
+	t.logger.Debug("stored attestation public key in system keyring", "cose_key", util.PrintCOSEKey(result.AttestationKey), "kid", util.BytesHexMax32(verifiedAgentKID))
 	return result, verifiedAgentKID, sentMessage, nil
 }
 
@@ -680,13 +683,13 @@ func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString
 	if verifier == nil {
 		return nil, backend, ErrVerifierNotConfigured
 	}
-	t.logger.Printf("submitting attestation payload to verifier backend %q: %T", backend, verifier)
+	t.logger.Debug("submitting attestation payload to verifier backend", "backend", backend, "verifier_type", fmt.Sprintf("%T", verifier))
 
 	verifierPayload := data
 	if backend == rats.VerifierBackendIntelQVL {
 		sgxBundle, err := decodeSGXQuote3TEEPBundle(data)
 		if err != nil {
-			t.logger.Printf("failed to decode SGX Quote3 TEEP bundle: %v", err)
+			t.logger.Error("failed to decode SGX Quote3 TEEP bundle", "err", err)
 			return nil, backend, ErrAttestationFailed
 		}
 		verifierPayload = sgxBundle.Quote
@@ -694,7 +697,7 @@ func (t *TAM) submitAttestationPayload(attestationPayloadFormat *util.DiagString
 
 	att, err := verifier.Process(verifierPayload)
 	if err != nil {
-		t.logger.Printf("challenge-response submission failed: %v", err)
+		t.logger.Error("challenge-response submission failed", "err", err)
 		return nil, backend, ErrAttestationFailed
 	}
 
@@ -764,7 +767,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 	if token == nil {
 		return nil, ErrFatal
 	}
-	t.logger.Printf("token is saved: %s\n", hex.EncodeToString(token))
+	t.logger.Debug("token is saved", "token", hex.EncodeToString(token))
 
 	sendingUpdate := TEEPMessage{
 		Type: TEEPTypeUpdate,
@@ -828,7 +831,7 @@ func (t *TAM) processQueryResponse(incomingMessage *TEEPMessage, agentKID []byte
 			return nil, ErrFatal
 		}
 		if manifest == nil {
-			t.logger.Printf("unknown SUIT Manifest is requested for ComponentID: %s", hex.EncodeToString(componentSet[i]))
+			t.logger.Debug("unknown SUIT Manifest is requested", "component_id", hex.EncodeToString(componentSet[i]))
 		} else {
 			sendingUpdate.Options.ManifestList = append(sendingUpdate.Options.ManifestList, manifest.Manifest)
 			manifests = append(manifests, model.SuitManifest{ID: manifest.ID})
@@ -923,7 +926,7 @@ func (t *TAM) ensureTrustedDemoAgentKey() error {
 	if err != nil {
 		return fmt.Errorf("derive demo trusted agent key kid: %w", err)
 	}
-	t.logger.Printf("Default TEEP Agent Key = %s, kid = %s", util.PrintCOSEKey(&key), util.BytesHexMax32(kid))
+	t.logger.Debug("loaded default TEEP Agent key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid))
 	existing, _ := t.getTEEPAgentKey(kid)
 	if existing != nil {
 		return nil
@@ -931,7 +934,7 @@ func (t *TAM) ensureTrustedDemoAgentKey() error {
 	if err := t.setTEEPAgentKey(&key, nil); err != nil {
 		return fmt.Errorf("store demo trusted agent key: %w", err)
 	}
-	t.logger.Printf("Stored default ESP256 TEEP Agent's key %s in system keyring.", hex.EncodeToString(kid))
+	t.logger.Debug("stored default ESP256 TEEP Agent key in system keyring", "kid", hex.EncodeToString(kid))
 	return nil
 }
 

@@ -6,8 +6,18 @@
 
 package logger
 
-import "log/slog"
+import (
+	"io"
+	"log/slog"
+	"os"
+)
 
 func New() *slog.Logger {
-	return slog.Default()
+	return NewWithWriter(os.Stdout, slog.LevelDebug)
+}
+
+func NewWithWriter(w io.Writer, level slog.Leveler) *slog.Logger {
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: level,
+	}))
 }

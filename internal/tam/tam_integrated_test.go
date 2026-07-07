@@ -15,7 +15,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -31,7 +31,7 @@ import (
 )
 
 func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	verifierClient, err := rats.NewVerifierClient(config.RAConfig{
 		BaseURL:     "https://localhost:8443/",
 		ContentType: `application/eat+cwt; eat_profile="urn:ietf:rfc:rfc9711"`,
@@ -162,7 +162,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 		Key: agentKey,
 	}
 	encodedEvidence, err := cbor.Marshal(evidence)
-	logger.Printf("encoded Evidence: %s\n", hex.EncodeToString(encodedEvidence))
+	logger.Debug("encoded Evidence", "evidence", hex.EncodeToString(encodedEvidence))
 	require.Nil(t, err)
 	// create message header
 	headers := cose.Headers{
@@ -172,7 +172,7 @@ func TestTAMResolveTEEPMessage_VERAISON_EAT_OK(t *testing.T) {
 	}
 	signedEvidence, err := cose.Sign1(rand.Reader, attesterSigner, headers, encodedEvidence, nil)
 	require.Nil(t, err)
-	logger.Printf("signed Evidence: %s\n", hex.EncodeToString(signedEvidence))
+	logger.Debug("signed Evidence", "evidence", hex.EncodeToString(signedEvidence))
 	queryResponse := TEEPMessage{
 		Type: TEEPTypeQueryResponse,
 		Options: TEEPOptions{

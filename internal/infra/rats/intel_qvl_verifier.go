@@ -128,7 +128,7 @@ import "C"
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 	"unsafe"
 
@@ -148,7 +148,7 @@ var (
 )
 
 type IntelQVLVerifier struct {
-	logger          *log.Logger
+	logger          *slog.Logger
 	collateralCache *intelQVLCollateralCache
 	pcsClient       *intelQVLPCSClient
 }
@@ -183,9 +183,9 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	}
 	if v.logger != nil && v.collateralCache != nil {
 		if cacheHit {
-			v.logger.Printf("Intel QVL collateral cache hit: key=%s", cacheKey)
+			v.logger.Debug("Intel QVL collateral cache hit", "key", cacheKey)
 		} else {
-			v.logger.Printf("Intel QVL collateral cache miss: key=%s", cacheKey)
+			v.logger.Debug("Intel QVL collateral cache miss", "key", cacheKey)
 		}
 	}
 
@@ -227,10 +227,10 @@ func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) 
 		if collateral != nil {
 			if key, err := v.collateralCache.Put(quote, collateral); err != nil {
 				if v.logger != nil {
-					v.logger.Printf("failed to store Intel QVL collateral cache: %v", err)
+					v.logger.Error("failed to store Intel QVL collateral cache", "err", err)
 				}
 			} else if v.logger != nil {
-				v.logger.Printf("stored Intel QVL collateral cache: key=%s", key)
+				v.logger.Debug("stored Intel QVL collateral cache", "key", key)
 			}
 		}
 		return collateral, false, cacheKey, nil
@@ -320,14 +320,14 @@ func getIntelQVLQuoteCollateral(pcsClient *intelQVLPCSClient, quote []byte, cQuo
 }
 
 func (v *IntelQVLVerifier) logNativeResult(nativeResult *intelQVLNativeResult, classification string, earStatus string) {
-	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
-		classification,
-		earStatus,
-		nativeResult.dcapStatus,
-		intelQVLVerificationResultName(nativeResult.verificationResult),
-		nativeResult.verificationResult,
-		nativeResult.collateralExpirationStatus,
-		nativeResult.supplementalDataSize,
+	v.logger.Debug("Intel QVL verification result",
+		"classification", classification,
+		"ear_status", earStatus,
+		"dcap_status", fmt.Sprintf("0x%04x", nativeResult.dcapStatus),
+		"verification_result_name", intelQVLVerificationResultName(nativeResult.verificationResult),
+		"verification_result", fmt.Sprintf("0x%x", nativeResult.verificationResult),
+		"collateral_expiration_status", nativeResult.collateralExpirationStatus,
+		"supplemental_data_size", nativeResult.supplementalDataSize,
 	)
 }
 

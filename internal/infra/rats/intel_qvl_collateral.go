@@ -11,7 +11,7 @@ package rats
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -23,7 +23,7 @@ const (
 
 type intelQVLCollateralCache struct {
 	dir    string
-	logger *log.Logger
+	logger *slog.Logger
 }
 
 type intelQVLCollateralCacheEntry struct {
@@ -35,7 +35,7 @@ var intelQVLNow = time.Now
 
 // newIntelQVLCollateralCache creates the Verifier-side Endorsement store directory.
 // The cache policy is intentionally owned by AttesTAM rather than QCNL/PCCS.
-func newIntelQVLCollateralCache(dir string, logger *log.Logger) (*intelQVLCollateralCache, error) {
+func newIntelQVLCollateralCache(dir string, logger *slog.Logger) (*intelQVLCollateralCache, error) {
 	if dir == "" {
 		return nil, nil
 	}

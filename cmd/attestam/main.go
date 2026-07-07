@@ -9,7 +9,7 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/kentakayama/AttesTAM/internal/config"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 	"github.com/kentakayama/AttesTAM/internal/server"
 )
 
@@ -52,7 +53,7 @@ func main() {
 	)
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "[attestam] ", log.LstdFlags|log.LUTC)
+	logger := internallogger.New().With("service", "attestam")
 
 	addrVal := stringFromEnv(logger, envAddr, *addr)
 	privateKeyPathVal := stringFromEnv(logger, envTAMTEEPPrivateKeyPath, *privateKeyPath)
@@ -85,7 +86,8 @@ func main() {
 
 	srv, err := server.New(cfg)
 	if err != nil {
-		logger.Fatalf("failed to create server: %v", err)
+		logger.Error("failed to create server", "err", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -98,10 +100,11 @@ func main() {
 
 	select {
 	case <-ctx.Done():
-		logger.Println("Shutdown signal received, stopping...")
+		logger.Info("shutdown signal received, stopping")
 	case err := <-errCh:
 		if err != nil {
-			logger.Fatalf("server error: %v", err)
+			logger.Error("server error", "err", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -110,19 +113,20 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatalf("graceful shutdown failed: %v", err)
+		logger.Error("graceful shutdown failed", "err", err)
+		os.Exit(1)
 	}
-	logger.Println("Server stopped cleanly.")
+	logger.Info("server stopped cleanly")
 }
 
-func stringFromEnv(logger *log.Logger, envKey, defaultValue string) string {
+func stringFromEnv(logger *slog.Logger, envKey, defaultValue string) string {
 	if value, ok := os.LookupEnv(envKey); ok {
 		return value
 	}
 	return defaultValue
 }
 
-func boolFromEnv(logger *log.Logger, envKey string, defaultValue bool) bool {
+func boolFromEnv(logger *slog.Logger, envKey string, defaultValue bool) bool {
 	value, ok := os.LookupEnv(envKey)
 	if !ok {
 		return defaultValue
@@ -130,13 +134,14 @@ func boolFromEnv(logger *log.Logger, envKey string, defaultValue bool) bool {
 
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		logger.Fatalf("invalid boolean for %s: %v", envKey, err)
+		logger.Error("invalid boolean environment value", "env", envKey, "err", err)
+		os.Exit(1)
 	}
 
 	return parsed
 }
 
-func durationFromEnv(logger *log.Logger, envKey string, defaultValue time.Duration) time.Duration {
+func durationFromEnv(logger *slog.Logger, envKey string, defaultValue time.Duration) time.Duration {
 	value, ok := os.LookupEnv(envKey)
 	if !ok {
 		return defaultValue
@@ -144,7 +149,8 @@ func durationFromEnv(logger *log.Logger, envKey string, defaultValue time.Durati
 
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
-		logger.Fatalf("invalid duration for %s: %v", envKey, err)
+		logger.Error("invalid duration environment value", "env", envKey, "err", err)
+		os.Exit(1)
 	}
 
 	return parsed

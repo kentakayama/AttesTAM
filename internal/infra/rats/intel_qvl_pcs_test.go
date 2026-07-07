@@ -15,7 +15,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -105,7 +105,7 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
 		IntelCollateralServiceURL: server.URL,
-		Logger:                    log.New(&logBuf, "", 0),
+		Logger:                    slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	})
 	require.NoError(t, err)
 

@@ -8,7 +8,7 @@ package tam
 
 import (
 	"crypto"
-	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ var (
 )
 
 func TestKeyring_GetSet(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tam, err := NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)

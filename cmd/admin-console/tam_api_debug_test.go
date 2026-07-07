@@ -10,13 +10,14 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 )
 
 func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
@@ -46,12 +47,9 @@ func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	origWriter := log.Writer()
-	origFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer log.SetOutput(origWriter)
-	defer log.SetFlags(origFlags)
+	origLogger := appLogger
+	appLogger = internallogger.NewWithWriter(&buf, slog.LevelDebug)
+	defer func() { appLogger = origLogger }()
 
 	client := &http.Client{
 		Transport: tamAPILoggingRoundTripper{next: http.DefaultTransport},
@@ -70,13 +68,13 @@ func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
 	defer resp.Body.Close()
 
 	logged := buf.String()
-	if !strings.Contains(logged, "TAM API request:") {
+	if !strings.Contains(logged, `msg="TAM API request"`) {
 		t.Fatalf("missing request log: %s", logged)
 	}
 	if !strings.Contains(logged, "POST "+srv.URL+"/AgentService/GetAgentStatus") {
 		t.Fatalf("missing request URL: %s", logged)
 	}
-	if !strings.Contains(logged, "status=200 OK") {
+	if !strings.Contains(logged, `status="200 OK"`) {
 		t.Fatalf("missing response status: %s", logged)
 	}
 	if !strings.Contains(logged, "h'6465762d31'") {
@@ -103,12 +101,9 @@ func TestTAMAPILoggingRoundTripperRedactsRegisterManifestRequestBody(t *testing.
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	origWriter := log.Writer()
-	origFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer log.SetOutput(origWriter)
-	defer log.SetFlags(origFlags)
+	origLogger := appLogger
+	appLogger = internallogger.NewWithWriter(&buf, slog.LevelDebug)
+	defer func() { appLogger = origLogger }()
 
 	client := &http.Client{
 		Transport: tamAPILoggingRoundTripper{next: http.DefaultTransport},
@@ -130,7 +125,7 @@ func TestTAMAPILoggingRoundTripperRedactsRegisterManifestRequestBody(t *testing.
 	if !strings.Contains(logged, "POST "+srv.URL+"/SUITManifestService/RegisterManifest") {
 		t.Fatalf("missing request URL: %s", logged)
 	}
-	if !strings.Contains(logged, "body:\n  <omitted: text.1.envelope.cbor>") {
+	if !strings.Contains(logged, "<omitted: text.1.envelope.cbor>") {
 		t.Fatalf("expected request body to be replaced with filename: %s", logged)
 	}
 	if strings.Contains(logged, "d86ba10102") {
