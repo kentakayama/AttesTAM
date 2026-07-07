@@ -1,0 +1,5 @@
+{
+  "fmspc": "00906ed50000",
+  "pck_ca": "processor",
+  "pcs_base_url": "https://api.trustedservices.intel.com/sgx/certification/v4"
+}

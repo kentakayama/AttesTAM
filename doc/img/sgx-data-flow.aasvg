@@ -1,0 +1,39 @@
+   .---------.   .---------------.       .--------.       .------------------.       .-------------.
+  |           | |    Intel as     |     |          |     |  Reference Value   |     |               |
+  | Intel as  | | Reference Value |     | Verifier |     |    Provider for    |     | Relying Party |
+  | Endorser  | |    Provider     |     |  Owner   |     | Target Environment |     |    Owner      |
+  |           | |     for TCB     |     |          |     |                    |     |               |
+   '-+-----+-'   '-+-------------'       '---+----'       '----+-------------'       '----+--------'
+     |     |       | *TCB Info               |                 |                          |
+     |     | *CRL  | *QE Identity            | Appraisal       | TE Identity              | Appraisl
+     |     v       v                         | Policy for      | *MRENCLAVE               | Policy for
+     |   .-----------.                       | Evidence        | *MRSIGNER                | Attestation
+     |   | Intel PCS |                       |                 |                          | Results
+     |   '---------+-'                       |                 |   .---------------------'
+     |             | Collateral              v                 |  |
+     |           .-)-------------------------------.           |  |
+     |           | |  SGX Root CA trust anchor --. |           |  |
+     |           | |    .--------------------.    ||           |  |
+     |           |  '-->|                    |<--' |           |  |
+     |           |      |     Intel QVL      |     +--.        |  |
+     |           |  .-->|                    |     |   |       |  |
+     |           | |    '--------------------'     |   |       |  |
+     |           | |          Verifier             |   |       |  |
+     |           '-)-------------------------------'   |       |  |
+     |             | SGX Quote w/                      |       |  |
+     |             | PCK Cert chain                    |       |  |
+     |              '-----.               Attestation  |       |  |
+     | PCK Cert chain      |                  Results  |       |  |
+     v                     |                           v       v  v
+.--------------------------)---------.              .-----------------.
+|   .-----.   Attester     |         |              |  Relying Party  |
+|   | PCE |                |         |              |                 |
+|   '--+--'                |         |              '-----------------'
+|      | sign on    .------+-------. |
+|      v ECDSA AK   |              | |
+|   .-----.         | Enclave App  | |
+|   | QE  +-------->+              | |
+|   '-----' Quote   '--------------' |
+|  Attesting            Target       |
+| Environment         Environment    |
+'------------------------------------'
