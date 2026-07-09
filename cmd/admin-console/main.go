@@ -9,28 +9,34 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
+
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 )
 
 var (
 	tmpl      *template.Template
 	buildTime = time.Now()
 	conf      AppConfig
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", os.Stderr, internallogger.DefaultLevel)
 )
 
 func main() {
 	conf = loadConfigFromFlags()
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", os.Stderr, conf.LogLevel)
 	if err := validateConfig(conf); err != nil {
-		log.Fatal(err)
+		appLogger.Error("invalid configuration", "err", err)
+		os.Exit(1)
 	}
 
 	var err error
 	tmpl, err = template.ParseFiles(resolvePath(filepath.Join("templates", "index.html")))
 	if err != nil {
-		log.Fatalf("parse template: %v", err)
+		appLogger.Error("parse template", "err", err)
+		os.Exit(1)
 	}
 
 	mux := http.NewServeMux()
@@ -42,9 +48,10 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
 
-	log.Printf("AttesTAM Console listening on http://127.0.0.1%v (build: %s) tamApiBase=%q", addr, buildTime.Format(time.RFC3339), conf.TAMAPIBase)
+	appLogger.Debug("AttesTAM Console listening", "addr", "http://127.0.0.1"+addr, "build", buildTime.Format(time.RFC3339), "tam_api_base", conf.TAMAPIBase)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
-		log.Fatal(err)
+		appLogger.Error("console server failed", "err", err)
+		os.Exit(1)
 	}
 }
 

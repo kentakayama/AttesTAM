@@ -9,12 +9,13 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/kentakayama/AttesTAM/internal/config"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 	"github.com/kentakayama/AttesTAM/internal/tam"
 )
 
@@ -23,19 +24,24 @@ type Server struct {
 	cfg     config.TAMConfig
 	handler *handler
 	http    *http.Server
-	logger  *log.Logger
+	logger  *slog.Logger
 }
 
 // New constructs a Server using the provided configuration.
 func New(cfg config.TAMConfig) (*Server, error) {
 	logger := cfg.Logger
 	if logger == nil {
-		logger = log.Default()
+		logger = slog.Default()
 	}
 
 	if !cfg.InsecureDemoMode && cfg.TAMTEEPPrivateKeyPath == "" {
-		logger.Printf("Using the public insecure demo TAM private key is not allowed outside insecure demo mode. Set -tam-teep-private-key-path.")
+		logger.Error("using the public insecure demo TAM private key is not allowed outside insecure demo mode; set -tam-teep-private-key-path")
 		return nil, errors.New("tam private key path is required outside insecure demo mode")
+	}
+
+	verifierLogger := logger
+	if renamed := internallogger.Rename(logger, "attestam-verifier"); renamed != nil {
+		verifierLogger = renamed
 	}
 
 	raCfg := config.RAConfig{
@@ -43,14 +49,14 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		ContentType:                    cfg.ChallengeContentType,
 		InsecureTLS:                    cfg.ChallengeInsecureTLS,
 		Timeout:                        cfg.ChallengeTimeout,
-		Logger:                         logger,
+		Logger:                         verifierLogger,
 		IntelCollateralCacheDir:        cfg.IntelCollateralCacheDir,
 		IntelCollateralServiceURL:      cfg.IntelCollateralServiceURL,
 		IntelCollateralInsecureTLS:     cfg.IntelCollateralInsecureTLS,
 		IntelCollateralSubscriptionKey: cfg.IntelCollateralSubscriptionKey,
 	}
 
-	logger.Printf("Attestation verifier backend selection follows QueryResponse attestation-payload-format. %q uses Intel QVL; other formats use VERAISON.", rats.AttestationPayloadFormatSGXQuote3TEEP)
+	logger.Debug("attestation verifier backend selection follows QueryResponse attestation-payload-format", "intel_qvl_format", rats.AttestationPayloadFormatSGXQuote3TEEP)
 
 	var t *tam.TAM
 	var err error
@@ -66,7 +72,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, err
 	}
 	if cfg.InsecureDemoMode {
-		logger.Printf("[WARNING] Insecure demo mode is enabled. This should NOT be used in production environments.")
+		logger.Warn("insecure demo mode is enabled; this should not be used in production environments")
 		if err := t.SeedDemoData(); err != nil {
 			return nil, err
 		}
@@ -93,7 +99,7 @@ func New(cfg config.TAMConfig) (*Server, error) {
 
 // ListenAndServe starts the HTTP server and blocks until it stops.
 func (s *Server) ListenAndServe() error {
-	s.logger.Printf("Run TAM Server on %s.", s.http.Addr)
+	s.logger.Debug("run TAM server", "addr", s.http.Addr)
 
 	err := s.http.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {

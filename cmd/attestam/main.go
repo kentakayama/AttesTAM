@@ -9,7 +9,8 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kentakayama/AttesTAM/internal/config"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 	"github.com/kentakayama/AttesTAM/internal/server"
 )
 
@@ -33,6 +35,7 @@ const (
 	envIntelCollateralServiceURL      = "ATTESTAM_INTEL_COLLATERAL_SERVICE_URL"
 	envIntelCollateralInsecureTLS     = "ATTESTAM_INTEL_COLLATERAL_SERVICE_INSECURE_TLS"
 	envIntelCollateralSubscriptionKey = "ATTESTAM_INTEL_COLLATERAL_SUBSCRIPTION_KEY"
+	envLogLevel                       = "ATTESTAM_LOG_LEVEL"
 )
 
 func main() {
@@ -49,10 +52,17 @@ func main() {
 		intelCollateralServiceURL      = flag.String("intel-collateral-service-url", "https://api.trustedservices.intel.com/sgx/certification/v4", "base URL for Intel PCS/PCCS collateral retrieval")
 		intelCollateralInsecureTLS     = flag.Bool("intel-collateral-service-insecure-tls", false, "skip TLS verification when retrieving Intel collateral from PCS/PCCS")
 		intelCollateralSubscriptionKey = flag.String("intel-collateral-subscription-key", "", "optional Intel PCS subscription key for Intel collateral retrieval")
+		logLevel                       = flag.String("log-level", "info", "minimum log level: debug, info, warn, or error")
 	)
 	flag.Parse()
 
-	logger := log.New(os.Stdout, "[attestam] ", log.LstdFlags|log.LUTC)
+	logLevelVal, err := resolveLogLevel(*logLevel, "log-level", envLogLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid log level: %v\n", err)
+		os.Exit(1)
+	}
+
+	logger := internallogger.NewNamed("attestam", logLevelVal)
 
 	addrVal := stringFromEnv(logger, envAddr, *addr)
 	privateKeyPathVal := stringFromEnv(logger, envTAMTEEPPrivateKeyPath, *privateKeyPath)
@@ -85,7 +95,8 @@ func main() {
 
 	srv, err := server.New(cfg)
 	if err != nil {
-		logger.Fatalf("failed to create server: %v", err)
+		logger.Error("failed to create server", "err", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -98,10 +109,11 @@ func main() {
 
 	select {
 	case <-ctx.Done():
-		logger.Println("Shutdown signal received, stopping...")
+		logger.Info("shutdown signal received, stopping")
 	case err := <-errCh:
 		if err != nil {
-			logger.Fatalf("server error: %v", err)
+			logger.Error("server error", "err", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -110,19 +122,20 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Fatalf("graceful shutdown failed: %v", err)
+		logger.Error("graceful shutdown failed", "err", err)
+		os.Exit(1)
 	}
-	logger.Println("Server stopped cleanly.")
+	logger.Info("server stopped cleanly")
 }
 
-func stringFromEnv(logger *log.Logger, envKey, defaultValue string) string {
+func stringFromEnv(logger *slog.Logger, envKey, defaultValue string) string {
 	if value, ok := os.LookupEnv(envKey); ok {
 		return value
 	}
 	return defaultValue
 }
 
-func boolFromEnv(logger *log.Logger, envKey string, defaultValue bool) bool {
+func boolFromEnv(logger *slog.Logger, envKey string, defaultValue bool) bool {
 	value, ok := os.LookupEnv(envKey)
 	if !ok {
 		return defaultValue
@@ -130,13 +143,14 @@ func boolFromEnv(logger *log.Logger, envKey string, defaultValue bool) bool {
 
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		logger.Fatalf("invalid boolean for %s: %v", envKey, err)
+		logger.Error("invalid boolean environment value", "env", envKey, "err", err)
+		os.Exit(1)
 	}
 
 	return parsed
 }
 
-func durationFromEnv(logger *log.Logger, envKey string, defaultValue time.Duration) time.Duration {
+func durationFromEnv(logger *slog.Logger, envKey string, defaultValue time.Duration) time.Duration {
 	value, ok := os.LookupEnv(envKey)
 	if !ok {
 		return defaultValue
@@ -144,8 +158,29 @@ func durationFromEnv(logger *log.Logger, envKey string, defaultValue time.Durati
 
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
-		logger.Fatalf("invalid duration for %s: %v", envKey, err)
+		logger.Error("invalid duration environment value", "env", envKey, "err", err)
+		os.Exit(1)
 	}
 
 	return parsed
+}
+
+func resolveLogLevel(cliValue string, flagName string, envKey string) (slog.Level, error) {
+	if flagWasSet(flagName) {
+		return internallogger.ParseLevel(cliValue)
+	}
+	if envValue, ok := os.LookupEnv(envKey); ok {
+		return internallogger.ParseLevel(envValue)
+	}
+	return internallogger.DefaultLevel, nil
+}
+
+func flagWasSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }

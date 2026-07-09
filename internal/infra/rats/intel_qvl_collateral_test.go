@@ -52,10 +52,8 @@ func TestIntelQVLCollateralCacheRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, key)
 
-	got, ok, gotKey, err := cache.Get(quote)
+	got, err := cache.Get(quote)
 	require.NoError(t, err)
-	require.True(t, ok)
-	require.Equal(t, key, gotKey)
 	require.Equal(t, collateral, got)
 }
 
@@ -78,9 +76,8 @@ func TestIntelQVLCollateralCacheGetExpiredTreatsAsMiss(t *testing.T) {
 	require.NoError(t, err)
 
 	intelQVLNow = func() time.Time { return now.Add(48 * time.Hour) }
-	got, ok, _, err := cache.Get(quote)
+	got, err := cache.Get(quote)
 	require.NoError(t, err)
-	require.False(t, ok)
 	require.Nil(t, got)
 }
 

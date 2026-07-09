@@ -11,7 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -232,7 +232,7 @@ func startRealTAMServer(t *testing.T) string {
 		Addr:             addr,
 		DBPath:           ":memory:",
 		InsecureDemoMode: true,
-		Logger:           log.New(io.Discard, "", 0),
+		Logger:           slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
 		t.Fatalf("tamserver.New: %v", err)

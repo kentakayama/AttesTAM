@@ -102,9 +102,8 @@ func TestIntelQVLVerifierProcess_CachesCollateralBeforeVerificationFailure(t *te
 	_, err = verifier.Process(quote)
 	require.ErrorContains(t, err, "tee_verify_quote failed")
 
-	collateral, ok, _, err := cache.Get(quote)
+	collateral, err := cache.Get(quote)
 	require.NoError(t, err)
-	require.True(t, ok)
 	require.Contains(t, string(collateral.TCBInfo), expectedCollateral)
 }
 

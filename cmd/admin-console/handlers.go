@@ -8,7 +8,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -45,7 +44,7 @@ func handleListAgents(w http.ResponseWriter, r *http.Request) {
 
 	devices, err := fetchTAMDevices(base)
 	if err != nil {
-		log.Printf("TAM API fetch failed: %v", err)
+		appLogger.Error("TAM API fetch failed", "err", err)
 		http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
 		return
 	}
@@ -66,7 +65,7 @@ func handleListManifestsService(w http.ResponseWriter, r *http.Request) {
 
 	manifests, err := fetchTAMManifests(base)
 	if err != nil {
-		log.Printf("TAM API fetch manifests failed: %v", err)
+		appLogger.Error("TAM API fetch manifests failed", "err", err)
 		http.Error(w, fmt.Sprintf("TAM API fetch failed: %v", err), http.StatusBadGateway)
 		return
 	}
@@ -86,7 +85,7 @@ func handleRegisterManifest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := postTAMManifest(w, r, base); err != nil {
-		log.Printf("TAM API post manifest failed: %v", err)
+		appLogger.Error("TAM API post manifest failed", "err", err)
 		http.Error(w, fmt.Sprintf("TAM API post failed: %v", err), http.StatusBadGateway)
 	}
 }

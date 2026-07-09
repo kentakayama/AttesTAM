@@ -128,7 +128,7 @@ import "C"
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 	"unsafe"
 
@@ -148,7 +148,7 @@ var (
 )
 
 type IntelQVLVerifier struct {
-	logger          *log.Logger
+	logger          *slog.Logger
 	collateralCache *intelQVLCollateralCache
 	pcsClient       *intelQVLPCSClient
 }
@@ -177,16 +177,9 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	cQuote := C.CBytes(payload)
 	defer C.free(cQuote)
 
-	collateral, cacheHit, cacheKey, err := v.quoteCollateral(payload, cQuote)
+	collateral, err := v.quoteCollateral(payload, cQuote)
 	if err != nil {
 		return nil, err
-	}
-	if v.logger != nil && v.collateralCache != nil {
-		if cacheHit {
-			v.logger.Printf("Intel QVL collateral cache hit: key=%s", cacheKey)
-		} else {
-			v.logger.Printf("Intel QVL collateral cache miss: key=%s", cacheKey)
-		}
 	}
 
 	status, nativeResult := intelQVLQuoteVerifier(cQuote, len(payload), collateral)
@@ -214,32 +207,36 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	return result, nil
 }
 
-func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) (*intelQVLQuoteCollateral, bool, string, error) {
+func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) (*intelQVLQuoteCollateral, error) {
 	if v.collateralCache != nil {
-		collateral, cacheHit, cacheKey, err := v.collateralCache.Get(quote)
-		if err != nil || cacheHit {
-			return collateral, cacheHit, cacheKey, err
+		collateral, err := v.collateralCache.Get(quote)
+		if err != nil {
+			return nil, err
 		}
+		if collateral != nil {
+			return collateral, nil
+		}
+
 		collateral, err = intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
 		if err != nil {
-			return nil, false, cacheKey, err
+			return nil, err
 		}
 		if collateral != nil {
 			if key, err := v.collateralCache.Put(quote, collateral); err != nil {
 				if v.logger != nil {
-					v.logger.Printf("failed to store Intel QVL collateral cache: %v", err)
+					v.logger.Error("failed to store Intel QVL collateral cache", "err", err)
 				}
 			} else if v.logger != nil {
-				v.logger.Printf("stored Intel QVL collateral cache: key=%s", key)
+				v.logger.Debug("stored Intel QVL collateral cache", "key", key)
 			}
 		}
-		return collateral, false, cacheKey, nil
+		return collateral, nil
 	}
 	collateral, err := intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
 	if err != nil {
-		return nil, false, "", err
+		return nil, err
 	}
-	return collateral, false, "", nil
+	return collateral, nil
 }
 
 func verifyIntelQVLQuote(cQuote unsafe.Pointer, quoteSize int, collateral *intelQVLQuoteCollateral) (uint32, intelQVLNativeResult) {
@@ -320,14 +317,14 @@ func getIntelQVLQuoteCollateral(pcsClient *intelQVLPCSClient, quote []byte, cQuo
 }
 
 func (v *IntelQVLVerifier) logNativeResult(nativeResult *intelQVLNativeResult, classification string, earStatus string) {
-	v.logger.Printf("Intel QVL verification result: classification=%s ear_status=%s dcap_status=0x%04x verification_result_name=%s verification_result=0x%x collateral_expiration_status=%d supplemental_data_size=%d",
-		classification,
-		earStatus,
-		nativeResult.dcapStatus,
-		intelQVLVerificationResultName(nativeResult.verificationResult),
-		nativeResult.verificationResult,
-		nativeResult.collateralExpirationStatus,
-		nativeResult.supplementalDataSize,
+	v.logger.Debug("Intel QVL verification result",
+		"classification", classification,
+		"ear_status", earStatus,
+		"dcap_status", fmt.Sprintf("0x%04x", nativeResult.dcapStatus),
+		"verification_result_name", intelQVLVerificationResultName(nativeResult.verificationResult),
+		"verification_result", fmt.Sprintf("0x%x", nativeResult.verificationResult),
+		"collateral_expiration_status", nativeResult.collateralExpirationStatus,
+		"supplemental_data_size", nativeResult.supplementalDataSize,
 	)
 }
 

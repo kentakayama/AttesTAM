@@ -16,7 +16,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -60,7 +60,7 @@ type intelQVLPCSClient struct {
 	baseURL         *url.URL
 	httpClient      *http.Client
 	subscriptionKey string
-	logger          *log.Logger
+	logger          *slog.Logger
 }
 
 func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
@@ -75,6 +75,9 @@ func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
 	transport := &http.Transport{}
 	if parsed.Scheme == "https" {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.IntelCollateralInsecureTLS}
+		if cfg.IntelCollateralInsecureTLS && cfg.Logger != nil {
+			cfg.Logger.Warn("TLS verification is disabled for Intel collateral service client", "base_url", parsed.String())
+		}
 	}
 	client := &http.Client{
 		Timeout:   cfg.Timeout,
@@ -254,11 +257,11 @@ func (c *intelQVLPCSClient) logFetchResult(rawURL string, resp *http.Response, b
 	if c.logger == nil {
 		return
 	}
-	c.logger.Printf("DEBUG Intel collateral service fetch result: url=%s status=%s body_len=%d body=%.30q",
-		rawURL,
-		resp.Status,
-		len(body),
-		body,
+	c.logger.Debug("Intel collateral service fetch result",
+		"url", rawURL,
+		"status", resp.Status,
+		"body_len", len(body),
+		"body", fmt.Sprintf("%.30q", body),
 	)
 }
 

@@ -12,7 +12,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,7 +65,7 @@ var (
 )
 
 func TestTCHandler_Update_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tam, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
@@ -77,7 +77,7 @@ func TestTCHandler_Update_OK(t *testing.T) {
 		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
-	h, err := newHandler(tam, log.Default())
+	h, err := newHandler(tam, slog.Default())
 	require.Nil(t, err)
 
 	req0 := httptest.NewRequest(http.MethodPost, "/SUITManifestService/RegisterManifest", bytes.NewReader(taggedManifest0))
@@ -103,7 +103,7 @@ func TestTCHandler_Update_OK(t *testing.T) {
 }
 
 func TestGetAgentStatus_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
@@ -115,7 +115,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 		t.Fatalf("TAM SeedDemoData: %v", err)
 	}
 
-	h, err := newHandler(tamInstance, log.Default())
+	h, err := newHandler(tamInstance, slog.Default())
 	require.Nil(t, err)
 
 	// get all TEEP Agent status for TAM Admin
@@ -163,7 +163,7 @@ func TestGetAgentStatus_OK(t *testing.T) {
 }
 
 func TestGetAgentStatus_NoContent(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
@@ -175,7 +175,7 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
-	h, err := newHandler(tamInstance, log.Default())
+	h, err := newHandler(tamInstance, slog.Default())
 	require.Nil(t, err)
 
 	req0 := httptest.NewRequest(http.MethodPost, "/AgentService/GetAgentStatus", bytes.NewReader([]byte{0x81, 0x41, 0x00})) // [h'00'], unknown KID
@@ -192,7 +192,7 @@ func TestGetAgentStatus_NoContent(t *testing.T) {
 }
 
 func TestGetManifests_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	if err != nil {
 		t.Fatalf("NewTAM error: %v", err)
@@ -204,7 +204,7 @@ func TestGetManifests_OK(t *testing.T) {
 		t.Fatalf("TAM SeedDemoEntities: %v", err)
 	}
 
-	h, err := newHandler(tamInstance, log.Default())
+	h, err := newHandler(tamInstance, slog.Default())
 	require.Nil(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/SUITManifestService/ListManifests", nil)
@@ -231,7 +231,7 @@ func TestGetManifests_OK(t *testing.T) {
 }
 
 func TestHTTPErrorResponse_MethodNotAllowed(t *testing.T) {
-	h, err := newHandler(nil, log.Default())
+	h, err := newHandler(nil, slog.Default())
 	require.Nil(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/AgentService/ListAgents", nil)
@@ -256,7 +256,7 @@ func TestHTTPErrorResponse_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
-	h, err := newHandler(nil, log.Default())
+	h, err := newHandler(nil, slog.Default())
 	require.Nil(t, err)
 
 	// create a request with a body larger than the configured max size (32 MiB)
@@ -289,7 +289,7 @@ func TestHTTPErrorResponse_ContentTooLarge(t *testing.T) {
 }
 
 func TestTAMOverHTTP_VerifierNotConfigured_ReturnsServiceUnavailable(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	tamInstance, err := tam.NewDemoTAM(nil, logger)
 	require.NoError(t, err)
 	require.NoError(t, tamInstance.InitDB(":memory:"))

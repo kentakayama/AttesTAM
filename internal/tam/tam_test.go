@@ -13,7 +13,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -77,7 +77,7 @@ func (v *MockSGXQuoteVerifier) Process(data []byte) (*rats.ProcessedAttestation,
 }
 
 func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	verifier := MockEATVerifier{}
 	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
@@ -168,7 +168,7 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 	}
 	signedEvidence, err := cose.Sign1(rand.Reader, attesterSigner, headers, encodedEvidence, nil)
 	require.Nil(t, err)
-	logger.Printf("signed Evidence: %s\n", hex.EncodeToString(signedEvidence))
+	logger.Debug("signed Evidence", "evidence", hex.EncodeToString(signedEvidence))
 	queryResponse := TEEPMessage{
 		Type: TEEPTypeQueryResponse,
 		Options: TEEPOptions{
@@ -197,7 +197,7 @@ func TestTAMResolveTEEPMessage_AgentAttestation_OK(t *testing.T) {
 }
 
 func TestTAMResolveTEEPMessage_AgentAttestationIntelQVLFixture_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	fixturePath := filepath.Join("testdata", "sgx_quote3_teep_bundle.cbor")
 	fixture, err := os.ReadFile(fixturePath)
 	require.NoError(t, err)
@@ -327,7 +327,7 @@ func decodeSignedTEEPMessageWithoutVerify(body []byte, msg *TEEPMessage) error {
 }
 
 func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
-	logger := log.Default()
+	logger := slog.Default()
 	verifier := MockEATVerifier{}
 	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
@@ -496,7 +496,7 @@ func testTAMResolveTEEPMessage_AgentUpdate_OK(t *testing.T, success bool) {
 }
 
 func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	verifier := MockEATVerifier{}
 	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
@@ -561,7 +561,7 @@ func TestTAMResolveTEEPMessage_TokenConsumed(t *testing.T) {
 }
 
 func TestTAMEnsureDefaultTEEPAgent_Dummy_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 	verifier := MockEATVerifier{}
 	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {
@@ -621,7 +621,7 @@ func TestTAMNoTCMatch(t *testing.T) {
 		},
 	}
 	// The handler should return nil without error even if there is no matching TC in the TCList
-	logger := log.Default()
+	logger := slog.Default()
 	verifier := MockEATVerifier{}
 	tam, err := NewDemoTAM(&verifier, logger)
 	if err != nil {

@@ -9,14 +9,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 )
 
 func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
@@ -46,12 +48,9 @@ func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	origWriter := log.Writer()
-	origFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer log.SetOutput(origWriter)
-	defer log.SetFlags(origFlags)
+	origLogger := appLogger
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", &buf, slog.LevelDebug)
+	defer func() { appLogger = origLogger }()
 
 	client := &http.Client{
 		Transport: tamAPILoggingRoundTripper{next: http.DefaultTransport},
@@ -70,13 +69,13 @@ func TestTAMAPILoggingRoundTripperLogsRequestAndResponse(t *testing.T) {
 	defer resp.Body.Close()
 
 	logged := buf.String()
-	if !strings.Contains(logged, "TAM API request:") {
+	if !strings.Contains(logged, "[DEBUG] attestam-console: TAM API request") {
 		t.Fatalf("missing request log: %s", logged)
 	}
 	if !strings.Contains(logged, "POST "+srv.URL+"/AgentService/GetAgentStatus") {
 		t.Fatalf("missing request URL: %s", logged)
 	}
-	if !strings.Contains(logged, "status=200 OK") {
+	if !strings.Contains(logged, `status="200 OK"`) {
 		t.Fatalf("missing response status: %s", logged)
 	}
 	if !strings.Contains(logged, "h'6465762d31'") {
@@ -103,12 +102,9 @@ func TestTAMAPILoggingRoundTripperRedactsRegisterManifestRequestBody(t *testing.
 	defer srv.Close()
 
 	var buf bytes.Buffer
-	origWriter := log.Writer()
-	origFlags := log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer log.SetOutput(origWriter)
-	defer log.SetFlags(origFlags)
+	origLogger := appLogger
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", &buf, slog.LevelDebug)
+	defer func() { appLogger = origLogger }()
 
 	client := &http.Client{
 		Transport: tamAPILoggingRoundTripper{next: http.DefaultTransport},
@@ -130,10 +126,46 @@ func TestTAMAPILoggingRoundTripperRedactsRegisterManifestRequestBody(t *testing.
 	if !strings.Contains(logged, "POST "+srv.URL+"/SUITManifestService/RegisterManifest") {
 		t.Fatalf("missing request URL: %s", logged)
 	}
-	if !strings.Contains(logged, "body:\n  <omitted: text.1.envelope.cbor>") {
+	if !strings.Contains(logged, "<omitted: text.1.envelope.cbor>") {
 		t.Fatalf("expected request body to be replaced with filename: %s", logged)
 	}
 	if strings.Contains(logged, "d86ba10102") {
 		t.Fatalf("request body leaked into logs: %s", logged)
 	}
+}
+
+func TestTAMAPILoggingRoundTripperSkipsDebugLogsAtInfoLevel(t *testing.T) {
+	reqBody, err := cbor.Marshal([][]byte{[]byte("dev-1")})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	var buf bytes.Buffer
+	origLogger := appLogger
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", &buf, slog.LevelInfo)
+	defer func() { appLogger = origLogger }()
+
+	req, err := http.NewRequest(http.MethodPost, "http://example.test/AgentService/GetAgentStatus", bytes.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+
+	_, err = tamAPILoggingRoundTripper{
+		next: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("boom")
+		}),
+	}.RoundTrip(req)
+	if err == nil {
+		t.Fatal("expected round trip error")
+	}
+
+	if got := buf.String(); got != "" {
+		t.Fatalf("expected no debug logs at info level, got: %s", got)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

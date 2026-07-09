@@ -9,7 +9,7 @@
 package rats
 
 import (
-	"log"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -102,7 +102,7 @@ var (
 )
 
 func TestVerifierClient_VERAISON_PSA_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 
 	verifierClient, err := NewVerifierClient(config.RAConfig{
 		BaseURL:     "https://localhost:8443/",
@@ -118,7 +118,7 @@ func TestVerifierClient_VERAISON_PSA_OK(t *testing.T) {
 }
 
 func TestVerifierClient_VERAISON_EAT_OK(t *testing.T) {
-	logger := log.Default()
+	logger := slog.Default()
 
 	verifierClient, err := NewVerifierClient(config.RAConfig{
 		BaseURL:     "https://localhost:8443/",

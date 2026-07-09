@@ -11,7 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -28,7 +28,7 @@ const (
 
 type handler struct {
 	tam    *tam.TAM
-	logger *log.Logger
+	logger *slog.Logger
 }
 
 type responseSpec struct {
@@ -37,7 +37,10 @@ type responseSpec struct {
 	contentType string
 }
 
-func newHandler(tam *tam.TAM, logger *log.Logger) (*handler, error) {
+func newHandler(tam *tam.TAM, logger *slog.Logger) (*handler, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &handler{
 		tam:    tam,
 		logger: logger,
@@ -71,12 +74,12 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 
 	// check the content
 	if r.Header.Get("Accept") != "application/teep+cbor" {
-		h.logger.Printf("content type mismatch: expected application/teep+cbor, actual %v", r.Header.Get("Accept"))
+		h.logger.Debug("content type mismatch", "expected", "application/teep+cbor", "header", "Accept", "actual", r.Header.Get("Accept"))
 		http.Error(w, "This endpoint only accepts Accept: application/teep+cbor", http.StatusUnsupportedMediaType)
 		return
 	}
 	if r.Header.Get("Content-Type") != "application/teep+cbor" {
-		h.logger.Printf("content type mismatch: expected application/teep+cbor, actual %v", r.Header.Get("Content-Type"))
+		h.logger.Debug("content type mismatch", "expected", "application/teep+cbor", "header", "Content-Type", "actual", r.Header.Get("Content-Type"))
 		http.Error(w, "This endpoint only accepts Content-Type: application/teep+cbor", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -90,17 +93,17 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			h.logger.Printf("request body is too large: %v", err)
+			h.logger.Debug("request body is too large", "err", err)
 			// TODO: should be 413, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		h.logger.Printf("failed reading request body: %v", err)
+		h.logger.Error("failed reading request body", "err", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
-		h.logger.Printf("failed to close request body: %v", err)
+		h.logger.Error("failed to close request body", "err", err)
 		// TODO: should be 400, but currently returns 500 respecting draft-ietf-teep-otrp-over-http which allows only 5xx for error responses. --- IGNORE ---
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -112,11 +115,11 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		// TODO: distinguish different types of errors and return appropriate status codes and messages.
 		switch err {
 		case tam.ErrVerifierNotConfigured:
-			h.logger.Printf("verifier client is not configured: %v", err)
+			h.logger.Error("verifier client is not configured", "err", err)
 			http.Error(w, "verifier client is not configured, so attestation with challenge-response is not available", http.StatusServiceUnavailable)
 			return
 		default:
-			h.logger.Printf("failed to resolve TEEP Message: %v", err)
+			h.logger.Error("failed to resolve TEEP Message", "err", err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -126,14 +129,14 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		resp = responseSpec{
 			status: http.StatusNoContent,
 		}
-		h.logger.Printf("Returns NoContent")
+		h.logger.Debug("returning response", "status", http.StatusNoContent)
 	} else {
 		resp = responseSpec{
 			status:      http.StatusOK,
 			body:        responseBody,
 			contentType: "application/teep+cbor",
 		}
-		h.logger.Printf("Returns %d bytes message", len(responseBody))
+		h.logger.Debug("returning response", "status", http.StatusOK, "bytes", len(responseBody))
 	}
 	h.writeResponse(w, resp)
 }
@@ -148,14 +151,14 @@ func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
 
 	// check the content
 	if r.Header.Get("Accept") != "application/cbor" {
-		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		h.logger.Debug("content type mismatch", "expected", "application/cbor", "header", "Accept", "actual", r.Header.Get("Accept"))
 		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
 		return
 	}
 
 	storedManifests, err := h.tam.GetManifests()
 	if err != nil {
-		h.logger.Printf("failed to get SUIT Manifests: %v", err)
+		h.logger.Error("failed to get SUIT Manifests", "err", err)
 		http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
 		return
 	}
@@ -172,7 +175,7 @@ func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
 	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no manifest found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(manifests)
 	if err != nil {
-		h.logger.Printf("failed to encode SUIT Manifests: %v", err)
+		h.logger.Error("failed to encode SUIT Manifests", "err", err)
 		http.Error(w, "failed to get SUIT Manifest", http.StatusInternalServerError)
 		return
 	}
@@ -195,7 +198,7 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 
 	// check the content
 	if r.Header.Get("Content-Type") != "application/suit-envelope+cose" {
-		h.logger.Printf("content type mismatch: expected application/suit-envelope+cose, actual %v", r.Header.Get("Content-Type"))
+		h.logger.Debug("content type mismatch", "expected", "application/suit-envelope+cose", "header", "Content-Type", "actual", r.Header.Get("Content-Type"))
 		http.Error(w, "This endpoint only accepts Content-Type: application/suit-envelope+cose", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -206,16 +209,16 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			h.logger.Printf("request body is too large: %v", err)
+			h.logger.Debug("request body is too large", "err", err)
 			http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
 			return
 		}
-		h.logger.Printf("failed reading request body: %v", err)
+		h.logger.Error("failed reading request body", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
-		h.logger.Printf("failed closing request body: %v", err)
+		h.logger.Error("failed closing request body", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
@@ -223,7 +226,7 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	// parse the body as SUIT_Envelope or Tagged_SUIT_Envelope
 	var envelope suit.Envelope
 	if err := cbor.Unmarshal(body, &envelope); err != nil {
-		h.logger.Printf("failed to parse SUIT Envelope: %v", err)
+		h.logger.Error("failed to parse SUIT Envelope", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
@@ -233,39 +236,39 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 
 	key, err := h.tam.GetEntityKey(envelope.AuthenticationWrapper.Value.AuthenticationBlocks[0].KID)
 	if err != nil || key == nil {
-		h.logger.Printf("the manifest signing key is not trusted by the TAM: %v", err)
+		h.logger.Debug("manifest signing key is not trusted by the TAM", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 
 	if err := envelope.Verify(key); err != nil {
-		h.logger.Printf("failed to verify the manifest: %v", err)
+		h.logger.Error("failed to verify the manifest", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 
 	var manifest suit.Nested[suit.Manifest]
 	if err := cbor.Unmarshal(envelope.ManifestBstr, &manifest); err != nil {
-		h.logger.Printf("failed to parse SUIT Manifest: %v", err)
+		h.logger.Error("failed to parse SUIT Manifest", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 
 	if len(manifest.Value.Common.Value.Components) != 1 {
-		h.logger.Printf("the number of Trusted Component should be exactly one: 1 != %d", len(manifest.Value.Common.Value.Components))
+		h.logger.Debug("the number of Trusted Component should be exactly one", "actual", len(manifest.Value.Common.Value.Components))
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 
 	encodedComponentID, err := cbor.Marshal(manifest.Value.Common.Value.Components[0])
 	if err != nil {
-		h.logger.Printf("failed to encode ComponentID: %v", err)
+		h.logger.Error("failed to encode ComponentID", "err", err)
 		http.Error(w, "failed to parse SUIT Manifest", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.tam.SetEnvelope(untaggedEnvelopeBytes, envelope.AuthenticationWrapper.Value.DigestBstr, envelope.AuthenticationWrapper.Value.AuthenticationBlocks[0].KID, encodedComponentID, manifest.Value.ManifestSequenceNumber); err != nil {
-		h.logger.Printf("failed to SetEnvelope: %v", err)
+		h.logger.Error("failed to SetEnvelope", "err", err)
 		switch err {
 		case tam.ErrNotAuthenticated:
 			http.Error(w, "the manifest signing key is not trusted by the TAM", http.StatusBadRequest)
@@ -283,7 +286,7 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kid, _ := key.Thumbprint(crypto.SHA256)
-	h.logger.Printf("A TC is registed: {Key: h'%s', TC: h'%s', Seq: %d}", hex.EncodeToString(kid), hex.EncodeToString(encodedComponentID), manifest.Value.ManifestSequenceNumber)
+	h.logger.Debug("a TC is registered", "key_kid", hex.EncodeToString(kid), "trusted_component", hex.EncodeToString(encodedComponentID), "sequence_number", manifest.Value.ManifestSequenceNumber)
 
 	resp := responseSpec{
 		status:      http.StatusOK,
@@ -301,7 +304,7 @@ func (h *handler) getAgentList(w http.ResponseWriter, r *http.Request) {
 
 	// check the content
 	if r.Header.Get("Accept") != "application/cbor" {
-		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		h.logger.Debug("content type mismatch", "expected", "application/cbor", "header", "Accept", "actual", r.Header.Get("Accept"))
 		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -315,7 +318,7 @@ func (h *handler) getAgentList(w http.ResponseWriter, r *http.Request) {
 	adminName := "admin@example.com"
 	entity, err := h.tam.FindEntity(adminName)
 	if err != nil {
-		h.logger.Printf("failed to find Device Admin entity: %v", err)
+		h.logger.Error("failed to find Device Admin entity", "err", err)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -331,14 +334,14 @@ func (h *handler) getAgentList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		h.logger.Printf("failed to get TEEP Agent list: %v", err)
+		h.logger.Error("failed to get TEEP Agent list", "err", err)
 		http.Error(w, "failed to get TEEP Agent list", http.StatusInternalServerError)
 		return
 	}
 
 	encoded, err := cbor.Marshal(agentList)
 	if err != nil {
-		h.logger.Printf("failed to encode TEEP Agent list: %v", err)
+		h.logger.Error("failed to encode TEEP Agent list", "err", err)
 		http.Error(w, "failed to encode TEEP Agent list", http.StatusInternalServerError)
 		return
 	}
@@ -359,12 +362,12 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 
 	// check the accept header
 	if r.Header.Get("Accept") != "application/cbor" {
-		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Accept"))
+		h.logger.Debug("content type mismatch", "expected", "application/cbor", "header", "Accept", "actual", r.Header.Get("Accept"))
 		http.Error(w, "This endpoint only accepts Accept: application/cbor", http.StatusUnsupportedMediaType)
 		return
 	}
 	if r.Header.Get("Content-Type") != "application/cbor" {
-		h.logger.Printf("content type mismatch: expected application/cbor, actual %v", r.Header.Get("Content-Type"))
+		h.logger.Debug("content type mismatch", "expected", "application/cbor", "header", "Content-Type", "actual", r.Header.Get("Content-Type"))
 		http.Error(w, "This endpoint only accepts Content-Type: application/cbor", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -375,22 +378,22 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			h.logger.Printf("request body is too large: %v", err)
+			h.logger.Debug("request body is too large", "err", err)
 			http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
 			return
 		}
-		h.logger.Printf("failed reading request body: %v", err)
+		h.logger.Error("failed reading request body", "err", err)
 		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
 		return
 	}
 	if err := r.Body.Close(); err != nil {
-		h.logger.Printf("failed to close request body: %v", err)
+		h.logger.Error("failed to close request body", "err", err)
 		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
 		return
 	}
 	var kids [][]byte
 	if err := cbor.Unmarshal(body, &kids); err != nil {
-		h.logger.Printf("failed to parse request body as list of KIDs: %v", err)
+		h.logger.Error("failed to parse request body as list of KIDs", "err", err)
 		http.Error(w, "failed to parse Request Body", http.StatusBadRequest)
 		return
 	}
@@ -401,7 +404,7 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 	adminName := "admin@example.com"
 	entity, err := h.tam.FindEntity(adminName)
 	if err != nil {
-		h.logger.Printf("failed to find Device Admin entity: %v", err)
+		h.logger.Error("failed to find Device Admin entity", "err", err)
 		http.Error(w, "failed to find Device Admin entity", http.StatusBadRequest)
 		return
 	}
@@ -410,21 +413,21 @@ func (h *handler) getAgentStatus(w http.ResponseWriter, r *http.Request) {
 	for _, kid := range kids {
 		agentStatus, err := h.tam.GetAgentStatus(entity, kid)
 		if err != nil {
-			h.logger.Printf("failed to get TEEP Agent status: %v", err)
+			h.logger.Error("failed to get TEEP Agent status", "err", err)
 			http.Error(w, "failed to get TEEP Agent status", http.StatusInternalServerError)
 			return
 		}
 		if agentStatus == nil {
 			continue
 		}
-		h.logger.Printf("got TEEP Agent status: %+v", agentStatus)
+		h.logger.Debug("got TEEP Agent status", "agent_status", agentStatus)
 		statusList = append(statusList, agentStatus)
 	}
 
 	// return `[]` even if the list is empty, because an empty list is a valid response meaning "no matching agent found", while "no content" may be interpreted as "the server failed to process the request".
 	encoded, err := cbor.Marshal(statusList)
 	if err != nil {
-		h.logger.Printf("failed to encode TEEP Agent status: %v", err)
+		h.logger.Error("failed to encode TEEP Agent status", "err", err)
 		http.Error(w, "failed to encode TEEP Agent status", http.StatusInternalServerError)
 		return
 	}
@@ -448,7 +451,7 @@ func (h *handler) writeResponse(w http.ResponseWriter, spec responseSpec) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(spec.body)))
 		w.WriteHeader(spec.status)
 		if _, err := w.Write(spec.body); err != nil {
-			h.logger.Printf("failed writing response body: %v", err)
+			h.logger.Error("failed writing response body", "err", err)
 		}
 		return
 	}

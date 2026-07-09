@@ -15,7 +15,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kentakayama/AttesTAM/internal/config"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 )
 
 func TestExtractIntelQVLQuotePCKCAFromFixture(t *testing.T) {
@@ -105,7 +106,7 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 
 	client, err := newIntelQVLPCSClient(config.RAConfig{
 		IntelCollateralServiceURL: server.URL,
-		Logger:                    log.New(&logBuf, "", 0),
+		Logger:                    internallogger.NewNamedWithWriter("attestam-verifier", &logBuf, slog.LevelDebug),
 	})
 	require.NoError(t, err)
 
@@ -115,9 +116,9 @@ func TestIntelQVLPCSClientLogsFetchResultAtDebugLevel(t *testing.T) {
 	require.Equal(t, "application/json", header.Get("Content-Type"))
 
 	logged := logBuf.String()
-	require.Contains(t, logged, "DEBUG Intel collateral service fetch result")
+	require.Contains(t, logged, "[DEBUG] attestam-verifier: Intel collateral service fetch result")
 	require.Contains(t, logged, server.URL+"/tcb?fmspc=001122334455")
-	require.Contains(t, logged, "status=200 OK")
+	require.Contains(t, logged, `status="200 OK"`)
 	require.Contains(t, logged, `body="{\"result\":\"ok\"}"`)
 }
 

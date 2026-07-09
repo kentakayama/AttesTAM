@@ -7,7 +7,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -17,7 +17,7 @@ type TAMConfig struct {
 	DBPath                         string
 	InsecureDemoMode               bool
 	TAMTEEPPrivateKeyPath          string
-	Logger                         *log.Logger
+	Logger                         *slog.Logger
 	ChallengeServerURL             string
 	ChallengeContentType           string
 	ChallengeInsecureTLS           bool
@@ -34,7 +34,7 @@ type RAConfig struct {
 	ContentType                    string
 	InsecureTLS                    bool
 	Timeout                        time.Duration
-	Logger                         *log.Logger
+	Logger                         *slog.Logger
 	IntelCollateralCacheDir        string
 	IntelCollateralServiceURL      string
 	IntelCollateralInsecureTLS     bool

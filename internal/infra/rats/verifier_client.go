@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,7 +34,7 @@ type VerifierClient struct {
 	httpClient  *http.Client
 	contentType string
 	timeout     time.Duration
-	logger      *log.Logger
+	logger      *slog.Logger
 }
 
 func NewVerifierClient(cfg config.RAConfig) (*VerifierClient, error) {
@@ -55,6 +55,9 @@ func NewVerifierClient(cfg config.RAConfig) (*VerifierClient, error) {
 	transport := &http.Transport{}
 	if base.Scheme == "https" {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.InsecureTLS}
+		if cfg.InsecureTLS && cfg.Logger != nil {
+			cfg.Logger.Warn("TLS verification is disabled for verifier client", "base_url", base.String())
+		}
 	}
 
 	httpClient := &http.Client{
@@ -138,7 +141,9 @@ func (v *VerifierClient) createSession(ctx context.Context) (*url.URL, error) {
 	}
 
 	if sessionID := extractSessionID(sessionURL); sessionID != "" {
-		v.logger.Printf("Challenge session UUID %s", sessionID)
+		if v.logger != nil {
+			v.logger.Debug("challenge session created", "session_uuid", sessionID)
+		}
 	}
 
 	return sessionURL, nil
@@ -178,14 +183,17 @@ func (v *VerifierClient) submitPayload(ctx context.Context, sessionURL *url.URL,
 }
 
 func (v *VerifierClient) logVerifierResponse(body []byte) {
+	if v.logger == nil {
+		return
+	}
 	decoded, decodeErr := renderDecodedVerifierResponse(body)
 	if decodeErr != nil {
-		v.logger.Printf("Verifier response body:\n%s", string(body))
-		v.logger.Printf("Failed to decode verifier response for pretty print: %v", decodeErr)
+		v.logger.Debug("verifier response body", "body", string(body))
+		v.logger.Debug("failed to decode verifier response for pretty print", "err", decodeErr)
 		return
 	}
 
-	v.logger.Printf("Verifier response (decoded):\n%s", decoded)
+	v.logger.Debug("verifier response (decoded)", "body", decoded)
 }
 
 func extractSessionID(u *url.URL) string {
