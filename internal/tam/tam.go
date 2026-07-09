@@ -83,7 +83,7 @@ func newTAMFromKeyBytes(keyBytes []byte, verifier rats.IRAVerifier, resolver ver
 		return nil, errors.New("failed to load TAM's private key")
 	}
 	kid, _ := key.Thumbprint(crypto.SHA256)
-	logger.Debug("loaded TAM key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid))
+	logger.Debug("loaded TAM key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid).CBORDiagString(0))
 
 	return &TAM{
 		verifier:        verifier,
@@ -926,7 +926,7 @@ func (t *TAM) ensureTrustedDemoAgentKey() error {
 	if err != nil {
 		return fmt.Errorf("derive demo trusted agent key kid: %w", err)
 	}
-	t.logger.Debug("loaded default TEEP Agent key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid))
+	t.logger.Debug("loaded default TEEP Agent key", "cose_key", util.PrintCOSEKey(&key), "kid", util.BytesHexMax32(kid).CBORDiagString(0))
 	existing, _ := t.getTEEPAgentKey(kid)
 	if existing != nil {
 		return nil

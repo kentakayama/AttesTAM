@@ -55,6 +55,9 @@ func NewVerifierClient(cfg config.RAConfig) (*VerifierClient, error) {
 	transport := &http.Transport{}
 	if base.Scheme == "https" {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.InsecureTLS}
+		if cfg.InsecureTLS && cfg.Logger != nil {
+			cfg.Logger.Warn("TLS verification is disabled for verifier client", "base_url", base.String())
+		}
 	}
 
 	httpClient := &http.Client{

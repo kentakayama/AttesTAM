@@ -75,6 +75,9 @@ func newIntelQVLPCSClient(cfg config.RAConfig) (*intelQVLPCSClient, error) {
 	transport := &http.Transport{}
 	if parsed.Scheme == "https" {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.IntelCollateralInsecureTLS}
+		if cfg.IntelCollateralInsecureTLS && cfg.Logger != nil {
+			cfg.Logger.Warn("TLS verification is disabled for Intel collateral service client", "base_url", parsed.String())
+		}
 	}
 	client := &http.Client{
 		Timeout:   cfg.Timeout,

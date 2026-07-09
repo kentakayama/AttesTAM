@@ -15,6 +15,7 @@ import (
 
 	"github.com/kentakayama/AttesTAM/internal/config"
 	"github.com/kentakayama/AttesTAM/internal/infra/rats"
+	internallogger "github.com/kentakayama/AttesTAM/internal/logger"
 	"github.com/kentakayama/AttesTAM/internal/tam"
 )
 
@@ -38,12 +39,17 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		return nil, errors.New("tam private key path is required outside insecure demo mode")
 	}
 
+	verifierLogger := logger
+	if renamed := internallogger.Rename(logger, "attestam-verifier"); renamed != nil {
+		verifierLogger = renamed
+	}
+
 	raCfg := config.RAConfig{
 		BaseURL:                        cfg.ChallengeServerURL,
 		ContentType:                    cfg.ChallengeContentType,
 		InsecureTLS:                    cfg.ChallengeInsecureTLS,
 		Timeout:                        cfg.ChallengeTimeout,
-		Logger:                         logger,
+		Logger:                         verifierLogger,
 		IntelCollateralCacheDir:        cfg.IntelCollateralCacheDir,
 		IntelCollateralServiceURL:      cfg.IntelCollateralServiceURL,
 		IntelCollateralInsecureTLS:     cfg.IntelCollateralInsecureTLS,

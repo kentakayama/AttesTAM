@@ -46,34 +46,34 @@ func newIntelQVLCollateralCache(dir string, logger *slog.Logger) (*intelQVLColla
 }
 
 // Get returns cached collateral only when the cache entry exists and is still valid.
-// Missing or expired entries are treated as cache misses and are not surfaced as errors.
-func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, bool, string, error) {
+// Missing or expired entries are treated as cache misses and return (nil, nil).
+func (c *intelQVLCollateralCache) Get(quote []byte) (*intelQVLQuoteCollateral, error) {
 	if c == nil {
-		return nil, false, "", nil
+		return nil, nil
 	}
-	path, key, err := c.pathForQuote(quote)
+	path, _, err := c.pathForQuote(quote)
 	if err != nil {
-		return nil, false, "", err
+		return nil, err
 	}
 	collateral, err := os.ReadFile(path)
 	if err == nil {
 		if len(collateral) == 0 {
-			return nil, false, key, fmt.Errorf("Intel QVL collateral cache file is empty: %s", path)
+			return nil, fmt.Errorf("Intel QVL collateral cache file is empty: %s", path)
 		}
 		decoded, err := unmarshalIntelQVLCollateralCacheEntry(collateral)
 		if err != nil {
-			return nil, false, key, fmt.Errorf("decode Intel QVL collateral cache file: %w", err)
+			return nil, fmt.Errorf("decode Intel QVL collateral cache file: %w", err)
 		}
 		if !decoded.ValidAt(intelQVLNow().UTC()) {
 			_ = os.Remove(path)
-			return nil, false, key, nil
+			return nil, nil
 		}
-		return decoded.Collateral, true, key, nil
+		return decoded.Collateral, nil
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, key, nil
+		return nil, nil
 	}
-	return nil, false, key, fmt.Errorf("read Intel QVL collateral cache file: %w", err)
+	return nil, fmt.Errorf("read Intel QVL collateral cache file: %w", err)
 }
 
 // Put stores collateral together with the AttesTAM-managed expiration time.

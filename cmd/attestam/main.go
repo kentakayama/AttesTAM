@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -34,6 +35,7 @@ const (
 	envIntelCollateralServiceURL      = "ATTESTAM_INTEL_COLLATERAL_SERVICE_URL"
 	envIntelCollateralInsecureTLS     = "ATTESTAM_INTEL_COLLATERAL_SERVICE_INSECURE_TLS"
 	envIntelCollateralSubscriptionKey = "ATTESTAM_INTEL_COLLATERAL_SUBSCRIPTION_KEY"
+	envLogLevel                       = "ATTESTAM_LOG_LEVEL"
 )
 
 func main() {
@@ -50,10 +52,17 @@ func main() {
 		intelCollateralServiceURL      = flag.String("intel-collateral-service-url", "https://api.trustedservices.intel.com/sgx/certification/v4", "base URL for Intel PCS/PCCS collateral retrieval")
 		intelCollateralInsecureTLS     = flag.Bool("intel-collateral-service-insecure-tls", false, "skip TLS verification when retrieving Intel collateral from PCS/PCCS")
 		intelCollateralSubscriptionKey = flag.String("intel-collateral-subscription-key", "", "optional Intel PCS subscription key for Intel collateral retrieval")
+		logLevel                       = flag.String("log-level", "info", "minimum log level: debug, info, warn, or error")
 	)
 	flag.Parse()
 
-	logger := internallogger.New().With("service", "attestam")
+	logLevelVal, err := resolveLogLevel(*logLevel, "log-level", envLogLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid log level: %v\n", err)
+		os.Exit(1)
+	}
+
+	logger := internallogger.NewNamed("attestam", logLevelVal)
 
 	addrVal := stringFromEnv(logger, envAddr, *addr)
 	privateKeyPathVal := stringFromEnv(logger, envTAMTEEPPrivateKeyPath, *privateKeyPath)
@@ -154,4 +163,24 @@ func durationFromEnv(logger *slog.Logger, envKey string, defaultValue time.Durat
 	}
 
 	return parsed
+}
+
+func resolveLogLevel(cliValue string, flagName string, envKey string) (slog.Level, error) {
+	if flagWasSet(flagName) {
+		return internallogger.ParseLevel(cliValue)
+	}
+	if envValue, ok := os.LookupEnv(envKey); ok {
+		return internallogger.ParseLevel(envValue)
+	}
+	return internallogger.DefaultLevel, nil
+}
+
+func flagWasSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }

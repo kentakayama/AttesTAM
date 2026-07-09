@@ -177,16 +177,9 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	cQuote := C.CBytes(payload)
 	defer C.free(cQuote)
 
-	collateral, cacheHit, cacheKey, err := v.quoteCollateral(payload, cQuote)
+	collateral, err := v.quoteCollateral(payload, cQuote)
 	if err != nil {
 		return nil, err
-	}
-	if v.logger != nil && v.collateralCache != nil {
-		if cacheHit {
-			v.logger.Debug("Intel QVL collateral cache hit", "key", cacheKey)
-		} else {
-			v.logger.Debug("Intel QVL collateral cache miss", "key", cacheKey)
-		}
 	}
 
 	status, nativeResult := intelQVLQuoteVerifier(cQuote, len(payload), collateral)
@@ -214,15 +207,19 @@ func (v *IntelQVLVerifier) Process(payload []byte) (*ProcessedAttestation, error
 	return result, nil
 }
 
-func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) (*intelQVLQuoteCollateral, bool, string, error) {
+func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) (*intelQVLQuoteCollateral, error) {
 	if v.collateralCache != nil {
-		collateral, cacheHit, cacheKey, err := v.collateralCache.Get(quote)
-		if err != nil || cacheHit {
-			return collateral, cacheHit, cacheKey, err
+		collateral, err := v.collateralCache.Get(quote)
+		if err != nil {
+			return nil, err
 		}
+		if collateral != nil {
+			return collateral, nil
+		}
+
 		collateral, err = intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
 		if err != nil {
-			return nil, false, cacheKey, err
+			return nil, err
 		}
 		if collateral != nil {
 			if key, err := v.collateralCache.Put(quote, collateral); err != nil {
@@ -233,13 +230,13 @@ func (v *IntelQVLVerifier) quoteCollateral(quote []byte, cQuote unsafe.Pointer) 
 				v.logger.Debug("stored Intel QVL collateral cache", "key", key)
 			}
 		}
-		return collateral, false, cacheKey, nil
+		return collateral, nil
 	}
 	collateral, err := intelQVLQuoteCollateralGetter(v.pcsClient, quote, cQuote, len(quote))
 	if err != nil {
-		return nil, false, "", err
+		return nil, err
 	}
-	return collateral, false, "", nil
+	return collateral, nil
 }
 
 func verifyIntelQVLQuote(cQuote unsafe.Pointer, quoteSize int, collateral *intelQVLQuoteCollateral) (uint32, intelQVLNativeResult) {

@@ -9,7 +9,6 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,11 +21,12 @@ var (
 	tmpl      *template.Template
 	buildTime = time.Now()
 	conf      AppConfig
-	appLogger = internallogger.NewWithWriter(os.Stderr, slog.LevelDebug).With("service", "attestam-console")
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", os.Stderr, internallogger.DefaultLevel)
 )
 
 func main() {
 	conf = loadConfigFromFlags()
+	appLogger = internallogger.NewNamedWithWriter("attestam-console", os.Stderr, conf.LogLevel)
 	if err := validateConfig(conf); err != nil {
 		appLogger.Error("invalid configuration", "err", err)
 		os.Exit(1)
