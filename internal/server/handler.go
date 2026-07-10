@@ -129,14 +129,18 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 		resp = responseSpec{
 			status: http.StatusNoContent,
 		}
-		h.logger.Debug("returning response", "status", http.StatusNoContent)
+		h.logger.Info("\033[36mreturning 204 NoContent\033[0m")
 	} else {
 		resp = responseSpec{
 			status:      http.StatusOK,
 			body:        responseBody,
 			contentType: "application/teep+cbor",
 		}
-		h.logger.Debug("returning response", "status", http.StatusOK, "bytes", len(responseBody))
+		var responseMessage tam.TEEPMessage
+		if err := cbor.Unmarshal(responseBody, &responseMessage); err == nil {
+			h.logger.Info("\033[36mreturning TEEP " + responseMessage.Type.String() + "\033[0m")
+			h.logger.Debug(responseMessage.CBORDiagString(0))
+		}
 	}
 	h.writeResponse(w, resp)
 }

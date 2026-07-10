@@ -229,6 +229,23 @@ func (t TEEPMessageType) CBORDiagString(indent int) string {
 	}
 }
 
+func (t TEEPMessageType) String() string {
+	switch t {
+	case TEEPTypeQueryRequest:
+		return "QueryRequest"
+	case TEEPTypeQueryResponse:
+		return "QueryResponse"
+	case TEEPTypeUpdate:
+		return "Update"
+	case TEEPTypeSuccess:
+		return "Success"
+	case TEEPTypeError:
+		return "Error"
+	default:
+		return fmt.Sprintf("unknown(%d)", int(t))
+	}
+}
+
 type TEEPOptions struct {
 	SupportedTEEPCipherSuites    util.DiagList[util.DiagList[TEEPCipherSuite]] `cbor:"1,keyasint,omitempty"`
 	Challenge                    util.BytesHexMax32                            `cbor:"2,keyasint,omitempty"`
