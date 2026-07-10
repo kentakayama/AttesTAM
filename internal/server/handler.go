@@ -286,7 +286,7 @@ func (h *handler) addTCManifest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kid, _ := key.Thumbprint(crypto.SHA256)
-	h.logger.Debug("a TC is registered", "key_kid", hex.EncodeToString(kid), "trusted_component", hex.EncodeToString(encodedComponentID), "sequence_number", manifest.Value.ManifestSequenceNumber)
+	h.logger.Info("a TC is registered", "key_kid", hex.EncodeToString(kid), "trusted_component", hex.EncodeToString(encodedComponentID), "sequence_number", manifest.Value.ManifestSequenceNumber)
 
 	resp := responseSpec{
 		status:      http.StatusOK,

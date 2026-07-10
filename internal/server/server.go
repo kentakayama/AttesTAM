@@ -89,6 +89,8 @@ func New(cfg config.TAMConfig) (*Server, error) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	logger.Info("TAM server initialized", "addr", "http://127.0.0.1"+cfg.Addr)
+
 	return &Server{
 		cfg:     cfg,
 		handler: h,

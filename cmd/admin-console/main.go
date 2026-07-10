@@ -48,7 +48,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", conf.Server.Port)
 
-	appLogger.Debug("AttesTAM Console listening", "addr", "http://127.0.0.1"+addr, "build", buildTime.Format(time.RFC3339), "tam_api_base", conf.TAMAPIBase)
+	appLogger.Info("AttesTAM Console listening", "addr", "http://127.0.0.1"+addr, "build", buildTime.Format(time.RFC3339), "tam_api_base", conf.TAMAPIBase)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		appLogger.Error("console server failed", "err", err)
 		os.Exit(1)
