@@ -111,7 +111,7 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	var response []byte
 	if len(body) == 0 {
 		// empty body means session creation, return QueryRequest
-		t.logger.Info("received empty TEEP message; returning QueryRequest with token")
+		t.logger.Info("\033[32mreceived empty TEEP message\033[0m")
 		return t.generateQueryRequest()
 	}
 
@@ -127,7 +127,8 @@ func (t *TAM) ResolveTEEPMessage(body []byte) ([]byte, error) {
 	// case 1) TAM sent QueryRequest with challenge & request-attestation
 	// case 2) someone created malformed TEEP Protocol messages
 
-	t.logger.Info("received TEEP message", "message", incomingMessage.CBORDiagString(0))
+	t.logger.Info("\033[32mreceived TEEP " + incomingMessage.Type.String() + "\033[0m")
+	t.logger.Debug(incomingMessage.CBORDiagString(0))
 
 	switch incomingMessage.Type {
 	case TEEPTypeQueryResponse:
