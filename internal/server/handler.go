@@ -19,6 +19,7 @@ import (
 	"github.com/kentakayama/AttesTAM/internal/domain/model"
 	"github.com/kentakayama/AttesTAM/internal/suit"
 	"github.com/kentakayama/AttesTAM/internal/tam"
+	"github.com/veraison/go-cose"
 )
 
 const (
@@ -136,13 +137,25 @@ func (h *handler) tamOverHttp(w http.ResponseWriter, r *http.Request) {
 			body:        responseBody,
 			contentType: "application/teep+cbor",
 		}
-		var responseMessage tam.TEEPMessage
-		if err := cbor.Unmarshal(responseBody, &responseMessage); err == nil {
-			h.logger.Info("\033[36mreturning TEEP " + responseMessage.Type.String() + "\033[0m")
-			h.logger.Debug(responseMessage.CBORDiagString(0))
-		}
+		logReply(h.logger, responseBody)
 	}
 	h.writeResponse(w, resp)
+}
+
+func logReply(logger *slog.Logger, responseBody []byte) {
+	var sign1 cose.Sign1Message
+	if err := sign1.UnmarshalCBOR(responseBody); err != nil {
+		logger.Error("failed to parse response COSE_Sign1 message", "err", err)
+		return
+	}
+
+	var responseMessage tam.TEEPMessage
+	if err := cbor.Unmarshal(sign1.Payload, &responseMessage); err != nil {
+		logger.Error("failed to parse response TEEP Message", "err", err)
+		return
+	}
+	logger.Info("\033[36mreturning TEEP " + responseMessage.Type.String() + "\033[0m")
+	logger.Debug(responseMessage.CBORDiagString(0))
 }
 
 func (h *handler) getManifests(w http.ResponseWriter, r *http.Request) {
